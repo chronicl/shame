@@ -3,7 +3,7 @@ use std::{cell::Cell, iter, marker::PhantomData, rc::Rc};
 
 use crate::{
     call_info,
-    common::integer::post_inc_u32,
+    common::{integer::post_inc_u32, proc_macro_reexports::TypeLayoutSemantics},
     frontend::{
         any::{
             render_io::{Attrib, Location, VertexAttribFormat, VertexBufferLayout},
@@ -38,6 +38,7 @@ use crate::{
         recording::Context,
         TextureFormatWrapper,
     },
+    TypeLayout,
 };
 
 use super::{binding::Binding, rasterizer::VertexIndex};
@@ -91,24 +92,56 @@ impl VertexBufferIter {
         self.next_slot += 1;
         self.at(slot)
     }
+
+    /// access the `i`th vertex buffer
+    /// that was bound when the draw command was scheduled and interpret its
+    /// type as `gpu_layout`.
+    #[track_caller]
+    pub fn at_dynamic(&mut self, i: u32, gpu_layout: TypeLayout) -> VertexBufferDynamic {
+        self.next_slot = i + 1;
+        VertexBufferDynamic::new(i, self.location_counter.clone(), gpu_layout)
+    }
+
+    /// access the `i`th vertex buffer
+    /// that was bound when the draw command was scheduled and interpret its
+    /// type as `gpu_layout`.
+    #[track_caller]
+    pub fn index_dynamic(&mut self, i: u32, gpu_layout: TypeLayout) -> VertexBufferDynamic {
+        // just to be consistent with the other `at` functions, where the
+        // `shame::Index` trait provides the `index` alternative, we offer both as
+        // type associated functions here. Choose which one you like better.
+        self.at_dynamic(i, gpu_layout)
+    }
+
+    /// access the next vertex buffer (or the first if no buffer was imported yet)
+    /// that was bound when the draw command was scheduled and interpret its
+    /// type as `gpu_layout`.
+    #[allow(clippy::should_implement_trait)] // not fallible
+    #[track_caller]
+    pub fn next_dynamic(&mut self, gpu_layout: TypeLayout) -> VertexBufferDynamic {
+        let slot = self.next_slot;
+        self.next_slot += 1;
+        self.at_dynamic(slot, gpu_layout)
+    }
 }
 
-/// a buffer containing an array of `T` where `T` has special layout rules (= may only contain vectors and scalars) and can only
-/// be looked up once by a [`VertexIndex`] of a render pipeline.
-pub struct VertexBuffer<'a, T: VertexLayout> {
+pub struct VertexBufferDynamic {
     slot: u32,
     attribs_and_stride: Result<(Box<[Attrib]>, u64), InvalidReason>,
-    phantom: PhantomData<&'a [T]>,
+    expected_any_count: usize,
 }
 
-impl<T: VertexLayout> VertexBuffer<'_, T> {
+impl VertexBufferDynamic {
     #[track_caller]
-    fn new(slot: u32, location_counter: Rc<LocationCounter>) -> Self {
+    fn new(slot: u32, location_counter: Rc<LocationCounter>, gpu_layout: TypeLayout) -> Self {
+        // Is this correct?
+        let expected_any_count = match &gpu_layout.kind {
+            TypeLayoutSemantics::Structure(s) => s.fields.len(),
+            _ => 1,
+        };
+
         let call_info = call_info!();
         let attribs_and_stride = Context::try_with(call_info, |ctx| {
-            let skip_stride_check = false; // it is implied that T is in an array, the strides must match
-            let gpu_layout = get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check);
-
             let attribs_and_stride = Attrib::get_attribs_and_stride(&gpu_layout, &location_counter).ok_or_else(|| {
                 ctx.push_error(FrontendError::MalformedVertexBufferLayout(gpu_layout).into());
                 InvalidReason::ErrorThatWasPushed
@@ -128,6 +161,65 @@ impl<T: VertexLayout> VertexBuffer<'_, T> {
         Self {
             slot,
             attribs_and_stride,
+            expected_any_count,
+        }
+    }
+
+    #[track_caller]
+    pub fn index(self, index: VertexIndex) -> Vec<Any> {
+        // just to be consistent with the other `at` functions, where the
+        // `shame::Index` trait provides the `index` alternative, we offer both as
+        // type associated functions here. Choose which one you like better.
+        self.at(index)
+    }
+
+    #[track_caller]
+    pub fn at(self, index: VertexIndex) -> Vec<Any> {
+        let lookup = index.0;
+
+        let result = Context::try_with(call_info!(), |ctx| {
+            self.attribs_and_stride.map(|(attribs, stride)| {
+                Any::vertex_buffer(
+                    self.slot,
+                    VertexBufferLayout {
+                        stride,
+                        lookup,
+                        attribs,
+                    },
+                )
+            })
+        })
+        .unwrap_or(Err(InvalidReason::CreatedWithNoActiveEncoding));
+
+        match result {
+            Ok(anys) => anys,
+            Err(reason) => vec![Any::new_invalid(reason); self.expected_any_count],
+        }
+    }
+}
+
+/// a buffer containing an array of `T` where `T` has special layout rules (= may only contain vectors and scalars) and can only
+/// be looked up once by a [`VertexIndex`] of a render pipeline.
+pub struct VertexBuffer<'a, T: VertexLayout> {
+    inner: Result<VertexBufferDynamic, InvalidReason>,
+    phantom: PhantomData<&'a [T]>,
+}
+
+
+impl<T: VertexLayout> VertexBuffer<'_, T> {
+    #[track_caller]
+    fn new(slot: u32, location_counter: Rc<LocationCounter>) -> Self {
+        let call_info = call_info!();
+        let inner = Context::try_with(call_info, |ctx| {
+            let skip_stride_check = false; // it is implied that T is in an array, the strides must match
+            let gpu_layout = get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check);
+
+            Ok(VertexBufferDynamic::new(slot, location_counter, gpu_layout))
+        })
+        .unwrap_or(Err(InvalidReason::CreatedWithNoActiveEncoding));
+
+        Self {
+            inner,
             phantom: PhantomData,
         }
     }
@@ -243,18 +335,8 @@ impl<T: VertexLayout> VertexBuffer<'_, T> {
         let invalid_with_reason =
             |reason| T::from_anys(std::iter::repeat_n(Any::new_invalid(reason), T::expected_num_anys()));
 
-        Context::try_with(call_info!(), |ctx| match self.attribs_and_stride {
-            Ok((attribs, stride)) => T::from_anys(
-                Any::vertex_buffer(
-                    self.slot,
-                    VertexBufferLayout {
-                        stride,
-                        lookup,
-                        attribs,
-                    },
-                )
-                .into_iter(),
-            ),
+        Context::try_with(call_info!(), |ctx| match self.inner {
+            Ok(inner) => T::from_anys(inner.at(index).into_iter()),
             Err(reason) => invalid_with_reason(reason),
         })
         .unwrap_or_else(|| invalid_with_reason(InvalidReason::CreatedWithNoActiveEncoding))
@@ -454,13 +536,13 @@ impl BindingIter<'_> {
     /// let texarr: sm::TextureArray<sm::tf::Rgba8Unorm, 4> = bind_group.next();
     /// let texarr: sm::TextureArray<sm::Filterable<f32x4>, 4> = bind_group.next();
     /// ```
-    /// ---    
+    /// ---
     /// ## storage textures
     /// ```
     /// let texsto: sm::StorageTexture<sm::tf::Rgba8Unorm> = bind_group.next();
     /// let texsto: sm::StorageTexture<sm::tf::Rgba8Unorm, u32x2> = bind_group.next();
     /// ```
-    /// ---    
+    /// ---
     /// ## Arrays of storage textures
     /// ```
     /// let texstoarr: sm::StorageTextureArray<sm::tf::Rgba8Unorm, 4> = bind_group.next();
