@@ -6,7 +6,7 @@ use crate::{
     common::{integer::post_inc_u32, proc_macro_reexports::TypeLayoutSemantics},
     frontend::{
         any::{
-            io_iter::{VertexBufferAny, VertexBufferIterAny},
+            io_iter::{LocationCounter, PartialVertexBufferLayout, VertexBufferAny, VertexBufferIterAny},
             render_io::{Attrib, Location, VertexAttribFormat, VertexBufferLayout},
             shared_io::{BindPath, BindingType},
             Any, InvalidReason,
@@ -50,15 +50,18 @@ use super::{binding::Binding, rasterizer::VertexIndex};
 /// use `.next()` or `.at(...)`/`.index(...)` to access individual vertex buffers
 pub struct VertexBufferIter {
     inner: VertexBufferIterAny,
+    location_counter: Rc<LocationCounter>,
 }
 
 impl VertexBufferIter {
     pub(crate) fn new() -> Self {
         Self {
             inner: VertexBufferIterAny::new(),
+            location_counter: Rc::new(0.into()),
         }
     }
 
+    /// (no documentation)
     pub fn as_any(&mut self) -> &mut VertexBufferIterAny { &mut self.inner }
 
     /// access the `i`th vertex buffer
@@ -66,7 +69,8 @@ impl VertexBufferIter {
     /// type as `T`.
     #[track_caller]
     pub fn at<T: VertexLayout>(&mut self, i: u32) -> VertexBuffer<T> {
-        VertexBuffer::new(self.as_any().at(i, T::gpu_layout()))
+        let layout = PartialVertexBufferLayout::from_vertex_layout::<T>(&self.location_counter);
+        VertexBuffer::new(self.as_any().at(i, layout))
     }
 
     /// access the `i`th vertex buffer
@@ -86,7 +90,8 @@ impl VertexBufferIter {
     #[allow(clippy::should_implement_trait)] // not fallible
     #[track_caller]
     pub fn next<T: VertexLayout>(&mut self) -> VertexBuffer<T> {
-        VertexBuffer::new(self.as_any().next(T::gpu_layout()))
+        let layout = PartialVertexBufferLayout::from_vertex_layout::<T>(&self.location_counter);
+        VertexBuffer::new(self.as_any().next(layout))
     }
 }
 

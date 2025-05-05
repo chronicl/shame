@@ -6,7 +6,7 @@ use crate::{
     common::proc_macro_reexports::TypeLayoutSemantics,
     frontend::rust_types::error::FrontendError,
     ir::{self, pipeline::PipelineError, recording::Context},
-    TypeLayout, VertexIndex,
+    GpuLayout, TypeLayout, VertexIndex, VertexLayout,
 };
 
 use super::{Any, InvalidReason};
@@ -17,7 +17,6 @@ use super::{Any, InvalidReason};
 /// use `.next()` or `.at(...)`/`.index(...)` to access individual vertex buffers
 pub struct VertexBufferIterAny {
     next_slot: u32,
-    location_counter: Rc<LocationCounter>,
     private_ctor: (),
 }
 
@@ -25,7 +24,6 @@ impl VertexBufferIterAny {
     pub(crate) fn new() -> Self {
         Self {
             next_slot: 0,
-            location_counter: Rc::new(0.into()),
             private_ctor: (),
         }
     }
@@ -34,9 +32,9 @@ impl VertexBufferIterAny {
     /// that was bound when the draw command was scheduled and interpret its
     /// type as `gpu_layout`.
     #[track_caller]
-    pub fn at(&mut self, i: u32, gpu_layout: TypeLayout) -> VertexBufferAny {
+    pub fn at(&mut self, i: u32, layout: PartialVertexBufferLayout) -> VertexBufferAny {
         self.next_slot = i + 1;
-        VertexBufferAny::new(i, self.location_counter.clone(), gpu_layout)
+        VertexBufferAny::new(i, layout)
     }
 
     /// access the next vertex buffer (or the first if no buffer was imported yet)
@@ -44,53 +42,45 @@ impl VertexBufferIterAny {
     /// type as `gpu_layout`.
     #[allow(clippy::should_implement_trait)] // not fallible
     #[track_caller]
-    pub fn next(&mut self, gpu_layout: TypeLayout) -> VertexBufferAny {
+    pub fn next(&mut self, layout: PartialVertexBufferLayout) -> VertexBufferAny {
         let slot = self.next_slot;
         self.next_slot += 1;
-        self.at(slot, gpu_layout)
+        self.at(slot, layout)
     }
 }
 
+/// (no documentation - chronicl)
 pub struct VertexBufferAny {
     slot: u32,
-    attribs_and_stride: Result<(Box<[Attrib]>, u64), InvalidReason>,
-    expected_any_count: usize,
+    layout: Result<PartialVertexBufferLayout, InvalidReason>,
+    attribute_count: usize,
 }
 
 impl VertexBufferAny {
     #[track_caller]
-    fn new(slot: u32, location_counter: Rc<LocationCounter>, gpu_layout: TypeLayout) -> Self {
-        // Is this correct?
-        let expected_any_count = match &gpu_layout.kind {
-            TypeLayoutSemantics::Structure(s) => s.fields.len(),
-            _ => 1,
-        };
+    fn new(slot: u32, layout: PartialVertexBufferLayout) -> Self {
+        let attribute_count = layout.attribs.len();
 
-        let call_info = call_info!();
-        let attribs_and_stride = Context::try_with(call_info, |ctx| {
-            let attribs_and_stride = Attrib::get_attribs_and_stride(&gpu_layout, &location_counter).ok_or_else(|| {
-                ctx.push_error(FrontendError::MalformedVertexBufferLayout(gpu_layout).into());
-                InvalidReason::ErrorThatWasPushed
-            });
-
-            if let Ok((new_attribs, _)) = &attribs_and_stride {
-                let rp = ctx.render_pipeline();
-                if let Err(e) = ensure_locations_are_unique(slot, ctx, &rp, new_attribs) {
+        let layout = Context::try_with(call_info!(), |ctx| {
+            let rp = ctx.render_pipeline();
+            match ensure_locations_are_unique(slot, ctx, &rp, &layout.attribs) {
+                Err(e) => {
                     ctx.push_error(e.into());
+                    Err(InvalidReason::ErrorThatWasPushed)
                 }
+                Ok(_) => Ok(layout),
             }
-
-            attribs_and_stride
         })
         .unwrap_or(Err(InvalidReason::CreatedWithNoActiveEncoding));
 
         Self {
             slot,
-            attribs_and_stride,
-            expected_any_count,
+            layout,
+            attribute_count,
         }
     }
 
+    /// (no documentation - chronicl)
     #[track_caller]
     pub fn index(self, index: VertexIndex) -> Vec<Any> {
         // just to be consistent with the other `at` functions, where the
@@ -99,31 +89,70 @@ impl VertexBufferAny {
         self.at(index)
     }
 
+    /// (no documentation - chronicl)
     #[track_caller]
     pub fn at(self, index: VertexIndex) -> Vec<Any> {
         let lookup = index.0;
 
-        let result = Context::try_with(call_info!(), |ctx| {
-            self.attribs_and_stride.map(|(attribs, stride)| {
+        let call_info = call_info!();
+        let result = self.layout.and_then(|layout| {
+            Context::try_with(call_info, |ctx| {
                 Any::vertex_buffer(
                     self.slot,
                     VertexBufferLayout {
-                        stride,
                         lookup,
-                        attribs,
+                        stride: layout.stride,
+                        attribs: layout.attribs,
                     },
                 )
             })
-        })
-        .unwrap_or(Err(InvalidReason::CreatedWithNoActiveEncoding));
+            .ok_or(InvalidReason::CreatedWithNoActiveEncoding)
+        });
 
         match result {
             Ok(anys) => anys,
-            Err(reason) => vec![Any::new_invalid(reason); self.expected_any_count],
+            Err(reason) => vec![Any::new_invalid(reason); self.attribute_count],
         }
     }
 }
 
+/// (no documentation - chronicl)
+pub struct PartialVertexBufferLayout {
+    /// (no documentation - chronicl)
+    pub attribs: Box<[Attrib]>,
+    /// (no documentation - chronicl)
+    pub stride: u64,
+}
+
+impl PartialVertexBufferLayout {
+    /// (no documentation - chronicl)
+    #[track_caller]
+    pub fn try_from_type<T: GpuLayout>(location_counter: &LocationCounter) -> Result<Self, InvalidReason> {
+        Self::try_from_type_layout(T::gpu_layout(), location_counter)
+    }
+
+    /// (no documentation - chronicl)
+    #[track_caller]
+    pub fn try_from_type_layout(layout: TypeLayout, location_counter: &LocationCounter) -> Result<Self, InvalidReason> {
+        Context::try_with(call_info!(), |ctx| {
+            Attrib::get_attribs_and_stride(&layout, location_counter).ok_or_else(|| {
+                ctx.push_error(FrontendError::MalformedVertexBufferLayout(layout).into());
+                InvalidReason::ErrorThatWasPushed
+            })
+        })
+        .unwrap_or(Err(InvalidReason::CreatedWithNoActiveEncoding))
+        .map(|(attribs, stride)| Self { attribs, stride })
+    }
+
+    // Infallible conversion supporte (except when no encoding).
+    // TODO? Is determined for types at GpuLayout derive time.
+    /// (no documentation - chronicl)
+    pub fn from_vertex_layout<T: VertexLayout>(location_counter: &LocationCounter) -> Self {
+        Self::try_from_type::<T>(location_counter).unwrap() // TODO this should not be unwrapped
+    }
+}
+
+/// (no documentation - chronicl)
 pub struct LocationCounter(Cell<u32>);
 
 impl LocationCounter {

@@ -10,7 +10,6 @@ use crate::{
     frontend::{
         encoding::{
             fill::{Fill, PickVertex},
-            io_iter::LocationCounter,
             EncodingErrorKind,
         },
         rust_types::type_layout::TypeLayoutSemantics,
@@ -24,6 +23,7 @@ use crate::{
     },
 };
 
+use super::io_iter::LocationCounter;
 use super::{blend::Blend, record_node, InvalidReason};
 
 #[allow(missing_docs)]

@@ -24,6 +24,7 @@ pub mod blend;
 pub mod flow_builders;
 /// types for building functions that appear as such in the shader code
 pub mod fn_builder;
+/// (no documentation)
 pub mod io_iter;
 /// types for render pipeline io such as vertex/fragment inputs/outputs
 pub mod render_io;
