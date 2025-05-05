@@ -125,30 +125,31 @@ pub struct PartialVertexBufferLayout {
 }
 
 impl PartialVertexBufferLayout {
-    /// (no documentation - chronicl)
     #[track_caller]
-    pub fn try_from_type<T: GpuLayout>(location_counter: &LocationCounter) -> Result<Self, InvalidReason> {
+    pub(crate) fn try_from_type<T: GpuLayout>(location_counter: &LocationCounter) -> Result<Self, FrontendError> {
         Self::try_from_type_layout(T::gpu_layout(), location_counter)
     }
 
-    /// (no documentation - chronicl)
     #[track_caller]
-    pub fn try_from_type_layout(layout: TypeLayout, location_counter: &LocationCounter) -> Result<Self, InvalidReason> {
-        Context::try_with(call_info!(), |ctx| {
-            Attrib::get_attribs_and_stride(&layout, location_counter).ok_or_else(|| {
-                ctx.push_error(FrontendError::MalformedVertexBufferLayout(layout).into());
-                InvalidReason::ErrorThatWasPushed
-            })
-        })
-        .unwrap_or(Err(InvalidReason::CreatedWithNoActiveEncoding))
-        .map(|(attribs, stride)| Self { attribs, stride })
+    pub(crate) fn try_from_type_layout(
+        layout: TypeLayout,
+        location_counter: &LocationCounter,
+    ) -> Result<Self, FrontendError> {
+        Attrib::get_attribs_and_stride(&layout, location_counter)
+            .ok_or(FrontendError::MalformedVertexBufferLayout(layout))
+            .map(|(attribs, stride)| Self { attribs, stride })
     }
 
-    // Infallible conversion supporte (except when no encoding).
-    // TODO? Is determined for types at GpuLayout derive time.
-    /// (no documentation - chronicl)
-    pub fn from_vertex_layout<T: VertexLayout>(location_counter: &LocationCounter) -> Self {
-        Self::try_from_type::<T>(location_counter).unwrap() // TODO this should not be unwrapped
+    /// Infallible conversion support for types implementing `VertexLayout`.
+    ///
+    /// `VertexLayout` is automatically derived with `#[derive(GpuLayout)]` if the type can be converted
+    /// to a vertex buffer layout. The requirements for that are
+    /// TODO(chronicl) check what the exact requirements are
+    /// - The type must not contain any nested types.
+    /// - All fields of the type must implement VertexAttribute
+    #[track_caller]
+    pub(crate) fn from_vertex_layout<T: VertexLayout>(location_counter: &LocationCounter) -> Self {
+        Self::try_from_type::<T>(location_counter).unwrap()
     }
 }
 
