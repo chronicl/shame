@@ -5,9 +5,9 @@ use crate::{
         any::{Any, InvalidReason},
         rust_types::{
             error::FrontendError,
-            layout_traits::CpuTypeLayout,
             type_layout::{
-                FieldLayout, FieldLayoutWithOffset, StructLayout, TypeLayout, TypeLayoutRules, TypeLayoutSemantics,
+                FieldLayout, FieldLayoutWithOffset, StructLayout, TypeLayout, CpuTypeLayout, TypeLayoutRules,
+                TypeLayoutSemantics,
             },
         },
     },

@@ -2,12 +2,12 @@ use std::{borrow::Cow, marker::PhantomData, ops::Deref};
 
 use super::{
     index::GpuIndex,
-    layout_traits::{ArrayElementsUnsizedError, CpuTypeLayout, FromAnys, GetAllFields, GpuLayout},
+    layout_traits::{ArrayElementsUnsizedError, FromAnys, GetAllFields, GpuLayout},
     len::{x1, x2, x3, x4, AtLeastLen, Len, Len2},
     mem::AddressSpace,
     reference::{AccessMode, AccessModeReadable},
     scalar_type::{ScalarType, ScalarTypeFp},
-    type_layout::{TypeLayout, TypeLayoutRules},
+    type_layout::{TypeLayout, CpuTypeLayout, TypeLayoutRules},
     type_traits::{
         BindingArgs, EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools,
         NoHandles,

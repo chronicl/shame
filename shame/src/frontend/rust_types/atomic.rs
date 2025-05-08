@@ -1,12 +1,12 @@
 use std::marker::PhantomData;
 
 use super::{
-    layout_traits::{ArrayElementsUnsizedError, CpuTypeLayout, FromAnys, GetAllFields, GpuLayout},
+    layout_traits::{ArrayElementsUnsizedError, FromAnys, GetAllFields, GpuLayout},
     len::x1,
     mem::{AddressSpace, AddressSpaceAtomic},
     reference::{AccessMode, AccessModeReadable, ReadWrite},
     scalar_type::{ScalarType, ScalarTypeInteger},
-    type_layout::{TypeLayout, TypeLayoutRules},
+    type_layout::{TypeLayout, TypeLayoutRules, CpuTypeLayout},
     type_traits::{
         BindingArgs, EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools,
         NoHandles,

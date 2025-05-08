@@ -22,8 +22,8 @@ use super::mem::AddressSpace;
 use super::reference::{AccessMode, AccessModeReadable};
 use super::struct_::{BufferFields, SizedFields, Struct};
 use super::type_layout::{
-    self, marker, ElementLayout, FieldLayout, FieldLayoutWithOffset, StructLayout, TypeLayout, TypeLayoutError,
-    TypeLayoutRules, TypeLayoutSemantics,
+    self, marker, ElementLayout, FieldLayout, FieldLayoutWithOffset, StructLayout, TypeLayout, CpuTypeLayout,
+    TypeLayoutError, TypeLayoutRules, TypeLayoutSemantics,
 };
 use super::type_traits::{
     BindingArgs, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles, VertexAttribute,
@@ -244,9 +244,6 @@ pub(crate) fn check_layout_push_error(
             InvalidReason::ErrorThatWasPushed
         })
 }
-
-/// TypeLayout for cpu types. Is not necessarily a valid layout for a gpu type.
-pub type CpuTypeLayout = TypeLayout<type_layout::marker::MaybeInvalid>;
 
 /// (no documentation yet)
 pub trait CpuLayout {

@@ -1,11 +1,11 @@
 use super::atomic::Atomic;
 use super::index::GpuIndex;
-use super::layout_traits::{ArrayElementsUnsizedError, CpuTypeLayout, FromAnys, GetAllFields, GpuLayout};
+use super::layout_traits::{ArrayElementsUnsizedError, FromAnys, GetAllFields, GpuLayout};
 use super::len::x1;
 use super::mem::AddressSpace;
 use super::reference::{AccessMode, AccessModeReadable, AccessModeWritable, Read};
 use super::scalar_type::ScalarTypeInteger;
-use super::type_layout::{ElementLayout, TypeLayout, TypeLayoutRules, TypeLayoutSemantics};
+use super::type_layout::{ElementLayout, TypeLayout, CpuTypeLayout, TypeLayoutRules, TypeLayoutSemantics};
 use super::type_traits::{
     BindingArgs, EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles,
 };

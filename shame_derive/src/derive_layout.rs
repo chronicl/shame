@@ -212,12 +212,12 @@ pub fn impl_for_struct(
                             [
                                 #(
                                     (
-                                        <#field_type as #re::GpuLayout>::gpu_layout(),
-                                        #re::FieldOptions {
-                                            name: std::stringify!(#field_ident).into(),
-                                            custom_min_align: #field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")).into(),
-                                            custom_min_size: #field_size.into(),
-                                        }
+                                        #re::FieldOptions::new(
+                                            std::stringify!(#field_ident),
+                                            #field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")).into(),
+                                            #field_size.into(),
+                                        ),
+                                        <#field_type as #re::GpuLayout>::gpu_layout()
                                     )
                                     ,
                                 )*

@@ -21,8 +21,8 @@ use std::{
     rc::Rc,
 };
 
-use super::layout_traits::{CpuTypeLayout, GetAllFields, GpuLayout};
-use super::type_layout::TypeLayout;
+use super::layout_traits::{GetAllFields, GpuLayout};
+use super::type_layout::{TypeLayout, CpuTypeLayout};
 use super::type_traits::{GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoBools};
 use super::{
     error::FrontendError,

@@ -9,6 +9,7 @@ use std::{
 };
 
 use crate::{
+    any::U32PowerOf2,
     call_info,
     common::{
         ignore_eq::{IgnoreInEqOrdHash, InEqOrd},
@@ -28,6 +29,18 @@ use crate::{
 use thiserror::Error;
 
 use super::{mem, type_traits};
+
+mod eq;
+mod maybe_invalid;
+mod sized;
+mod valid;
+mod vertex;
+
+pub use eq::*;
+pub use maybe_invalid::*;
+pub use sized::*;
+pub use valid::*;
+pub use vertex::*;
 
 /// The type contained in the bytes of a `TypeLayout`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -78,6 +91,10 @@ pub struct TypeLayout<T: TypeRestriction = marker::Valid> {
     _phantom: PhantomData<T>,
 }
 
+// TODO(chronicl) consider refactoring to it's own type which implements from and into TypeLayout<marker::MaybeInvalid>
+/// TypeLayout for cpu types. Is not necessarily a valid layout for a gpu type.
+pub type CpuTypeLayout = TypeLayout<marker::MaybeInvalid>;
+
 use marker::TypeRestriction;
 // TODO(chronicl) would be nice to have a different name for this module
 pub mod marker {
@@ -122,116 +139,17 @@ pub mod marker {
     impl_from_into!(VertexAttribute -> MaybeInvalid, Valid, Sized, Vertex);
 }
 
-pub struct TypeLayoutBuilder<T: TypeRestriction = marker::Valid> {
-    struct_builder: StructLayoutBuilder,
+// TODO(chronicl) could consider to add another generic which determines whether at least one field
+// has been added, so that the `new` method may avoid taking the first field immediately.
+pub struct StructLayoutBuilder<T: TypeRestriction = marker::Valid> {
+    struct_builder: StructLayoutBuilderErased,
+    // This is used by TypeLayoutBuilder<marker::Valid>, which only has one public method `finish`,
+    // which inserts this last, potentially unsized field and finishes the build.
+    // Building a TypeLayout<marker::Valid> always starts with a StructLayoutBuilder<marker::Sized>
+    // and converts automatically to a StructLayoutBuilder<marker::Valid> when extending
+    // by a field that is TypeLayout<marker::Valid> (potentially unsized).
+    last_maybe_unsized_field: Option<(TypeLayout, FieldOptions)>,
     _phantom: PhantomData<T>,
-}
-
-impl<T: TypeRestriction> TypeLayoutBuilder<T> {
-    fn __new(options: impl Into<StructOptions>) -> Self {
-        Self {
-            struct_builder: StructLayoutBuilder::new(options.into()),
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl TypeLayoutBuilder {
-    /// Construct a new `TypeLayoutBuilder<Vertex>` and immediately add it's first field.
-    /// Having at least one field is a requirement of a gpu struct.
-    pub fn new_struct(
-        struct_options: impl Into<StructOptions>,
-        layout: TypeLayout<marker::Sized>,
-        field_options: impl Into<FieldOptions>,
-    ) -> Self {
-        let mut this = Self::__new(struct_options);
-        this.extend(layout, field_options);
-        this
-    }
-
-
-    // Creating a TypeLayout with one unsized field is not possible with `Self::new_struct`.
-    /// Construct a new TypeLayout with exactly one field, which may be unsized.
-    pub fn new_struct_single_field(
-        struct_options: impl Into<StructOptions>,
-        layout: TypeLayout,
-        field_options: impl Into<FieldOptions>,
-    ) -> TypeLayout {
-        let mut this = Self::__new(struct_options);
-        this.finish_maybe_unsized(layout, field_options)
-    }
-
-
-    pub fn extend(
-        &mut self,
-        layout: impl Into<TypeLayout<marker::Sized>>,
-        options: impl Into<FieldOptions>,
-    ) -> &mut Self {
-        unsafe_type_layout::extend(self, layout.into(), options);
-        self
-    }
-
-    pub fn finish(self) -> TypeLayout { unsafe_type_layout::finish(self) }
-
-    pub fn finish_maybe_unsized(
-        mut self,
-        layout: impl Into<TypeLayout>,
-        options: impl Into<FieldOptions>,
-    ) -> TypeLayout {
-        unsafe_type_layout::finish_maybe_unsized(self, layout.into(), options)
-    }
-}
-
-impl TypeLayoutBuilder<marker::Sized> {
-    /// Construct a new `TypeLayoutBuilder<Vertex>` and immediately add it's first field.
-    /// Having at least one field is a requirement of a gpu struct.
-    pub fn new_struct(
-        struct_options: impl Into<StructOptions>,
-        layout: TypeLayout<marker::Sized>,
-        field_options: impl Into<FieldOptions>,
-    ) -> Self {
-        let mut this = Self::__new(struct_options);
-        this.extend(layout, field_options);
-        this
-    }
-
-    pub fn extend(
-        &mut self,
-        layout: impl Into<TypeLayout<marker::Sized>>,
-        options: impl Into<FieldOptions>,
-    ) -> &mut Self {
-        unsafe_type_layout::extend(self, layout.into(), options);
-        self
-    }
-
-    pub fn finish(self) -> TypeLayout<marker::Sized> { unsafe_type_layout::finish(self) }
-}
-
-// Does not have a finish_maybe_unsized method,
-// because it's fields must be at most 16 byte so it can't be unsized.
-impl TypeLayoutBuilder<marker::Vertex> {
-    /// Construct a new `TypeLayoutBuilder<Vertex>` and immediately add it's first field.
-    /// Having at least one field is a requirement of `TypeLayout<Vertex>`.
-    pub fn new_struct(
-        struct_options: impl Into<StructOptions>,
-        layout: TypeLayout<marker::VertexAttribute>,
-        field_options: impl Into<FieldOptions>,
-    ) -> Self {
-        let mut this = Self::__new(struct_options);
-        this.extend(layout, field_options);
-        this
-    }
-
-    pub fn extend(
-        &mut self,
-        layout: TypeLayout<marker::VertexAttribute>,
-        options: impl Into<FieldOptions>,
-    ) -> &mut Self {
-        unsafe_type_layout::extend(self, layout.into(), options);
-        self
-    }
-
-    pub fn finish(self) -> TypeLayout<marker::Vertex> { unsafe_type_layout::finish(self) }
 }
 
 // TODO(chronicl) probably don't use the word unsafe here, but something like dangerous.
@@ -244,16 +162,15 @@ pub(in super::super::rust_types) mod unsafe_type_layout {
     use crate::{GpuAligned, GpuSized};
     use super::*;
 
-    pub fn new_struct<T: TypeRestriction>(byte_size: Option<u64>, byte_align: u64, s: StructLayout) -> TypeLayout<T> {
-        TypeLayout {
-            byte_size,
-            byte_align: byte_align.into(),
-            kind: TypeLayoutSemantics::Structure(Rc::new(s)),
+    pub fn new_builder<T: TypeRestriction>(options: impl Into<StructOptions>) -> StructLayoutBuilder<T> {
+        StructLayoutBuilder {
+            struct_builder: StructLayoutBuilderErased::new(options.into()),
+            last_maybe_unsized_field: None,
             _phantom: PhantomData,
         }
     }
 
-    pub fn new<T: TypeRestriction>(
+    pub fn new_type_layout<T: TypeRestriction>(
         byte_size: Option<u64>,
         byte_align: u64,
         kind: TypeLayoutSemantics,
@@ -266,26 +183,39 @@ pub(in super::super::rust_types) mod unsafe_type_layout {
         }
     }
 
-    pub fn extend<R: TypeRestriction>(
-        builder: &mut TypeLayoutBuilder<R>,
-        layout: TypeLayout<marker::Sized>,
-        options: impl Into<FieldOptions>,
-    ) {
-        builder.struct_builder.extend(layout, options.into());
+    pub fn new_type_layout_struct<T: TypeRestriction>(
+        byte_size: Option<u64>,
+        byte_align: u64,
+        s: StructLayout,
+    ) -> TypeLayout<T> {
+        TypeLayout {
+            byte_size,
+            byte_align: byte_align.into(),
+            kind: TypeLayoutSemantics::Structure(Rc::new(s)),
+            _phantom: PhantomData,
+        }
     }
 
-    pub fn finish<R: TypeRestriction>(builder: TypeLayoutBuilder<R>) -> TypeLayout<R> {
+    pub fn extend<R: TypeRestriction>(
+        builder: &mut StructLayoutBuilder<R>,
+        layout: TypeLayout<marker::Sized>,
+        options: FieldOptions,
+    ) {
+        builder.struct_builder.extend(layout, options);
+    }
+
+    pub fn finish<R: TypeRestriction>(builder: StructLayoutBuilder<R>) -> TypeLayout<R> {
         let (byte_size, byte_align, s) = builder.struct_builder.finish();
-        new_struct(Some(byte_size), byte_align, s)
+        new_type_layout_struct(Some(byte_size), byte_align, s)
     }
 
     pub fn finish_maybe_unsized<R: TypeRestriction>(
-        builder: TypeLayoutBuilder<R>,
+        builder: StructLayoutBuilder<R>,
         layout: TypeLayout,
         options: impl Into<FieldOptions>,
     ) -> TypeLayout<R> {
         let (byte_size, byte_align, s) = builder.struct_builder.finish_maybe_unsized(layout, options.into());
-        new_struct(byte_size, byte_align, s)
+        new_type_layout_struct(byte_size, byte_align, s)
     }
 
     pub fn cast<From: TypeRestriction, Into: TypeRestriction>(layout: TypeLayout<From>) -> TypeLayout<Into> {
@@ -297,10 +227,6 @@ pub(in super::super::rust_types) mod unsafe_type_layout {
         }
     }
 }
-
-// TODO(chronicl)
-// - Add new_struct_with_options which allows to modify TypeLayoutRules and packed
-// - Use macro_rules to avoid repeating builder methods
 
 /// (no documentation - chronicl)
 #[derive(Debug, Clone)]
@@ -329,15 +255,23 @@ impl<T: Into<CanonName>> From<T> for StructOptions {
 #[derive(Debug, Clone)]
 pub struct FieldOptions {
     pub name: CanonName,
-    pub custom_min_align: Option<u64>,
+    pub(crate) custom_min_align: Option<u64>,
     pub custom_min_size: Option<u64>,
 }
 
 impl FieldOptions {
-    pub fn new(name: impl Into<CanonName>, custom_min_align: Option<u64>, custom_min_size: Option<u64>) -> Self {
+    /// Creates new `FieldOptions`.
+    ///
+    /// If you only want to customize the name, you can convert most string types
+    /// to `FieldOptions` using `Into::into`.
+    pub fn new(
+        name: impl Into<CanonName>,
+        custom_min_align: Option<U32PowerOf2>,
+        custom_min_size: Option<u64>,
+    ) -> Self {
         Self {
             name: name.into(),
-            custom_min_align,
+            custom_min_align: custom_min_align.map(Into::into),
             custom_min_size,
         }
     }
@@ -347,7 +281,10 @@ impl<T: Into<CanonName>> From<T> for FieldOptions {
     fn from(name: T) -> Self { Self::new(name, None, None) }
 }
 
-struct StructLayoutBuilder {
+/// Builds a TypeLayout<marker::Valid> and is wrapped by all StructLayoutBuilder<T>,
+/// which impose further restrictions on the building process, so that they may
+/// produce more strict TypeLayouts, such as StructLayoutBuilder<Sized> -> TypeLayout<Sized>.
+struct StructLayoutBuilderErased {
     next_offset_min: u64,
     align: u64,
     packed: bool,
@@ -355,7 +292,7 @@ struct StructLayoutBuilder {
     s: StructLayout,
 }
 
-impl StructLayoutBuilder {
+impl StructLayoutBuilderErased {
     fn new(options: StructOptions) -> Self {
         Self {
             next_offset_min: 0,
@@ -425,29 +362,6 @@ impl StructLayoutBuilder {
     }
 }
 
-// TODO(chronicl) This impl is marker::MaybeInvalid, because it's mostly used for
-// CpuTypeLayout = TypeLayout<marker::MaybeInvalid> construction. Consider making some of
-// these methods available to TypeLayout<marker::Valid>.
-impl TypeLayout<marker::MaybeInvalid> {
-    pub(crate) fn new(byte_size: Option<u64>, byte_align: u64, kind: TypeLayoutSemantics) -> Self {
-        Self {
-            byte_size,
-            byte_align: byte_align.into(),
-            kind,
-            _phantom: PhantomData,
-        }
-    }
-
-    pub(crate) fn from_rust_sized<T: Sized>(kind: TypeLayoutSemantics) -> Self {
-        Self::new(Some(size_of::<T>() as u64), align_of::<T>() as u64, kind)
-    }
-
-    fn first_line_of_display_with_ellipsis(&self) -> String {
-        let string = format!("{}", self);
-        string.split_once('\n').map(|(s, _)| format!("{s}…")).unwrap_or(string)
-    }
-}
-
 /// a sized or unsized struct type with 0 or more fields
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -465,6 +379,9 @@ impl StructLayout {
     /// returns a `(byte_size, byte_alignment, struct_layout)` tuple
     #[doc(hidden)]
     pub fn from_ir_struct(rules: TypeLayoutRules, s: &ir::Struct) -> (Option<u64>, u64, StructLayout) {
+        // Could replace all of this with TypeLayout::from_struct and then
+        // taking the StructLayout from TypeLayout::kind, but that would
+        // need an unreachable!.
         let mut total_byte_size = None;
         let struct_layout = StructLayout {
             name: s.name().clone().into(),
@@ -555,7 +472,7 @@ pub enum TypeLayoutError {
 impl TypeLayout {
     pub fn struct_from_parts(
         struct_options: impl Into<StructOptions>,
-        mut fields: impl ExactSizeIterator<Item = (TypeLayout, FieldOptions)>,
+        mut fields: impl ExactSizeIterator<Item = (FieldOptions, TypeLayout)>,
     ) -> Result<TypeLayout, StructLayoutError> {
         let struct_options = struct_options.into();
         let num_fields = fields.len();
@@ -570,30 +487,27 @@ impl TypeLayout {
                 })
         };
 
-        let (layout, options) = fields
+        let (options, layout) = fields
             .next()
             .ok_or_else(|| StructLayoutError::HasNoFields(struct_options.name.clone()))?;
         let layout = make_sized(layout, 0)?;
-        let mut builder = TypeLayoutBuilder::<marker::Valid>::new_struct(struct_options.clone(), layout, options);
+        let mut builder = StructLayoutBuilder::new_struct(struct_options.clone(), options, layout);
 
-        // TODO(chronicl) I want to avoid the unreachable here, but need different builder api for it.
-        // Making sure the for loop is entered
         if num_fields == 1 {
-            return Ok(builder.finish());
+            return Ok(builder.finish().into());
         }
-        for (i, (layout, options)) in fields.enumerate() {
+        for (i, (options, layout)) in fields.enumerate() {
             let field_index = i + 1;
             let is_last_field = field_index == num_fields - 1;
             if is_last_field {
-                return Ok(builder.finish_maybe_unsized(layout, options));
+                return Ok(builder.extend(options, layout).finish());
             } else {
                 let layout = make_sized(layout, i)?;
-                builder.extend(layout, options);
+                builder = builder.extend(options, layout);
             }
         }
-        // is_last_field will always be true for the last element of the fields iterator
-        // and we enter the for loop, because of the num_fields == 1 check before it.
-        unreachable!()
+        // TODO(chronicl) this is actually unreachable, but should replace this with different builder api anyway
+        Ok(builder.finish().into())
     }
 
 
@@ -615,7 +529,7 @@ impl TypeLayout {
     }
 
     pub fn from_array(rules: TypeLayoutRules, element: &ir::SizedType, len: Option<NonZeroU32>) -> Self {
-        unsafe_type_layout::new(
+        unsafe_type_layout::new_type_layout(
             len.map(|n| byte_size_of_array(element, n)),
             align_of_array(element),
             TypeLayoutSemantics::Array(
@@ -633,44 +547,41 @@ impl TypeLayout {
     pub fn from_struct(rules: TypeLayoutRules, s: &ir::Struct) -> Self {
         let sized_fields = s.sized_fields();
 
-        let array_options = |field: &ir::RuntimeSizedArrayField| {
-            FieldOptions::new(field.name.clone(), field.custom_min_align.map(u64::from), None)
-        };
+        let array_options =
+            |field: &ir::RuntimeSizedArrayField| FieldOptions::new(field.name.clone(), field.custom_min_align, None);
 
         if sized_fields.is_empty() {
             // ir::Struct always has at least one field and if there are no sized_fields (checked above),
             // then there must be an unsized field.
             let array = s.last_unsized_field().as_ref().unwrap();
             let array_layout = TypeLayout::from_array(rules, &array.element_ty, None);
-            TypeLayoutBuilder::new_struct_single_field(s.name().clone(), array_layout, array_options(array))
+            StructLayoutBuilder::new_struct(s.name().clone(), array_options(array), array_layout).finish()
         } else {
             // checked above that at least one sized field exists
             let first_field = &sized_fields[0];
 
             let options = |field: &ir::SizedField| {
-                FieldOptions::new(
-                    field.name.clone(),
-                    field.custom_min_align.map(u64::from),
-                    field.custom_min_size,
-                )
+                FieldOptions::new(field.name.clone(), field.custom_min_align, field.custom_min_size)
             };
-            let layout = |field: &ir::SizedField| TypeLayout::from_sized_ty(rules, field.ty());
+            let layout =
+                |field: &ir::SizedField| -> TypeLayout<marker::Sized> { TypeLayout::from_sized_ty(rules, field.ty()) };
 
-            let mut builder = TypeLayoutBuilder::<marker::Valid>::new_struct(
+            let mut builder = StructLayoutBuilder::<marker::Sized>::new_struct(
                 s.name().clone(),
-                layout(first_field),
                 options(first_field),
+                layout(first_field),
             );
 
             for field in &sized_fields[1..] {
-                builder.extend(layout(field), options(field));
+                builder = builder.extend(options(field), layout(field));
             }
 
             if let Some(array) = s.last_unsized_field() {
                 let array_layout = TypeLayout::from_array(rules, &array.element_ty, None);
-                builder.finish_maybe_unsized(array_layout, array_options(array))
-            } else {
+                let builder = builder.extend(array_options(array), array_layout);
                 builder.finish()
+            } else {
+                builder.finish().into()
             }
         }
     }
@@ -704,9 +615,11 @@ impl TypeLayout<marker::Sized> {
             // `Eq` operator on `TypeLayout` that behaves intuitively.
             // The layout of `bool`s is not actually observable in any part of the api.
             {
-                unsafe_type_layout::new(Some(size), align, Sem::Vector(*l, *t))
+                unsafe_type_layout::new_type_layout(Some(size), align, Sem::Vector(*l, *t))
             }
-            ir::SizedType::Matrix(c, r, t) => unsafe_type_layout::new(Some(size), align, Sem::Matrix(*c, *r, *t)),
+            ir::SizedType::Matrix(c, r, t) => {
+                unsafe_type_layout::new_type_layout(Some(size), align, Sem::Matrix(*c, *r, *t))
+            }
             ir::SizedType::Array(sized, l) => Self::from_sized_array(rules, sized, *l),
             ir::SizedType::Atomic(t) => Self::from_sized_ty(rules, &ir::SizedType::Vector(ir::Len::X1, (*t).into())),
             // ir::SizedType guarantees that the TypeLayout is sized.
@@ -715,7 +628,7 @@ impl TypeLayout<marker::Sized> {
     }
 
     pub fn from_sized_array(rules: TypeLayoutRules, element: &ir::SizedType, len: NonZeroU32) -> Self {
-        unsafe_type_layout::new(
+        unsafe_type_layout::new_type_layout(
             Some(byte_size_of_array(element, len)),
             align_of_array(element),
             TypeLayoutSemantics::Array(
@@ -737,19 +650,18 @@ impl TypeLayout<marker::Sized> {
         let first_field = fields.next().unwrap();
 
         let options = |field: &ir::SizedField| {
-            FieldOptions::new(
-                field.name.clone(),
-                field.custom_min_align.map(u64::from),
-                field.custom_min_size,
-            )
+            FieldOptions::new(field.name.clone(), field.custom_min_align, field.custom_min_size)
         };
         let layout = |field: &ir::SizedField| TypeLayout::from_sized_ty(rules, first_field.ty());
 
-        let mut builder =
-            TypeLayoutBuilder::<marker::Sized>::new_struct(s.name().clone(), layout(first_field), options(first_field));
+        let mut builder = StructLayoutBuilder::<marker::Sized>::new_struct(
+            s.name().clone(),
+            options(first_field),
+            layout(first_field),
+        );
 
         for field in fields {
-            builder.extend(layout(field), options(field));
+            builder = builder.extend(options(field), layout(field));
         }
 
         builder.finish()
@@ -847,14 +759,6 @@ impl<T: TypeRestriction> TypeLayout<T> {
             }
         };
         Ok(())
-    }
-}
-
-impl TypeLayout<marker::Sized> {
-    // TOOD(chronicl) find better name
-    fn byte_size_sized(&self) -> u64 {
-        // Sized types have a size
-        self.byte_size.unwrap()
     }
 }
 
@@ -985,451 +889,4 @@ impl<T: TypeRestriction> Display for TypeLayout<T> {
 
 impl<T: TypeRestriction> Debug for TypeLayout<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.write("", false, f) }
-}
-
-#[derive(Clone)]
-pub struct LayoutMismatch {
-    /// 2 (name, layout) pairs
-    layouts: [(String, TypeLayout<marker::MaybeInvalid>); 2],
-    colored_error: bool,
-}
-
-
-impl std::fmt::Debug for LayoutMismatch {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self) // use Display
-    }
-}
-
-impl LayoutMismatch {
-    fn pad_width(name_a: &str, name_b: &str) -> usize { name_a.chars().count().max(name_b.chars().count()) + SEP.len() }
-}
-
-impl Display for LayoutMismatch {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let colored = self.colored_error;
-        let [(a_name, a), (b_name, b)] = &self.layouts;
-        write!(f, "{:width$}", ' ', width = Self::pad_width(a_name, b_name))?;
-        let layouts = [(a_name.as_str(), a), (b_name.as_str(), b)];
-        match LayoutMismatch::write("", layouts, colored, f) {
-            Err(MismatchWasFound) => Ok(()),
-            Ok(KeepWriting) => {
-                writeln!(
-                    f,
-                    "<internal error while writing layout mismatch: no difference found, please report this error>"
-                )?;
-                writeln!(f, "the full type layouts in question are:")?;
-                for (name, layout) in layouts {
-                    writeln!(f, "`{}`:", name)?;
-                    writeln!(f, "{}", layout)?;
-                }
-                Ok(())
-            }
-        }
-    }
-}
-
-/// layout mismatch diff name separator
-/// used in the display impl of LayoutMismatch to show the actual place where the layouts mismatch
-/// ```
-/// layout mismatch:
-/// cpu{SEP} f32
-/// gpu{SEP} i32
-/// ```
-const SEP: &str = ": ";
-
-/// whether the mismatching part of the TypeLayouts in a LayoutMismatch was already expressed via writes.
-/// indicates that the `write` function should stop writing.
-pub(crate) struct MismatchWasFound;
-pub(crate) struct KeepWriting;
-
-impl LayoutMismatch {
-    //TODO(low prio) try to figure out a cleaner way of writing these.
-
-    /// this function uses the `Err(MismatchWasFound)` to halt traversing the typelayout.
-    /// It does not constitute an error of this function, it is just so the ? operator can be used to propagate the abort.
-    #[allow(clippy::needless_return)]
-    pub(crate) fn write<W: Write>(
-        indent: &str,
-        layouts: [(&str, &TypeLayout<marker::MaybeInvalid>); 2],
-        colored: bool,
-        f: &mut W,
-    ) -> Result<KeepWriting, MismatchWasFound> {
-        let tab = "  ";
-        let [(a_name, a), (b_name, b)] = layouts;
-
-        if a == b {
-            a.write(indent, colored, f);
-            return Ok(KeepWriting);
-        }
-
-        let use_256_color_mode = false;
-        let hex_color = |f_: &mut W, hex| match colored {
-            true => set_color(f_, Some(hex), use_256_color_mode),
-            false => Ok(()),
-        };
-        let color_reset = |f_: &mut W| match colored {
-            true => set_color(f_, None, use_256_color_mode),
-            false => Ok(()),
-        };
-
-        let color_a_hex = "#DF5853";
-        let color_b_hex = "#9A639C";
-        let color_a = |f| hex_color(f, color_a_hex);
-        let color_b = |f| hex_color(f, color_b_hex);
-
-        let pad_width = Self::pad_width(a_name, b_name);
-
-        use TypeLayoutSemantics as S;
-        match (&a.kind, &b.kind) {
-            (S::Structure(sa), S::Structure(sb)) => {
-                let max_fields = sa.all_fields().len().max(sb.all_fields().len());
-                {
-                    write!(f, "struct ");
-                    hex_color(f, color_a_hex);
-                    write!(f, "{}", sa.name);
-                    color_reset(f);
-                    write!(f, " / ");
-                    hex_color(f, color_b_hex);
-                    write!(f, "{}", sb.name);
-                    color_reset(f);
-                    writeln!(f, " {{");
-                }
-
-                let mut sa_fields = sa.all_fields().iter();
-                let mut sb_fields = sb.all_fields().iter();
-
-                loop {
-                    //TODO(low prio) get a hold of the code duplication here
-                    match (sa_fields.next(), sb_fields.next()) {
-                        (Some(a_field), Some(b_field)) => {
-                            let offsets_match = a_field.rel_byte_offset == b_field.rel_byte_offset;
-                            let types_match = a_field.field.ty == b_field.field.ty;
-                            if !offsets_match && types_match {
-                                // only write this mismatch if the types are also the same, otherwise display the detailed type mismatch further below
-                                let a_ty_string = a_field.field.ty.first_line_of_display_with_ellipsis();
-                                let b_ty_string = b_field.field.ty.first_line_of_display_with_ellipsis();
-                                color_a(f);
-                                writeln!(
-                                    f,
-                                    "{a_name}{SEP}{indent}{:3} {}: {a_ty_string} align={}",
-                                    a_field.rel_byte_offset,
-                                    a_field.field.name,
-                                    a_field.field.align()
-                                );
-                                color_b(f);
-                                writeln!(
-                                    f,
-                                    "{b_name}{SEP}{indent}{:3} {}: {b_ty_string} align={}",
-                                    b_field.rel_byte_offset,
-                                    b_field.field.name,
-                                    b_field.field.align()
-                                );
-                                color_reset(f);
-                                writeln!(
-                                    f,
-                                    "field offset is different on {a_name} ({}) and {b_name} ({}).",
-                                    a_field.rel_byte_offset, b_field.rel_byte_offset
-                                );
-                                return Err(MismatchWasFound);
-                            }
-                            let offset = a_field.rel_byte_offset;
-                            let a_field = &a_field.field;
-                            let b_field = &b_field.field;
-                            let field = &a_field;
-
-                            if offsets_match {
-                                write!(f, "{:width$}{indent}{offset:3} ", ' ', width = pad_width);
-                            } else {
-                                write!(f, "{:width$}{indent}  ? ", ' ', width = pad_width);
-                            }
-                            if a_field.name != b_field.name {
-                                writeln!(f);
-                                color_a(f);
-                                writeln!(f, "{a_name}{SEP}{indent}    {}: …", a_field.name);
-                                color_b(f);
-                                writeln!(f, "{b_name}{SEP}{indent}    {}: …", b_field.name);
-                                color_reset(f);
-                                writeln!(
-                                    f,
-                                    "identifier mismatch, either\nfield '{}' is missing on {a_name}, or\nfield '{}' is missing on {b_name}.",
-                                    b_field.name, a_field.name
-                                );
-                                return Err(MismatchWasFound);
-                            }
-                            write!(f, "{}: ", field.name);
-                            if a_field.ty != b_field.ty {
-                                Self::write(
-                                    &format!("{indent}{tab}"),
-                                    [(a_name, &a_field.ty), (b_name, &b_field.ty)],
-                                    colored,
-                                    f,
-                                )?;
-                                return Err(MismatchWasFound);
-                            }
-                            write!(f, "{}", field.ty.first_line_of_display_with_ellipsis());
-                            if a_field.byte_size() != b_field.byte_size() {
-                                writeln!(f);
-                                color_a(f);
-                                writeln!(
-                                    f,
-                                    "{a_name}{SEP}{indent} size={}",
-                                    a_field
-                                        .byte_size()
-                                        .as_ref()
-                                        .map(|x| x as &dyn Display)
-                                        .unwrap_or(&"?" as _)
-                                );
-                                color_b(f);
-                                writeln!(
-                                    f,
-                                    "{b_name}{SEP}{indent} size={}",
-                                    b_field
-                                        .byte_size()
-                                        .as_ref()
-                                        .map(|x| x as &dyn Display)
-                                        .unwrap_or(&"?" as _)
-                                );
-                                color_reset(f);
-                                return Err(MismatchWasFound);
-                            }
-
-                            write!(
-                                f,
-                                " size={}",
-                                field
-                                    .byte_size()
-                                    .as_ref()
-                                    .map(|x| x as &dyn Display)
-                                    .unwrap_or(&"?" as _)
-                            );
-                            writeln!(f, ",");
-                        }
-                        (Some(a_field), None) => {
-                            let offset = a_field.rel_byte_offset;
-                            let a_field = &a_field.field;
-                            let field = &a_field;
-                            color_a(f);
-                            write!(f, "{a_name}{SEP}{indent}{offset:3} ");
-                            write!(f, "{}: ", field.name);
-                            write!(f, "{}", field.ty.first_line_of_display_with_ellipsis());
-                            write!(
-                                f,
-                                " size={}",
-                                field
-                                    .byte_size()
-                                    .as_ref()
-                                    .map(|x| x as &dyn Display)
-                                    .unwrap_or(&"?" as _)
-                            );
-                            writeln!(f, ",");
-                            color_b(f);
-                            writeln!(f, "{b_name}{SEP}{indent}<missing field '{}'>", a_field.name);
-                            color_reset(f);
-                            return Err(MismatchWasFound);
-                        }
-                        (None, Some(b_field)) => {
-                            let offset = b_field.rel_byte_offset;
-                            let b_field = &b_field.field;
-                            color_a(f);
-                            writeln!(f, "{a_name}{SEP}{indent}<missing field '{}'>", b_field.name);
-                            let field = &b_field;
-                            color_b(f);
-                            write!(f, "{b_name}{SEP}{indent}{offset:3} ");
-                            write!(f, "{}: ", field.name);
-                            write!(f, "{}", field.ty.first_line_of_display_with_ellipsis());
-                            write!(
-                                f,
-                                " size={}",
-                                field
-                                    .byte_size()
-                                    .as_ref()
-                                    .map(|x| x as &dyn Display)
-                                    .unwrap_or(&"?" as _)
-                            );
-                            writeln!(f, ",");
-                            color_reset(f);
-                            return Err(MismatchWasFound);
-                        }
-                        (None, None) => break,
-                    }
-                }
-
-                write!(f, "{:width$}{indent}}}", ' ', width = pad_width);
-                let align_matches = a.align() == b.align();
-                let size_matches = a.byte_size() == b.byte_size();
-                if !align_matches && size_matches {
-                    writeln!(f);
-                    color_a(f);
-                    writeln!(f, "{a_name}{SEP}{indent}align={}", a.align());
-                    color_b(f);
-                    writeln!(f, "{b_name}{SEP}{indent}align={}", b.align());
-                    color_reset(f);
-                    return Err(MismatchWasFound);
-                } else {
-                    match align_matches {
-                        true => write!(f, " align={}", a.align()),
-                        false => write!(f, " align=?"),
-                    };
-                }
-                if !size_matches {
-                    writeln!(f);
-                    color_a(f);
-                    writeln!(
-                        f,
-                        "{a_name}{SEP}{indent}size={}",
-                        a.byte_size().as_ref().map(|x| x as &dyn Display).unwrap_or(&"?" as _)
-                    );
-                    color_b(f);
-                    writeln!(
-                        f,
-                        "{b_name}{SEP}{indent}size={}",
-                        b.byte_size().as_ref().map(|x| x as &dyn Display).unwrap_or(&"?" as _)
-                    );
-                    color_reset(f);
-                    return Err(MismatchWasFound);
-                } else {
-                    match a.byte_size() {
-                        Some(size) => write!(f, " size={size}"),
-                        None => write!(f, " size=?"),
-                    };
-                }
-                // this should never happen, returning Ok(KeepWriting) will trigger the internal error in the Display impl
-                return Ok(KeepWriting);
-            }
-            (S::Array(ta, na), S::Array(tb, nb)) => {
-                if na != nb {
-                    writeln!(f);
-                    color_a(f);
-                    write!(f, "{a_name}{SEP}");
-
-                    write!(
-                        f,
-                        "array<…, {}>",
-                        match na {
-                            Some(n) => n as &dyn Display,
-                            None => (&"runtime-sized") as &dyn Display,
-                        }
-                    );
-
-                    //a.writeln(indent, colored, f);
-                    writeln!(f);
-                    color_b(f);
-                    write!(f, "{b_name}{SEP}");
-
-                    write!(
-                        f,
-                        "array<…, {}>",
-                        match nb {
-                            Some(n) => n as &dyn Display,
-                            None => (&"runtime-sized") as &dyn Display,
-                        }
-                    );
-
-                    //b.writeln(indent, colored, f);
-                    color_reset(f);
-                    Err(MismatchWasFound)
-                } else {
-                    write!(f, "array<");
-                    //ta.ty.write(&(indent.to_string() + tab), colored, f);
-
-                    Self::write(
-                        &format!("{indent}{tab}"),
-                        [(a_name, &ta.ty), (b_name, &tb.ty)],
-                        colored,
-                        f,
-                    )?;
-
-                    if let Some(na) = na {
-                        write!(f, ", {na}");
-                    }
-                    write!(f, ">");
-
-                    if ta.byte_stride != tb.byte_stride {
-                        writeln!(f);
-                        color_a(f);
-                        writeln!(f, "{a_name}{SEP}{indent}>  stride={}", ta.byte_stride);
-                        color_b(f);
-                        writeln!(f, "{b_name}{SEP}{indent}>  stride={}", tb.byte_stride);
-                        color_reset(f);
-                        Err(MismatchWasFound)
-                    } else {
-                        // this should never happen, returning Ok(KeepWriting) will trigger the internal error in the Display impl
-                        write!(f, ">  stride={}", ta.byte_stride);
-                        return Ok(KeepWriting);
-                    }
-                }
-            }
-            (S::Vector(na, ta), S::Vector(nb, tb)) => {
-                writeln!(f);
-                color_a(f);
-                write!(f, "{a_name}{SEP}");
-                a.writeln(indent, colored, f);
-                color_b(f);
-                write!(f, "{b_name}{SEP}");
-                b.writeln(indent, colored, f);
-                color_reset(f);
-                Err(MismatchWasFound)
-            }
-            (S::Matrix(c, r, t), S::Matrix(c1, r1, t1)) => {
-                writeln!(f);
-                color_a(f);
-                write!(f, "{a_name}{SEP}");
-                a.writeln(indent, colored, f);
-                color_b(f);
-                write!(f, "{b_name}{SEP}");
-                b.writeln(indent, colored, f);
-                color_reset(f);
-                Err(MismatchWasFound)
-            }
-            (S::PackedVector(p), S::PackedVector(p1)) => {
-                writeln!(f);
-                color_a(f);
-                write!(f, "{a_name}{SEP}");
-                a.writeln(indent, colored, f);
-                color_b(f);
-                write!(f, "{b_name}{SEP}");
-                b.writeln(indent, colored, f);
-                color_reset(f);
-                Err(MismatchWasFound)
-            }
-            (
-                // its written like this so that exhaustiveness checks lead us to this match statement if a type is added
-                S::Structure { .. } | S::Array { .. } | S::Vector { .. } | S::Matrix { .. } | S::PackedVector { .. },
-                _,
-            ) => {
-                // TypeLayoutSemantics mismatch
-                writeln!(f);
-                color_a(f);
-                write!(f, "{a_name}{SEP}");
-                a.writeln(indent, colored, f);
-                color_b(f);
-                write!(f, "{b_name}{SEP}");
-                b.writeln(indent, colored, f);
-                color_reset(f);
-                Err(MismatchWasFound)
-            }
-        }
-    }
-}
-
-/// takes two pairs of `(debug_name, layout)` and compares them for equality.
-///
-/// if the two layouts are not equal it uses the debug names in the returned
-/// error to tell the two layouts apart.
-pub(crate) fn check_eq<L: TypeRestriction, R: TypeRestriction>(
-    a: (&str, &TypeLayout<L>),
-    b: (&str, &TypeLayout<R>),
-) -> Result<(), LayoutMismatch> {
-    match a.1.layout_eq(b.1) {
-        true => Ok(()),
-        false => Err(LayoutMismatch {
-            layouts: [
-                (a.0.into(), a.1.to_owned().into_maybe_invalid()),
-                (b.0.into(), b.1.to_owned().into_maybe_invalid()),
-            ],
-            colored_error: Context::try_with(call_info!(), |ctx| ctx.settings().colored_error_messages)
-                .unwrap_or(false),
-        }),
-    }
 }

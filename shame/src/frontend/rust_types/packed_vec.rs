@@ -19,10 +19,10 @@ use crate::{
 
 use super::{
     error::FrontendError,
-    layout_traits::{from_single_any, ArrayElementsUnsizedError, CpuTypeLayout, FromAnys, GpuLayout},
+    layout_traits::{from_single_any, ArrayElementsUnsizedError, FromAnys, GpuLayout},
     len::LenEven,
     scalar_type::ScalarType,
-    type_layout::{unsafe_type_layout, TypeLayout, TypeLayoutRules, TypeLayoutSemantics},
+    type_layout::{unsafe_type_layout, TypeLayout, CpuTypeLayout, TypeLayoutRules, TypeLayoutSemantics},
     type_traits::{GpuAligned, GpuSized, NoAtomics, NoBools, NoHandles, VertexAttribute},
     vec::IsVec,
     GpuType,
@@ -134,7 +134,7 @@ impl<T: PackedScalarType, L: LenEven> NoAtomics for PackedVec<T, L> {}
 impl<T: PackedScalarType, L: LenEven> GpuLayout for PackedVec<T, L> {
     fn gpu_layout() -> TypeLayout {
         let packed_vec = get_type_description::<L, T>();
-        unsafe_type_layout::new(
+        unsafe_type_layout::new_type_layout(
             Some(u8::from(packed_vec.byte_size()) as u64),
             packed_vec.align(),
             TypeLayoutSemantics::PackedVector(get_type_description::<L, T>()),

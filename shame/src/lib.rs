@@ -316,10 +316,10 @@ pub use shame_derive::CpuLayout;
 pub use shame_derive::GpuLayout;
 pub use frontend::rust_types::layout_traits::GpuLayout;
 pub use frontend::rust_types::layout_traits::CpuLayout;
-pub use frontend::rust_types::layout_traits::CpuTypeLayout;
 //TODO(chronicl) remove this export
 pub use frontend::rust_types::type_layout;
 pub use frontend::rust_types::type_layout::TypeLayout;
+pub use frontend::rust_types::type_layout::CpuTypeLayout;
 pub use frontend::rust_types::type_layout::TypeLayoutError;
 pub use frontend::rust_types::layout_traits::ArrayElementsUnsizedError;
 
@@ -334,6 +334,7 @@ pub use frontend::rust_types::struct_::SizedFields;
 pub use frontend::rust_types::type_traits::NoBools;
 pub use frontend::rust_types::type_traits::NoAtomics;
 pub use frontend::rust_types::type_traits::NoHandles;
+pub use frontend::rust_types::type_traits::VertexAttribute;
 
 pub use frontend::rust_types::layout_traits::VertexLayout;
 
