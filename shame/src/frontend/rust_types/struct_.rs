@@ -21,7 +21,7 @@ use std::{
     rc::Rc,
 };
 
-use super::layout_traits::{GetAllFields, GpuLayout};
+use super::layout_traits::{CpuTypeLayout, GetAllFields, GpuLayout};
 use super::type_layout::TypeLayout;
 use super::type_traits::{GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoBools};
 use super::{
@@ -137,7 +137,7 @@ impl<T: SizedFields + GpuStore> Deref for Struct<T> {
 impl<T: SizedFields + GpuStore> GpuLayout for Struct<T> {
     fn gpu_layout() -> TypeLayout { T::gpu_layout() }
 
-    fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
+    fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, CpuTypeLayout), ArrayElementsUnsizedError>> {
         T::cpu_type_name_and_layout().map(|x| x.map(|(name, l)| (format!("Struct<{name}>").into(), l)))
     }
 }

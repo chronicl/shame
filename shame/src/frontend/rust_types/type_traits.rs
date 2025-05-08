@@ -3,9 +3,13 @@ use super::{
     layout_traits::{FromAnys, GetAllFields, GpuLayout},
     mem::{self, AddressSpace},
     reference::{AccessMode, AccessModeReadable},
+    type_layout::{self, unsafe_type_layout},
     AsAny, GpuType, ToGpuType,
 };
-use crate::frontend::any::shared_io::{BindPath, BindingType};
+use crate::{
+    frontend::any::shared_io::{BindPath, BindingType},
+    TypeLayout,
+};
 use crate::{
     call_info,
     common::proc_macro_utils::push_wrong_amount_of_args_error,
@@ -161,6 +165,9 @@ pub trait GpuSized: GpuAligned {
     fn sized_ty() -> ir::SizedType
     where
         Self: GpuType;
+
+    /// Returns the `TypeLayout` of Self, with a marker that guarantees that the layout is of a sized type.
+    fn gpu_layout_sized() -> TypeLayout<type_layout::marker::Sized> { unsafe_type_layout::cast(Self::gpu_layout()) }
 }
 
 #[diagnostic::on_unimplemented(
@@ -213,7 +220,14 @@ pub trait NoHandles: GpuLayout {}
 ///
 /// * `sm::vec`s of non-boolean type (e.g. `sm::f32x4`)
 /// * `sm::packed::PackedVec`s (e.g. `sm::packed::unorm8x4`)
-pub trait VertexAttribute: GpuLayout + FromAnys {
+// Is at most 16 bytes according to https://www.w3.org/TR/WGSL/#input-output-locations
+// and thus GpuSized.
+pub trait VertexAttribute: GpuLayout + FromAnys + GpuSized {
     #[doc(hidden)] // runtime api
     fn vertex_attrib_format() -> VertexAttribFormat;
+    /// Returns the `TypeLayout` of Self, with a marker that guarantees that the layout
+    /// is that of a `VertexAttribute` type.
+    fn gpu_layout_vertex_attribute() -> TypeLayout<type_layout::marker::VertexAttribute> {
+        unsafe_type_layout::cast(Self::gpu_layout())
+    }
 }

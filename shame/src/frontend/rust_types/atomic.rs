@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use super::{
-    layout_traits::{ArrayElementsUnsizedError, FromAnys, GetAllFields, GpuLayout},
+    layout_traits::{ArrayElementsUnsizedError, CpuTypeLayout, FromAnys, GetAllFields, GpuLayout},
     len::x1,
     mem::{AddressSpace, AddressSpaceAtomic},
     reference::{AccessMode, AccessModeReadable, ReadWrite},
@@ -130,10 +130,12 @@ impl<T: ScalarTypeInteger> GetAllFields for Atomic<T> {
 }
 
 impl<T: ScalarTypeInteger> GpuLayout for Atomic<T> {
-    fn gpu_layout() -> TypeLayout { TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &<Self as GpuSized>::sized_ty()) }
+    fn gpu_layout() -> TypeLayout {
+        TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &<Self as GpuSized>::sized_ty()).into()
+    }
 
     fn cpu_type_name_and_layout()
-    -> Option<Result<(std::borrow::Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
+    -> Option<Result<(std::borrow::Cow<'static, str>, CpuTypeLayout), ArrayElementsUnsizedError>> {
         None
     }
 }

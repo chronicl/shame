@@ -5,6 +5,7 @@ use crate::{
         any::{Any, InvalidReason},
         rust_types::{
             error::FrontendError,
+            layout_traits::CpuTypeLayout,
             type_layout::{
                 FieldLayout, FieldLayoutWithOffset, StructLayout, TypeLayout, TypeLayoutRules, TypeLayoutSemantics,
             },
@@ -59,7 +60,7 @@ pub fn collect_into_array_exact<T, const N: usize>(mut it: impl Iterator<Item = 
 pub struct ReprCField {
     pub name: &'static str,
     pub alignment: usize,
-    pub layout: TypeLayout,
+    pub layout: CpuTypeLayout,
 }
 
 pub enum ReprCError {
@@ -72,7 +73,7 @@ pub fn repr_c_struct_layout(
     first_fields_with_offsets_and_sizes: &[(ReprCField, usize, usize)],
     last_field: ReprCField,
     last_field_size: Option<usize>,
-) -> Result<TypeLayout, ReprCError> {
+) -> Result<CpuTypeLayout, ReprCError> {
     let last_field_offset = match first_fields_with_offsets_and_sizes.last() {
         None => 0,
         Some((_2nd_last_field, _2nd_last_offset, _2nd_last_size)) => {

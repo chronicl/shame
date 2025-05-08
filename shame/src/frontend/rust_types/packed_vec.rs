@@ -19,10 +19,10 @@ use crate::{
 
 use super::{
     error::FrontendError,
-    layout_traits::{from_single_any, ArrayElementsUnsizedError, FromAnys, GpuLayout},
+    layout_traits::{from_single_any, ArrayElementsUnsizedError, CpuTypeLayout, FromAnys, GpuLayout},
     len::LenEven,
     scalar_type::ScalarType,
-    type_layout::{TypeLayout, TypeLayoutRules, TypeLayoutSemantics},
+    type_layout::{unsafe_type_layout, TypeLayout, TypeLayoutRules, TypeLayoutSemantics},
     type_traits::{GpuAligned, GpuSized, NoAtomics, NoBools, NoHandles, VertexAttribute},
     vec::IsVec,
     GpuType,
@@ -134,18 +134,18 @@ impl<T: PackedScalarType, L: LenEven> NoAtomics for PackedVec<T, L> {}
 impl<T: PackedScalarType, L: LenEven> GpuLayout for PackedVec<T, L> {
     fn gpu_layout() -> TypeLayout {
         let packed_vec = get_type_description::<L, T>();
-        TypeLayout::new(
+        unsafe_type_layout::new(
             Some(u8::from(packed_vec.byte_size()) as u64),
             packed_vec.align(),
             TypeLayoutSemantics::PackedVector(get_type_description::<L, T>()),
         )
     }
 
-    fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
+    fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, CpuTypeLayout), ArrayElementsUnsizedError>> {
         let sized_ty = Self::sized_ty_equivalent();
         let name = sized_ty.to_string().into();
         let layout = TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &sized_ty);
-        Some(Ok((name, layout)))
+        Some(Ok((name, layout.into())))
     }
 }
 

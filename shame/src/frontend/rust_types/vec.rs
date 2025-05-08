@@ -2,7 +2,7 @@ use super::{
     error::FrontendError,
     index::GpuIndex,
     ir,
-    layout_traits::from_single_any,
+    layout_traits::{from_single_any, CpuTypeLayout},
     len::*,
     mem::AddressSpace,
     reference::{AccessMode, AccessModeReadable},
@@ -68,7 +68,7 @@ pub type scalar<T> = vec<T, x1>;
 /// let my_vec3 = sm::vec!(1.0, 2.0, 3.0);
 /// let my_vec4 = sm::vec!(my_vec3, 0.0); // component concatenation, like usual in shaders
 /// let my_vec4 = my_vec3.extend(0.0); // or like this
-///    
+///
 /// let my_normal = sm::vec!(1.0, 1.0, 0.0).normalize();
 /// let rgb = my_normal.remap(-1.0..=1.0, 0.0..=1.0); // remap linear ranges (instead of " * 0.5 + 0.5")
 ///
@@ -573,10 +573,12 @@ impl<T: ScalarType, L: Len> GpuStore for vec<T, L> {
 }
 
 impl<T: ScalarType, L: Len> GpuLayout for vec<T, L> {
-    fn gpu_layout() -> TypeLayout { TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &<Self as GpuSized>::sized_ty()) }
+    fn gpu_layout() -> TypeLayout {
+        TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &<Self as GpuSized>::sized_ty()).into()
+    }
 
     fn cpu_type_name_and_layout()
-    -> Option<Result<(std::borrow::Cow<'static, str>, TypeLayout), super::layout_traits::ArrayElementsUnsizedError>>
+    -> Option<Result<(std::borrow::Cow<'static, str>, CpuTypeLayout), super::layout_traits::ArrayElementsUnsizedError>>
     {
         None
     }

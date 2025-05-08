@@ -1,6 +1,6 @@
 use super::atomic::Atomic;
 use super::index::GpuIndex;
-use super::layout_traits::{ArrayElementsUnsizedError, FromAnys, GetAllFields, GpuLayout};
+use super::layout_traits::{ArrayElementsUnsizedError, CpuTypeLayout, FromAnys, GetAllFields, GpuLayout};
 use super::len::x1;
 use super::mem::AddressSpace;
 use super::reference::{AccessMode, AccessModeReadable, AccessModeWritable, Read};
@@ -169,7 +169,7 @@ impl<T: GpuType + GpuStore + GpuSized, N: ArrayLen> ToGpuType for Array<T, N> {
 impl<T: GpuType + GpuSized + GpuLayout, N: ArrayLen> GpuLayout for Array<T, N> {
     fn gpu_layout() -> TypeLayout { TypeLayout::from_array(TypeLayoutRules::Wgsl, &T::sized_ty(), N::LEN) }
 
-    fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
+    fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, CpuTypeLayout), ArrayElementsUnsizedError>> {
         let (t_cpu_name, t_cpu_layout) = match T::cpu_type_name_and_layout()? {
             Ok(t) => t,
             Err(e) => return Some(Err(e)),
