@@ -119,9 +119,6 @@ pub mod marker {
         Vertex,          // VertexLayout
         VertexAttribute  // VertexAttribute
     );
-    // TODO(chronicl)
-    // Storage, // StorageLayout
-    // Uniform, // UniformLayout
 
     macro_rules! impl_from_into {
         ($from:ident -> $($into:ident),*) => {
@@ -198,10 +195,10 @@ pub(in super::super::rust_types) mod unsafe_type_layout {
 
     pub fn extend<R: TypeRestriction>(
         builder: &mut StructLayoutBuilder<R>,
-        layout: TypeLayout<marker::Sized>,
         options: FieldOptions,
+        layout: TypeLayout<marker::Sized>,
     ) {
-        builder.struct_builder.extend(layout, options);
+        builder.struct_builder.extend(options, layout);
     }
 
     pub fn finish<R: TypeRestriction>(builder: StructLayoutBuilder<R>) -> TypeLayout<R> {
@@ -214,7 +211,7 @@ pub(in super::super::rust_types) mod unsafe_type_layout {
         layout: TypeLayout,
         options: impl Into<FieldOptions>,
     ) -> TypeLayout<R> {
-        let (byte_size, byte_align, s) = builder.struct_builder.finish_maybe_unsized(layout, options.into());
+        let (byte_size, byte_align, s) = builder.struct_builder.finish_maybe_unsized(options.into(), layout);
         new_type_layout_struct(byte_size, byte_align, s)
     }
 
@@ -306,7 +303,7 @@ impl StructLayoutBuilderErased {
         }
     }
 
-    fn extend(&mut self, layout: TypeLayout<marker::Sized>, options: FieldOptions) {
+    fn extend(&mut self, options: FieldOptions, layout: TypeLayout<marker::Sized>) {
         let field_size = FieldLayout::calculate_byte_size(layout.byte_size_sized(), options.custom_min_size);
         let field_align = FieldLayout::calculate_align(layout.align(), options.custom_min_align);
         let field_offset = self.next_field_offset(field_align, options.custom_min_align);
@@ -329,7 +326,7 @@ impl StructLayoutBuilderErased {
 
     /// Returns (byte_size, byte_align, StructLayout), where byte_size is None
     /// if the struct is unsized, that is, when `last_field` is unsized.
-    fn finish_maybe_unsized(mut self, layout: TypeLayout, options: FieldOptions) -> (Option<u64>, u64, StructLayout) {
+    fn finish_maybe_unsized(mut self, options: FieldOptions, layout: TypeLayout) -> (Option<u64>, u64, StructLayout) {
         let field = FieldLayout::new(layout, options);
         let field_offset = self.next_field_offset(field.align(), field.custom_min_align.0);
         let align = self.align.max(field.align());
@@ -379,49 +376,25 @@ impl StructLayout {
     /// returns a `(byte_size, byte_alignment, struct_layout)` tuple
     #[doc(hidden)]
     pub fn from_ir_struct(rules: TypeLayoutRules, s: &ir::Struct) -> (Option<u64>, u64, StructLayout) {
-        // Could replace all of this with TypeLayout::from_struct and then
-        // taking the StructLayout from TypeLayout::kind, but that would
-        // need an unreachable!.
-        let mut total_byte_size = None;
-        let struct_layout = StructLayout {
-            name: s.name().clone().into(),
-            fields: {
-                let mut offset = 0;
-                let mut fields = Vec::new();
-                for field in s.sized_fields() {
-                    fields.push(FieldLayoutWithOffset {
-                        field: FieldLayout {
-                            name: field.name.clone(),
-                            ty: TypeLayout::from_sized_ty(rules, &field.ty).into(),
-                            custom_min_size: field.custom_min_size.into(),
-                            custom_min_align: field.custom_min_align.map(u64::from).into(),
-                        },
-                        rel_byte_offset: match rules {
-                            TypeLayoutRules::Wgsl => {
-                                let rel_byte_offset = round_up(field.align(), offset);
-                                offset = rel_byte_offset + field.byte_size();
-                                rel_byte_offset
-                            }
-                        },
-                    })
-                }
-                if let Some(unsized_array) = s.last_unsized_field() {
-                    fields.push(FieldLayoutWithOffset {
-                        field: FieldLayout {
-                            name: unsized_array.name.clone(),
-                            custom_min_align: unsized_array.custom_min_align.map(u64::from).into(),
-                            custom_min_size: None.into(),
-                            ty: TypeLayout::from_array(rules, &unsized_array.element_ty, None).into(),
-                        },
-                        rel_byte_offset: round_up(unsized_array.align(), offset),
-                    })
-                } else {
-                    total_byte_size = Some(s.min_byte_size());
-                }
-                fields
-            },
-        };
-        (total_byte_size, s.align(), struct_layout)
+        let mut builder =
+            StructLayoutBuilderErased::new(StructOptions::new(s.name().clone(), false, TypeLayoutRules::Wgsl));
+
+        for field in s.sized_fields() {
+            builder.extend(
+                FieldOptions::new(field.name.clone(), field.custom_min_align, field.custom_min_size),
+                TypeLayout::from_sized_ty(rules, &field.ty),
+            );
+        }
+
+        if let Some(array) = s.last_unsized_field() {
+            builder.finish_maybe_unsized(
+                FieldOptions::new(array.name.clone(), array.custom_min_align, None),
+                TypeLayout::from_array(rules, &array.element_ty, None),
+            )
+        } else {
+            let (size, align, s) = builder.finish();
+            (Some(size), align, s)
+        }
     }
 }
 
@@ -469,205 +442,6 @@ pub enum TypeLayoutError {
     InArrayElement(Rc<TypeLayoutError>),
 }
 
-impl TypeLayout {
-    pub fn struct_from_parts(
-        struct_options: impl Into<StructOptions>,
-        mut fields: impl ExactSizeIterator<Item = (FieldOptions, TypeLayout)>,
-    ) -> Result<TypeLayout, StructLayoutError> {
-        let struct_options = struct_options.into();
-        let num_fields = fields.len();
-
-        let make_sized = |layout: TypeLayout, field_index: usize| {
-            layout
-                .try_into_sized()
-                .map_err(|layout| StructLayoutError::UnsizedFieldMustBeLast {
-                    struct_name: struct_options.name.clone(),
-                    unsized_field_index: field_index,
-                    num_fields,
-                })
-        };
-
-        let (options, layout) = fields
-            .next()
-            .ok_or_else(|| StructLayoutError::HasNoFields(struct_options.name.clone()))?;
-        let layout = make_sized(layout, 0)?;
-        let mut builder = StructLayoutBuilder::new_struct(struct_options.clone(), options, layout);
-
-        if num_fields == 1 {
-            return Ok(builder.finish().into());
-        }
-        for (i, (options, layout)) in fields.enumerate() {
-            let field_index = i + 1;
-            let is_last_field = field_index == num_fields - 1;
-            if is_last_field {
-                return Ok(builder.extend(options, layout).finish());
-            } else {
-                let layout = make_sized(layout, i)?;
-                builder = builder.extend(options, layout);
-            }
-        }
-        // TODO(chronicl) this is actually unreachable, but should replace this with different builder api anyway
-        Ok(builder.finish().into())
-    }
-
-
-    pub fn try_into_sized(self) -> Result<TypeLayout<marker::Sized>, TypeLayout> {
-        if self.byte_size().is_some() {
-            Ok(unsafe_type_layout::cast(self))
-        } else {
-            Err(self)
-        }
-    }
-
-    pub fn from_ty(rules: TypeLayoutRules, ty: &ir::Type) -> Result<Self, TypeLayoutError> {
-        match ty {
-            Type::Unit | Type::Ptr(_, _, _) | Type::Ref(_, _, _) => {
-                Err(TypeLayoutError::LayoutUndefined(ty.clone(), rules))
-            }
-            Type::Store(ty) => Self::from_store_ty(rules, ty),
-        }
-    }
-
-    pub fn from_array(rules: TypeLayoutRules, element: &ir::SizedType, len: Option<NonZeroU32>) -> Self {
-        unsafe_type_layout::new_type_layout(
-            len.map(|n| byte_size_of_array(element, n)),
-            align_of_array(element),
-            TypeLayoutSemantics::Array(
-                Rc::new(ElementLayout {
-                    byte_stride: match rules {
-                        TypeLayoutRules::Wgsl => stride_of_array(element),
-                    },
-                    ty: TypeLayout::from_sized_ty(rules, element).into(),
-                }),
-                len.map(NonZeroU32::get),
-            ),
-        )
-    }
-
-    pub fn from_struct(rules: TypeLayoutRules, s: &ir::Struct) -> Self {
-        let sized_fields = s.sized_fields();
-
-        let array_options =
-            |field: &ir::RuntimeSizedArrayField| FieldOptions::new(field.name.clone(), field.custom_min_align, None);
-
-        if sized_fields.is_empty() {
-            // ir::Struct always has at least one field and if there are no sized_fields (checked above),
-            // then there must be an unsized field.
-            let array = s.last_unsized_field().as_ref().unwrap();
-            let array_layout = TypeLayout::from_array(rules, &array.element_ty, None);
-            StructLayoutBuilder::new_struct(s.name().clone(), array_options(array), array_layout).finish()
-        } else {
-            // checked above that at least one sized field exists
-            let first_field = &sized_fields[0];
-
-            let options = |field: &ir::SizedField| {
-                FieldOptions::new(field.name.clone(), field.custom_min_align, field.custom_min_size)
-            };
-            let layout =
-                |field: &ir::SizedField| -> TypeLayout<marker::Sized> { TypeLayout::from_sized_ty(rules, field.ty()) };
-
-            let mut builder = StructLayoutBuilder::<marker::Sized>::new_struct(
-                s.name().clone(),
-                options(first_field),
-                layout(first_field),
-            );
-
-            for field in &sized_fields[1..] {
-                builder = builder.extend(options(field), layout(field));
-            }
-
-            if let Some(array) = s.last_unsized_field() {
-                let array_layout = TypeLayout::from_array(rules, &array.element_ty, None);
-                let builder = builder.extend(array_options(array), array_layout);
-                builder.finish()
-            } else {
-                builder.finish().into()
-            }
-        }
-    }
-
-    pub fn from_store_ty(rules: TypeLayoutRules, ty: &ir::StoreType) -> Result<Self, TypeLayoutError> {
-        match ty {
-            ir::StoreType::Sized(sized) => Ok(TypeLayout::from_sized_ty(rules, sized).into()),
-            ir::StoreType::Handle(handle) => Err(TypeLayoutError::LayoutUndefined(ir::Type::Store(ty.clone()), rules)),
-            ir::StoreType::RuntimeSizedArray(element) => Ok(TypeLayout::from_array(rules, element, None)),
-            ir::StoreType::BufferBlock(s) => Ok(TypeLayout::from_struct(rules, s)),
-        }
-    }
-
-
-    pub fn from_aligned_type(rules: TypeLayoutRules, ty: &AlignedType) -> Self {
-        match ty {
-            AlignedType::Sized(sized) => TypeLayout::from_sized_ty(rules, sized).into(),
-            AlignedType::RuntimeSizedArray(element) => Self::from_array(rules, element, None),
-        }
-    }
-}
-
-impl TypeLayout<marker::Sized> {
-    pub fn from_sized_ty(rules: TypeLayoutRules, ty: &ir::SizedType) -> Self {
-        pub use TypeLayoutSemantics as Sem;
-        let size = ty.byte_size();
-        let align = ty.align();
-        match ty {
-            ir::SizedType::Vector(l, t) =>
-            // we treat bool as a type that has a layout to allow for an
-            // `Eq` operator on `TypeLayout` that behaves intuitively.
-            // The layout of `bool`s is not actually observable in any part of the api.
-            {
-                unsafe_type_layout::new_type_layout(Some(size), align, Sem::Vector(*l, *t))
-            }
-            ir::SizedType::Matrix(c, r, t) => {
-                unsafe_type_layout::new_type_layout(Some(size), align, Sem::Matrix(*c, *r, *t))
-            }
-            ir::SizedType::Array(sized, l) => Self::from_sized_array(rules, sized, *l),
-            ir::SizedType::Atomic(t) => Self::from_sized_ty(rules, &ir::SizedType::Vector(ir::Len::X1, (*t).into())),
-            // ir::SizedType guarantees that the TypeLayout is sized.
-            ir::SizedType::Structure(s) => unsafe_type_layout::cast(TypeLayout::from_struct(rules, s)),
-        }
-    }
-
-    pub fn from_sized_array(rules: TypeLayoutRules, element: &ir::SizedType, len: NonZeroU32) -> Self {
-        unsafe_type_layout::new_type_layout(
-            Some(byte_size_of_array(element, len)),
-            align_of_array(element),
-            TypeLayoutSemantics::Array(
-                Rc::new(ElementLayout {
-                    byte_stride: match rules {
-                        TypeLayoutRules::Wgsl => stride_of_array(element),
-                    },
-                    ty: Self::from_sized_ty(rules, element).into(),
-                }),
-                Some(len.get()),
-            ),
-        )
-    }
-
-    pub fn from_sized_struct(rules: TypeLayoutRules, s: &ir::SizedStruct) -> Self {
-        let mut fields = s.fields();
-
-        // Gpu structs have at least one field
-        let first_field = fields.next().unwrap();
-
-        let options = |field: &ir::SizedField| {
-            FieldOptions::new(field.name.clone(), field.custom_min_align, field.custom_min_size)
-        };
-        let layout = |field: &ir::SizedField| TypeLayout::from_sized_ty(rules, first_field.ty());
-
-        let mut builder = StructLayoutBuilder::<marker::Sized>::new_struct(
-            s.name().clone(),
-            options(first_field),
-            layout(first_field),
-        );
-
-        for field in fields {
-            builder = builder.extend(options(field), layout(field));
-        }
-
-        builder.finish()
-    }
-}
-
 impl<T: TypeRestriction> TypeLayout<T> {
     pub fn byte_size(&self) -> Option<u64> { self.byte_size }
 
@@ -677,7 +451,7 @@ impl<T: TypeRestriction> TypeLayout<T> {
         self.byte_size == other.byte_size && self.kind == other.kind
     }
 
-    /// Although all TypeLayout<T> always implement Into<TypeLayout<marker::MaybeInvalid> this method
+    /// Although all TypeLayout<T> always implement Into<TypeLayout<marker::MaybeInvalid>, this method
     /// is offered to avoid having to declare that as a bound when handling generic TypeLayout<T>.
     pub fn into_maybe_invalid(self) -> TypeLayout<marker::MaybeInvalid> { unsafe_type_layout::cast(self) }
 

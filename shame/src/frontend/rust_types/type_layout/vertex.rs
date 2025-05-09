@@ -89,7 +89,7 @@ impl StructLayoutBuilder<marker::Vertex> {
     }
 
     pub fn extend(mut self, options: impl Into<FieldOptions>, layout: TypeLayout<marker::VertexAttribute>) -> Self {
-        unsafe_type_layout::extend(&mut self, layout.into(), options.into());
+        unsafe_type_layout::extend(&mut self, options.into(), layout.into());
         self
     }
 
