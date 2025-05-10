@@ -5,7 +5,7 @@ use super::len::x1;
 use super::mem::AddressSpace;
 use super::reference::{AccessMode, AccessModeReadable, AccessModeWritable, Read};
 use super::scalar_type::ScalarTypeInteger;
-use super::type_layout::{ElementLayout, TypeLayout, CpuTypeLayout, TypeLayoutRules, TypeLayoutSemantics};
+use super::type_layout::{ElementLayout, TypeLayout, TypeLayoutUnconstraint, TypeLayoutRules, TypeLayoutSemantics};
 use super::type_traits::{
     BindingArgs, EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles,
 };
@@ -150,6 +150,14 @@ impl<T: GpuType + GpuSized, const N: usize> GpuSized for Array<T, Size<N>> {
             Size::<N>::LEN.expect("known length at compile time"),
         )
     }
+
+    fn gpu_layout_sized() -> TypeLayout<super::type_layout::constraint::Sized> {
+        TypeLayout::from_sized_array(
+            TypeLayoutRules::Wgsl,
+            &T::sized_ty(),
+            Size::<N>::LEN.expect("known length at compile time"),
+        )
+    }
 }
 
 #[rustfmt::skip] impl<T: GpuType + GpuSized + NoHandles, N: ArrayLen> NoHandles for Array<T, N> {}
@@ -167,9 +175,10 @@ impl<T: GpuType + GpuStore + GpuSized, N: ArrayLen> ToGpuType for Array<T, N> {
 }
 
 impl<T: GpuType + GpuSized + GpuLayout, N: ArrayLen> GpuLayout for Array<T, N> {
-    fn gpu_layout() -> TypeLayout { TypeLayout::from_array(TypeLayoutRules::Wgsl, &T::sized_ty(), N::LEN) }
+    fn gpu_layout() -> TypeLayout { TypeLayout::from_array_ir(TypeLayoutRules::Wgsl, &T::sized_ty(), N::LEN) }
 
-    fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, CpuTypeLayout), ArrayElementsUnsizedError>> {
+    fn cpu_type_name_and_layout()
+    -> Option<Result<(Cow<'static, str>, TypeLayoutUnconstraint), ArrayElementsUnsizedError>> {
         let (t_cpu_name, t_cpu_layout) = match T::cpu_type_name_and_layout()? {
             Ok(t) => t,
             Err(e) => return Some(Err(e)),

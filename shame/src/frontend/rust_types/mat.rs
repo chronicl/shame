@@ -7,7 +7,7 @@ use super::{
     mem::AddressSpace,
     reference::{AccessMode, AccessModeReadable},
     scalar_type::{ScalarType, ScalarTypeFp},
-    type_layout::{TypeLayout, CpuTypeLayout, TypeLayoutRules},
+    type_layout::{TypeLayout, TypeLayoutUnconstraint, TypeLayoutRules},
     type_traits::{
         BindingArgs, EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools,
         NoHandles,
@@ -55,7 +55,8 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuLayout for mat<T, C, R> {
         TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &<Self as GpuSized>::sized_ty()).into()
     }
 
-    fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, CpuTypeLayout), ArrayElementsUnsizedError>> {
+    fn cpu_type_name_and_layout()
+    -> Option<Result<(Cow<'static, str>, TypeLayoutUnconstraint), ArrayElementsUnsizedError>> {
         None
     }
 }
@@ -69,6 +70,10 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> FromAnys for mat<T, C, R> {
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuSized for mat<T, C, R> {
     fn sized_ty() -> ir::SizedType { ir::SizedType::Matrix(C::LEN2, R::LEN2, T::SCALAR_TYPE_FP) }
+
+    fn gpu_layout_sized() -> TypeLayout<super::type_layout::constraint::Sized> {
+        TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &Self::sized_ty())
+    }
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuType for mat<T, C, R> {

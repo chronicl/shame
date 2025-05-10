@@ -3,7 +3,7 @@ use super::{
     layout_traits::{FromAnys, GetAllFields, GpuLayout},
     mem::{self, AddressSpace},
     reference::{AccessMode, AccessModeReadable},
-    type_layout::{self, unsafe_type_layout},
+    type_layout::{self, type_layout_internal},
     AsAny, GpuType, ToGpuType,
 };
 use crate::{
@@ -167,7 +167,7 @@ pub trait GpuSized: GpuAligned {
         Self: GpuType;
 
     /// Returns the `TypeLayout` of Self, with a marker that guarantees that the layout is of a sized type.
-    fn gpu_layout_sized() -> TypeLayout<type_layout::marker::Sized> { unsafe_type_layout::cast(Self::gpu_layout()) }
+    fn gpu_layout_sized() -> TypeLayout<type_layout::constraint::Sized>;
 }
 
 #[diagnostic::on_unimplemented(
@@ -227,7 +227,5 @@ pub trait VertexAttribute: GpuLayout + FromAnys + GpuSized {
     fn vertex_attrib_format() -> VertexAttribFormat;
     /// Returns the `TypeLayout` of Self, with a marker that guarantees that the layout
     /// is that of a `VertexAttribute` type.
-    fn gpu_layout_vertex_attribute() -> TypeLayout<type_layout::marker::VertexAttribute> {
-        unsafe_type_layout::cast(Self::gpu_layout())
-    }
+    fn gpu_layout_vertex_attribute() -> TypeLayout<type_layout::constraint::VertexAttribute>;
 }

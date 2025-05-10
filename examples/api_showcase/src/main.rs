@@ -486,13 +486,13 @@ struct Mat2([[f32; 2]; 2]);
 // tell `shame` about the layout semantics of your cpu types
 // Mat2::layout() == sm::f32x2x2::layout()
 impl sm::CpuLayout for Mat2 {
-    fn cpu_layout() -> sm::CpuTypeLayout { sm::f32x2x2::gpu_layout().into() }
+    fn cpu_layout() -> sm::TypeLayoutUnconstraint { sm::f32x2x2::gpu_layout().into() }
 }
 
 #[repr(C, align(16))]
 struct Mat4([[f32; 4]; 4]);
 impl sm::CpuLayout for Mat4 {
-    fn cpu_layout() -> sm::CpuTypeLayout { sm::f32x4x4::gpu_layout().into() }
+    fn cpu_layout() -> sm::TypeLayoutUnconstraint { sm::f32x4x4::gpu_layout().into() }
 }
 
 // using "duck-traiting" allows you to define layouts for foreign cpu-types,

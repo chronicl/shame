@@ -7,7 +7,7 @@ use super::{
     mem::AddressSpace,
     reference::{AccessMode, AccessModeReadable},
     scalar_type::{dtype_as_scalar_from_f64, ScalarType, ScalarTypeInteger, ScalarTypeNumber},
-    type_layout::{TypeLayoutRules, CpuTypeLayout},
+    type_layout::{TypeLayoutRules, TypeLayoutUnconstraint},
     type_traits::{BindingArgs, GpuAligned, GpuStoreImplCategory, NoAtomics, NoHandles, VertexAttribute},
     AsAny, GpuType, To, ToGpuType,
 };
@@ -539,6 +539,10 @@ impl<T: ScalarType, L: Len> Deref for vec<T, L> {
 
 impl<T: ScalarType, L: Len> GpuSized for vec<T, L> {
     fn sized_ty() -> ir::SizedType { ir::SizedType::Vector(L::LEN, T::SCALAR_TYPE) }
+
+    fn gpu_layout_sized() -> TypeLayout<super::type_layout::constraint::Sized> {
+        TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &ir::SizedType::Vector(L::LEN, T::SCALAR_TYPE))
+    }
 }
 
 impl<T: ScalarType, L: Len> GpuAligned for vec<T, L> {
@@ -577,9 +581,12 @@ impl<T: ScalarType, L: Len> GpuLayout for vec<T, L> {
         TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &<Self as GpuSized>::sized_ty()).into()
     }
 
-    fn cpu_type_name_and_layout()
-    -> Option<Result<(std::borrow::Cow<'static, str>, CpuTypeLayout), super::layout_traits::ArrayElementsUnsizedError>>
-    {
+    fn cpu_type_name_and_layout() -> Option<
+        Result<
+            (std::borrow::Cow<'static, str>, TypeLayoutUnconstraint),
+            super::layout_traits::ArrayElementsUnsizedError,
+        >,
+    > {
         None
     }
 }
@@ -1098,6 +1105,10 @@ where
     Self: NoBools,
 {
     fn vertex_attrib_format() -> VertexAttribFormat { VertexAttribFormat::Fine(L::LEN, T::SCALAR_TYPE) }
+
+    fn gpu_layout_vertex_attribute() -> TypeLayout<super::type_layout::constraint::VertexAttribute> {
+        TypeLayout::from_vec::<T, L>(TypeLayoutRules::Wgsl)
+    }
 }
 
 impl<T: ScalarType, L: Len> FromAnys for vec<T, L> {

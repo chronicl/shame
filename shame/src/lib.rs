@@ -316,10 +316,9 @@ pub use shame_derive::CpuLayout;
 pub use shame_derive::GpuLayout;
 pub use frontend::rust_types::layout_traits::GpuLayout;
 pub use frontend::rust_types::layout_traits::CpuLayout;
-//TODO(chronicl) remove this export
 pub use frontend::rust_types::type_layout;
 pub use frontend::rust_types::type_layout::TypeLayout;
-pub use frontend::rust_types::type_layout::CpuTypeLayout;
+pub use frontend::rust_types::type_layout::TypeLayoutUnconstraint;
 pub use frontend::rust_types::type_layout::TypeLayoutError;
 pub use frontend::rust_types::layout_traits::ArrayElementsUnsizedError;
 

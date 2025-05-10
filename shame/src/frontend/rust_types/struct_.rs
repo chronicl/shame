@@ -22,7 +22,7 @@ use std::{
 };
 
 use super::layout_traits::{GetAllFields, GpuLayout};
-use super::type_layout::{TypeLayout, CpuTypeLayout};
+use super::type_layout::{TypeLayout, TypeLayoutRules, TypeLayoutUnconstraint};
 use super::type_traits::{GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoBools};
 use super::{
     error::FrontendError,
@@ -123,6 +123,10 @@ impl<T: SizedFields + GpuStore> GpuAligned for Struct<T> {
 
 impl<T: SizedFields + GpuStore> GpuSized for Struct<T> {
     fn sized_ty() -> ir::SizedType { ir::SizedType::Structure(T::get_sizedstruct_type()) }
+
+    fn gpu_layout_sized() -> TypeLayout<super::type_layout::constraint::Sized> {
+        TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &Self::sized_ty())
+    }
 }
 
 impl<T: SizedFields + GpuStore + NoBools> NoBools for Struct<T> {}
@@ -137,7 +141,8 @@ impl<T: SizedFields + GpuStore> Deref for Struct<T> {
 impl<T: SizedFields + GpuStore> GpuLayout for Struct<T> {
     fn gpu_layout() -> TypeLayout { T::gpu_layout() }
 
-    fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, CpuTypeLayout), ArrayElementsUnsizedError>> {
+    fn cpu_type_name_and_layout()
+    -> Option<Result<(Cow<'static, str>, TypeLayoutUnconstraint), ArrayElementsUnsizedError>> {
         T::cpu_type_name_and_layout().map(|x| x.map(|(name, l)| (format!("Struct<{name}>").into(), l)))
     }
 }

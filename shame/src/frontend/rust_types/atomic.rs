@@ -6,7 +6,7 @@ use super::{
     mem::{AddressSpace, AddressSpaceAtomic},
     reference::{AccessMode, AccessModeReadable, ReadWrite},
     scalar_type::{ScalarType, ScalarTypeInteger},
-    type_layout::{TypeLayout, TypeLayoutRules, CpuTypeLayout},
+    type_layout::{TypeLayout, TypeLayoutRules, TypeLayoutUnconstraint},
     type_traits::{
         BindingArgs, EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools,
         NoHandles,
@@ -70,6 +70,10 @@ impl<T: ScalarTypeInteger> ToGpuType for Atomic<T> {
 
 impl<T: ScalarTypeInteger> GpuSized for Atomic<T> {
     fn sized_ty() -> ir::SizedType { ir::SizedType::Atomic(T::SCALAR_TYPE_INTEGER) }
+
+    fn gpu_layout_sized() -> TypeLayout<super::type_layout::constraint::Sized> {
+        TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &Self::sized_ty())
+    }
 }
 
 impl<T: ScalarTypeInteger> GpuAligned for Atomic<T> {
@@ -135,7 +139,7 @@ impl<T: ScalarTypeInteger> GpuLayout for Atomic<T> {
     }
 
     fn cpu_type_name_and_layout()
-    -> Option<Result<(std::borrow::Cow<'static, str>, CpuTypeLayout), ArrayElementsUnsizedError>> {
+    -> Option<Result<(std::borrow::Cow<'static, str>, TypeLayoutUnconstraint), ArrayElementsUnsizedError>> {
         None
     }
 }

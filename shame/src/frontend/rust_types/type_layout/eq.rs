@@ -1,9 +1,10 @@
 use super::*;
 
+/// Error of two layouts mismatching. Implements Display for a visualization of the mismatch.
 #[derive(Clone)]
 pub struct LayoutMismatch {
     /// 2 (name, layout) pairs
-    layouts: [(String, TypeLayout<marker::MaybeInvalid>); 2],
+    layouts: [(String, TypeLayout<constraint::Unconstraint>); 2],
     colored_error: bool,
 }
 
@@ -64,7 +65,7 @@ impl LayoutMismatch {
     #[allow(clippy::needless_return)]
     pub(crate) fn write<W: Write>(
         indent: &str,
-        layouts: [(&str, &TypeLayout<marker::MaybeInvalid>); 2],
+        layouts: [(&str, &TypeLayout<constraint::Unconstraint>); 2],
         colored: bool,
         f: &mut W,
     ) -> Result<KeepWriting, MismatchWasFound> {
@@ -430,16 +431,19 @@ impl LayoutMismatch {
 ///
 /// if the two layouts are not equal it uses the debug names in the returned
 /// error to tell the two layouts apart.
-pub(crate) fn check_eq<L: TypeRestriction, R: TypeRestriction>(
+pub(crate) fn check_eq<L: TypeConstraint, R: TypeConstraint>(
     a: (&str, &TypeLayout<L>),
     b: (&str, &TypeLayout<R>),
-) -> Result<(), LayoutMismatch> {
-    match a.1.layout_eq(b.1) {
+) -> Result<(), LayoutMismatch>
+where
+    TypeLayout<L>: PartialEq<TypeLayout<R>>,
+{
+    match a.1 == b.1 {
         true => Ok(()),
         false => Err(LayoutMismatch {
             layouts: [
-                (a.0.into(), a.1.to_owned().into_maybe_invalid()),
-                (b.0.into(), b.1.to_owned().into_maybe_invalid()),
+                (a.0.into(), a.1.to_owned().into_unconstraint()),
+                (b.0.into(), b.1.to_owned().into_unconstraint()),
             ],
             colored_error: Context::try_with(call_info!(), |ctx| ctx.settings().colored_error_messages)
                 .unwrap_or(false),

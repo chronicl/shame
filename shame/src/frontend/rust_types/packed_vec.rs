@@ -22,7 +22,7 @@ use super::{
     layout_traits::{from_single_any, ArrayElementsUnsizedError, FromAnys, GpuLayout},
     len::LenEven,
     scalar_type::ScalarType,
-    type_layout::{unsafe_type_layout, TypeLayout, CpuTypeLayout, TypeLayoutRules, TypeLayoutSemantics},
+    type_layout::{type_layout_internal, TypeLayout, TypeLayoutUnconstraint, TypeLayoutRules, TypeLayoutSemantics},
     type_traits::{GpuAligned, GpuSized, NoAtomics, NoBools, NoHandles, VertexAttribute},
     vec::IsVec,
     GpuType,
@@ -104,7 +104,7 @@ impl<T: PackedScalarType, L: LenEven> PackedVec<T, L> {
     }
 }
 
-fn get_type_description<L: LenEven, T: PackedScalarType>() -> PackedVector {
+pub(crate) fn get_type_description<L: LenEven, T: PackedScalarType>() -> PackedVector {
     PackedVector {
         len: L::LEN_EVEN,
         bits_per_component: T::BITS_PER_COMPONENT,
@@ -119,6 +119,10 @@ impl<T: PackedScalarType, L: LenEven> GpuSized for PackedVec<T, L> {
     {
         unreachable!("Self: !GpuType")
     }
+
+    fn gpu_layout_sized() -> TypeLayout<super::type_layout::constraint::Sized> {
+        TypeLayout::from_packed_vector(TypeLayoutRules::Wgsl, get_type_description::<L, T>())
+    }
 }
 
 impl<T: PackedScalarType, L: LenEven> GpuAligned for PackedVec<T, L> {
@@ -132,16 +136,10 @@ impl<T: PackedScalarType, L: LenEven> NoHandles for PackedVec<T, L> {}
 impl<T: PackedScalarType, L: LenEven> NoAtomics for PackedVec<T, L> {}
 
 impl<T: PackedScalarType, L: LenEven> GpuLayout for PackedVec<T, L> {
-    fn gpu_layout() -> TypeLayout {
-        let packed_vec = get_type_description::<L, T>();
-        unsafe_type_layout::new_type_layout(
-            Some(u8::from(packed_vec.byte_size()) as u64),
-            packed_vec.align(),
-            TypeLayoutSemantics::PackedVector(get_type_description::<L, T>()),
-        )
-    }
+    fn gpu_layout() -> TypeLayout { Self::gpu_layout_sized().into() }
 
-    fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, CpuTypeLayout), ArrayElementsUnsizedError>> {
+    fn cpu_type_name_and_layout()
+    -> Option<Result<(Cow<'static, str>, TypeLayoutUnconstraint), ArrayElementsUnsizedError>> {
         let sized_ty = Self::sized_ty_equivalent();
         let name = sized_ty.to_string().into();
         let layout = TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &sized_ty);
@@ -283,6 +281,10 @@ where
     Self: NoBools,
 {
     fn vertex_attrib_format() -> VertexAttribFormat { VertexAttribFormat::Coarse(get_type_description::<L, T>()) }
+
+    fn gpu_layout_vertex_attribute() -> TypeLayout<super::type_layout::constraint::VertexAttribute> {
+        TypeLayout::from_packed_vector_vertex_attr::<T, L>(TypeLayoutRules::Wgsl)
+    }
 }
 
 /// see https://www.w3.org/TR/WGSL/#pack4x8snorm-builtin

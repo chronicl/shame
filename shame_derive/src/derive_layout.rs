@@ -178,6 +178,10 @@ pub fn impl_for_struct(
         .map(|f| quote_option(f.align.clone()))
         .collect::<Vec<_>>();
 
+    let (first_field_ident, last_fields_ident) = field_ident.split_first().expect("checked above");
+    let (first_field_type, last_fields_type) = field_type.split_first().expect("checked above");
+    let (first_field_size, last_fields_size) = field_size.split_first().expect("checked above");
+    let (first_field_align, last_fields_align) = field_align.split_first().expect("checked above");
     let (last_field_ident, first_fields_ident) = field_ident.split_last().expect("checked above");
     let (last_field_type, first_fields_type) = field_type.split_last().expect("checked above");
     let (last_field_size, first_fields_size) = field_size.split_last().expect("checked above");
@@ -230,7 +234,7 @@ pub fn impl_for_struct(
                         }
                     }
 
-                    fn cpu_type_name_and_layout() -> Option<Result<(std::borrow::Cow<'static, str>, #re::CpuTypeLayout), #re::ArrayElementsUnsizedError>> {
+                    fn cpu_type_name_and_layout() -> Option<Result<(std::borrow::Cow<'static, str>, #re::TypeLayoutUnconstraint), #re::ArrayElementsUnsizedError>> {
                         use #re::CpuLayout as _;
                         #(
                             Some(Ok((
@@ -250,6 +254,32 @@ pub fn impl_for_struct(
                     #(#triv #field_type: #re::VertexAttribute,)*
                     #where_clause_predicates
                 {
+                    fn gpu_layout_vertex() -> #re::TypeLayout<#re::constraint::Vertex> {
+                        #re::TypeLayout::struct_builder_vertex(
+                            #re::StructOptions::new(
+                                std::stringify!(#derive_struct_ident),
+                                #is_gpu_repr_packed,
+                                #re::TypeLayoutRules::Wgsl
+                            ),
+                            #re::FieldOptions::new(
+                                std::stringify!(#first_field_ident),
+                                #first_field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")).into(),
+                                #first_field_size.into()
+                            ),
+                            <#first_field_type as #re::VertexAttribute>::gpu_layout_vertex_attribute()
+                        )
+                        #(
+                            .extend(
+                                #re::FieldOptions::new(
+                                    std::stringify!(#last_fields_ident),
+                                    #last_fields_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")).into(),
+                                    #last_fields_size.into()
+                                ),
+                                <#last_fields_type as #re::VertexAttribute>::gpu_layout_vertex_attribute()
+                            )
+                        )*
+                        .finish()
+                    }
                 }
             };
 
@@ -313,6 +343,33 @@ pub fn impl_for_struct(
                     fn sized_ty() -> #re::ir::SizedType where
                     #triv Self: #re::GpuType {
                         unreachable!("Self: !GpuType")
+                    }
+
+                    fn gpu_layout_sized() -> #re::TypeLayout<#re::constraint::Sized> {
+                        #re::TypeLayout::struct_builder(
+                            #re::StructOptions::new(
+                                std::stringify!(#derive_struct_ident),
+                                #is_gpu_repr_packed,
+                                #re::TypeLayoutRules::Wgsl
+                            ),
+                            #re::FieldOptions::new(
+                                std::stringify!(#first_field_ident),
+                                #first_field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")).into(),
+                                #first_field_size.into()
+                            ),
+                            <#first_field_type as #re::GpuSized>::gpu_layout_sized()
+                        )
+                        #(
+                            .extend(
+                                #re::FieldOptions::new(
+                                    std::stringify!(#last_fields_ident),
+                                    #last_fields_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")).into(),
+                                    #last_fields_size.into()
+                                ),
+                                <#last_fields_type as #re::GpuSized>::gpu_layout_sized()
+                            )
+                        )*
+                        .finish()
                     }
                 }
 
@@ -564,7 +621,7 @@ pub fn impl_for_struct(
                 #(#field_type: #re::CpuAligned,)*
                 #where_clause_predicates
             {
-                fn cpu_layout() -> #re::CpuTypeLayout {
+                fn cpu_layout() -> #re::TypeLayoutUnconstraint {
                     //use #re::CpuLayout // using `use` instead of `as #re::CpuAligned` allows for duck-traits to circumvent the orphan rule
                     use #re::CpuAligned;
                     use #re::CpuLayout as _;
