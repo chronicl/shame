@@ -412,7 +412,7 @@ impl StructLayout {
 
     /// returns a `(byte_size, byte_alignment, struct_layout)` tuple
     #[doc(hidden)]
-    pub fn from_ir_struct(rules: TypeLayoutRules, s: &ir::Struct) -> (Option<u64>, u64, StructLayout) {
+    pub fn from_struct_ir(rules: TypeLayoutRules, s: &ir::Struct) -> (Option<u64>, u64, StructLayout) {
         let mut builder =
             StructLayoutBuilderErased::new(StructOptions::new(s.name().clone(), false, TypeLayoutRules::Wgsl));
 
