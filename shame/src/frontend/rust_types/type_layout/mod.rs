@@ -315,73 +315,89 @@ impl<T: Into<CanonName>> From<T> for FieldOptions {
     fn from(name: T) -> Self { Self::new(name, None, None) }
 }
 
-/// Builds a TypeLayout<marker::Valid> and is wrapped by all StructLayoutBuilder<T>,
-/// which impose further restrictions on the building process, so that they may
-/// produce more strict TypeLayouts, such as StructLayoutBuilder<Sized> -> TypeLayout<Sized>.
-struct StructLayoutBuilderErased {
+/// `LayoutCalculator` helps calculate the size, align and the field offsets of a gpu struct.
+#[derive(Debug, Clone)]
+pub struct LayoutCalculator {
     next_offset_min: u64,
     align: u64,
     packed: bool,
     rules: TypeLayoutRules,
-    s: StructLayout,
 }
 
-impl StructLayoutBuilderErased {
-    fn new(options: StructOptions) -> Self {
+impl LayoutCalculator {
+    /// Creates a new `LayoutCalculator`, which calculates the size and
+    /// the field offsets of a structs layout.
+    pub fn new(packed: bool, rules: TypeLayoutRules) -> Self {
         Self {
             next_offset_min: 0,
             align: 1,
-            packed: options.packed,
-            rules: options.rules,
-            s: StructLayout {
-                name: options.name.into(),
-                fields: Vec::new(),
-            },
+            packed,
+            rules,
         }
     }
 
-    fn extend(&mut self, options: FieldOptions, layout: TypeLayout<constraint::Sized>) {
-        let field_size = FieldLayout::calculate_byte_size(layout.byte_size_sized(), options.custom_min_size);
-        let field_align = FieldLayout::calculate_align(layout.align(), options.custom_min_align);
-        let field_offset = self.next_field_offset(field_align, options.custom_min_align);
-        self.next_offset_min = field_offset + field_size;
-        self.align = self.align.max(field_align);
+    /// Returns the field's offset in the struct.
+    pub fn extend(
+        &mut self,
+        size: u64,
+        align: u64,
+        custom_min_size: Option<u64>,
+        custom_min_align: Option<u64>,
+    ) -> u64 {
+        let size = FieldLayout::calculate_byte_size(size, custom_min_size);
+        let align = FieldLayout::calculate_align(align, custom_min_align);
 
-        self.s.fields.push(FieldLayoutWithOffset {
-            field: FieldLayout::new(layout.into(), options),
-            rel_byte_offset: field_offset,
-        });
+        let offset = self.next_field_offset(align, custom_min_align);
+        self.next_offset_min = offset + size;
+        self.align = self.align.max(align);
+
+        offset
     }
 
-    /// Returns (byte_size, byte_align, StructLayout).
+    /// Returns (byte size, byte align, last field offset).
+    ///
+    /// `self` is consumed, so that no further fields may be extended, because
+    /// only the last field may be unsized.
+    pub fn extend_maybe_unsized(
+        mut self,
+        size: Option<u64>,
+        align: u64,
+        custom_min_size: Option<u64>,
+        custom_min_align: Option<u64>,
+    ) -> (Option<u64>, u64, u64) {
+        if let Some(size) = size {
+            let offset = self.extend(size, align, custom_min_size, custom_min_align);
+            (Some(self.byte_size()), self.align(), offset)
+        } else {
+            let (offset, align) = self.extend_unsized(align, custom_min_align);
+            (None, align, offset)
+        }
+    }
+
+
+    /// Returns (byte align, last field offset).
+    ///
+    /// `self` is consumed, so that no further fields may be extended, because
+    /// only the last field may be unsized.
+    pub fn extend_unsized(mut self, align: u64, custom_min_align: Option<u64>) -> (u64, u64) {
+        let align = FieldLayout::calculate_align(align, custom_min_align);
+
+        let offset = self.next_field_offset(align, custom_min_align);
+        self.align = self.align.max(align);
+
+        (offset, self.align)
+    }
+
+    /// Returns the byte size of the struct.
     // wgsl spec:
     //   roundUp(AlignOf(S), justPastLastMember)
     //   where justPastLastMember = OffsetOfMember(S,N) + SizeOfMember(S,N)
     //
     // self.next_offset_min is justPastLastMember already.
-    fn finish(self) -> (u64, u64, StructLayout) { (round_up(self.align, self.next_offset_min), self.align, self.s) }
+    pub fn byte_size(&self) -> u64 { round_up(self.align, self.next_offset_min) }
 
-    /// Returns (byte_size, byte_align, StructLayout), where byte_size is None
-    /// if the struct is unsized, that is, when `last_field` is unsized.
-    fn finish_maybe_unsized(mut self, options: FieldOptions, layout: TypeLayout) -> (Option<u64>, u64, StructLayout) {
-        let field = FieldLayout::new(layout, options);
-        let field_offset = self.next_field_offset(field.align(), field.custom_min_align.0);
-        let align = self.align.max(field.align());
-
-        // wgsl spec:
-        //   roundUp(AlignOf(S), justPastLastMember)
-        //   where justPastLastMember = OffsetOfMember(S,N) + SizeOfMember(S,N)
-        let size = field
-            .byte_size()
-            .map(|field_size| round_up(align, field_offset + field_size));
-
-        self.s.fields.push(FieldLayoutWithOffset {
-            field,
-            rel_byte_offset: field_offset,
-        });
-
-        (size, align, self.s)
-    }
+    /// Returns the align of the struct.
+    pub fn align(&self) -> u64 { self.align }
 
     /// field_align should already respect field_custom_min_align.
     /// field_custom_min_align is used to overwrite packing if self is packed.
@@ -393,6 +409,61 @@ impl StructLayoutBuilderErased {
                 (false, _) => round_up(field_align, self.next_offset_min),
             },
         }
+    }
+}
+
+/// Builds a TypeLayout<marker::Valid> and is wrapped by all StructLayoutBuilder<T>,
+/// which impose further restrictions on the building process, so that they may
+/// produce more strict TypeLayouts, such as StructLayoutBuilder<Sized> -> TypeLayout<Sized>.
+struct StructLayoutBuilderErased {
+    calc: LayoutCalculator,
+    s: StructLayout,
+}
+
+impl StructLayoutBuilderErased {
+    fn new(options: StructOptions) -> Self {
+        Self {
+            calc: LayoutCalculator::new(options.packed, options.rules),
+            s: StructLayout {
+                name: options.name.into(),
+                fields: Vec::new(),
+            },
+        }
+    }
+
+    fn extend(&mut self, options: FieldOptions, layout: TypeLayout<constraint::Sized>) {
+        let field_offset = self.calc.extend(
+            layout.byte_size_sized(),
+            layout.align(),
+            options.custom_min_size,
+            options.custom_min_align,
+        );
+
+        self.s.fields.push(FieldLayoutWithOffset {
+            field: FieldLayout::new(layout.into(), options),
+            rel_byte_offset: field_offset,
+        });
+    }
+
+    /// Returns (byte_size, byte_align, StructLayout).
+    fn finish(self) -> (u64, u64, StructLayout) { (self.calc.byte_size(), self.calc.align(), self.s) }
+
+    /// Returns (byte_size, byte_align, StructLayout), where byte_size is None
+    /// if the struct is unsized, that is, when `last_field` is unsized.
+    fn finish_maybe_unsized(mut self, options: FieldOptions, layout: TypeLayout) -> (Option<u64>, u64, StructLayout) {
+        let (size, align, offset) = self.calc.extend_maybe_unsized(
+            layout.byte_size(),
+            layout.align(),
+            options.custom_min_size,
+            options.custom_min_align,
+        );
+
+        self.s.fields.push(FieldLayoutWithOffset {
+            field: FieldLayout::new(layout, options),
+            rel_byte_offset: offset,
+        });
+
+        (size, align, self.s)
     }
 }
 
