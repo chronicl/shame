@@ -325,8 +325,8 @@ pub struct LayoutCalculator {
 }
 
 impl LayoutCalculator {
-    /// Creates a new `LayoutCalculator`, which calculates the size and
-    /// the field offsets of a structs layout.
+    /// Creates a new `LayoutCalculator`, which calculates the size, align and
+    /// the field offsets of a gpu struct.
     pub fn new(packed: bool, rules: TypeLayoutRules) -> Self {
         Self {
             next_offset_min: 0,
