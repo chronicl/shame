@@ -336,16 +336,18 @@ impl LayoutCalculator {
         }
     }
 
-    /// Returns the field's offset in the struct.
+    /// Extends the layout by a field given it's size and align.
+    ///
+    /// Returns the field's offset.
     pub fn extend(
         &mut self,
-        size: u64,
-        align: u64,
+        field_size: u64,
+        field_align: u64,
         custom_min_size: Option<u64>,
         custom_min_align: Option<u64>,
     ) -> u64 {
-        let size = FieldLayout::calculate_byte_size(size, custom_min_size);
-        let align = FieldLayout::calculate_align(align, custom_min_align);
+        let size = FieldLayout::calculate_byte_size(field_size, custom_min_size);
+        let align = FieldLayout::calculate_align(field_align, custom_min_align);
 
         let offset = self.next_field_offset(align, custom_min_align);
         self.next_offset_min = offset + size;
@@ -354,33 +356,36 @@ impl LayoutCalculator {
         offset
     }
 
+    /// Extends the layout by a field given it's size and align. If the field
+    /// is unsized, pass `None` as it's size.
+    ///
     /// Returns (byte size, byte align, last field offset).
     ///
     /// `self` is consumed, so that no further fields may be extended, because
     /// only the last field may be unsized.
     pub fn extend_maybe_unsized(
         mut self,
-        size: Option<u64>,
-        align: u64,
+        field_size: Option<u64>,
+        field_align: u64,
         custom_min_size: Option<u64>,
         custom_min_align: Option<u64>,
     ) -> (Option<u64>, u64, u64) {
-        if let Some(size) = size {
-            let offset = self.extend(size, align, custom_min_size, custom_min_align);
+        if let Some(size) = field_size {
+            let offset = self.extend(size, field_align, custom_min_size, custom_min_align);
             (Some(self.byte_size()), self.align(), offset)
         } else {
-            let (offset, align) = self.extend_unsized(align, custom_min_align);
+            let (offset, align) = self.extend_unsized(field_align, custom_min_align);
             (None, align, offset)
         }
     }
 
 
-    /// Returns (byte align, last field offset).
+    /// Extends the layout by an unsized field given it's align.
     ///
     /// `self` is consumed, so that no further fields may be extended, because
     /// only the last field may be unsized.
-    pub fn extend_unsized(mut self, align: u64, custom_min_align: Option<u64>) -> (u64, u64) {
-        let align = FieldLayout::calculate_align(align, custom_min_align);
+    pub fn extend_unsized(mut self, field_align: u64, custom_min_align: Option<u64>) -> (u64, u64) {
+        let align = FieldLayout::calculate_align(field_align, custom_min_align);
 
         let offset = self.next_field_offset(align, custom_min_align);
         self.align = self.align.max(align);
