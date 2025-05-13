@@ -4,13 +4,14 @@ use thiserror::Error;
 
 use crate::frontend::any::Any;
 use crate::frontend::rust_types::type_layout::TypeLayout;
+use crate::{ir};
+use crate::type_layout::{constraint, LayoutCalculator, VertexAttribute};
 use crate::{
     call_info,
     common::iterator_ext::try_collect,
     frontend::{
         encoding::{
             fill::{Fill, PickVertex},
-            io_iter::LocationCounter,
             EncodingErrorKind,
         },
         rust_types::type_layout::TypeLayoutSemantics,
@@ -139,6 +140,34 @@ pub struct VertexBufferLayout {
     pub attribs: Box<[Attrib]>,
 }
 
+/// The memory layout and lookup method of a vertex buffer.
+///
+/// A vertex buffer can consist of multiple vertex attributes, each of which
+/// are interleaved inside the buffer and repeated the same amount of times.
+///
+/// Each vertex attribute is of [`vec`] or [`packed::PackedVec`] type.
+///
+/// see https://docs.rs/wgpu/latest/wgpu/struct.VertexBufferLayout.html
+///
+/// or https://www.w3.org/TR/webgpu/#dictdef-gpuvertexbufferlayout
+///
+/// [`vec`]: crate::vec
+/// [`packed::PackedVec`]: crate::packed::PackedVec
+#[derive(Debug, Clone)]
+pub struct VertexBufferLayoutRecorded {
+    /// Slot of the layout
+    pub slot: u32,
+    /// The index that is used to look up the vertex attributes within a vertex buffer
+    ///
+    /// either `vertex_index` or `instance_index`
+    pub lookup: VertexBufferLookupIndex,
+    /// The amount of bytes between the first occurence of a vertex attribute in
+    /// the buffer and the next occurence of that same attribute in the buffer.
+    pub stride: u64,
+    /// Location and layout information of each vertex attribute
+    pub attribs: Vec<RecordedWithIndex<Attrib>>,
+}
+
 /// a mask that specifies which color components should be written to and which
 /// ones should be ignored.
 ///
@@ -244,78 +273,106 @@ impl VertexAttribFormat {
     }
 }
 
-impl Attrib {
-    pub(crate) fn get_attribs_and_stride(
-        layout: &TypeLayout,
-        mut location_counter: &LocationCounter,
-    ) -> Option<(Box<[Attrib]>, u64)> {
-        let stride = {
-            let size = layout.byte_size()?;
-            stride_of_array_from_element_align_size(layout.align(), size)
-        };
-        use TypeLayoutSemantics as TLS;
+/// Signifies ownership of a vertex buffer layout if `VertexBufferKey::is_valid` is true.
+///
+/// Can be used to extend the vertex buffer layout via `Any::vertex_buffer_extend`.
+/// If the key is not valid the resulting `Any`s will not be valid, but
+/// `Any::vertex_buffer_extend` is still okay to call.
+pub struct VertexBufferKey(Result<usize, InvalidReason>);
 
-        let attribs: Box<[Attrib]> = match &layout.kind {
-            TLS::Matrix(..) | TLS::Array(..) | TLS::Vector(_, ScalarType::Bool) => return None,
-            TLS::Vector(len, non_bool) => [Attrib {
-                offset: 0,
-                location: location_counter.next(),
-                format: VertexAttribFormat::Fine(*len, *non_bool),
-            }]
-            .into(),
-            TLS::PackedVector(packed_vector) => [Attrib {
-                offset: 0,
-                location: location_counter.next(),
-                format: VertexAttribFormat::Coarse(*packed_vector),
-            }]
-            .into(),
-            TLS::Structure(rc) => try_collect(rc.fields.iter().map(|f| {
-                Some(Attrib {
-                    offset: f.rel_byte_offset,
-                    location: location_counter.next(),
-                    format: match f.field.ty.kind {
-                        TLS::Vector(_, ScalarType::Bool) => return None,
-                        TLS::Vector(len, non_bool) => Some(VertexAttribFormat::Fine(len, non_bool)),
-                        TLS::PackedVector(packed_vector) => Some(VertexAttribFormat::Coarse(packed_vector)),
-                        TLS::Matrix(..) | TLS::Array(..) | TLS::Structure(..) => None,
-                    }?,
-                })
-            }))?,
-        };
-
-        Some((attribs, stride))
-    }
+impl VertexBufferKey {
+    /// Returns whether this key is valid.
+    pub fn is_valid(&self) -> bool { self.0.is_ok() }
 }
 
 impl Any {
-    #[allow(missing_docs)]
+    /// Obtains ownership over a new vertex buffer layout. The `VertexBufferKey` can
+    /// be used with `Any::vertex_buffer_extend` to add attributes to the vertex buffer layout.
     #[track_caller]
-    pub fn vertex_buffer(slot: u32, layout: VertexBufferLayout) -> Vec<Any> {
-        let attribs_len = layout.attribs.len();
-        Context::try_with(call_info!(), |ctx| {
+    pub fn vertex_buffer_new(slot: u32) -> VertexBufferKey {
+        let result = Context::try_with(call_info!(), |ctx| {
             ctx.push_error_if_outside_encoding_scope("vertex buffer import");
-            let attribs = layout.attribs.clone();
-            ctx.render_pipeline_mut().vertex_buffers.push(RecordedWithIndex::new(
-                layout,
-                slot,
-                ctx.latest_user_caller(),
-            ));
-            // order important! must happen after vertex_buffers.push
-            attribs
-                .iter()
-                .map(|attrib| {
-                    record_node(
-                        ctx.latest_user_caller(),
-                        ShaderIo::GetVertexInput(attrib.location).into(),
-                        &[],
-                    )
-                })
-                .collect()
+
+            let buffers = &mut ctx.render_pipeline_mut().vertex_buffers_recorded;
+
+            match buffers.iter().position(|b| b.slot == slot) {
+                Some(_) => {
+                    ctx.push_error(PipelineError::DuplicateVertexBufferImport(slot).into());
+                    Err(InvalidReason::ErrorThatWasPushed)
+                }
+                None => {
+                    let i = buffers.len();
+                    buffers.push(VertexBufferLayoutRecorded {
+                        slot,
+                        stride: 1,
+                        lookup: VertexBufferLookupIndex::VertexIndex,
+                        attribs: Default::default(),
+                    });
+                    Ok(i)
+                }
+            }
         })
-        .unwrap_or(vec![
-            Any::new_invalid(InvalidReason::CreatedWithNoActiveEncoding);
-            attribs_len
-        ])
+        .unwrap_or(Err(InvalidReason::CreatedWithNoActiveEncoding));
+
+        VertexBufferKey(result)
+    }
+
+    /// Extends the vertex buffer layout by the given vertex `attributes`.
+    ///
+    /// - Later calls to this function extending the same `slot` will overwrite
+    ///   the `stride` and `lookup`.
+    #[track_caller]
+    pub fn vertex_buffer_extend(
+        slot: &VertexBufferKey,
+        lookup: VertexBufferLookupIndex,
+        stride: u64,
+        // TODO(chronicl) probably change this to iterator over Attrib
+        attributes: impl IntoIterator<Item = (Location, VertexAttribute)>,
+    ) -> Vec<Any> {
+        let call_info = call_info!();
+
+        let mut new_attribute_count = 0;
+        let anys = Context::try_with(call_info, |ctx| -> Result<Vec<Any>, InvalidReason> {
+            ctx.push_error_if_outside_encoding_scope("vertex attribute import");
+
+            let buffers = &mut ctx.render_pipeline_mut().vertex_buffers_recorded;
+
+            let slot_index = slot.0?;
+            let slot = buffers[slot_index].slot;
+
+            let mut anys = Vec::<Any>::new();
+            for (location, attr) in attributes.into_iter() {
+                new_attribute_count += 1;
+                if let Err(e) = ensure_location_is_unique(ctx, slot, location, buffers) {
+                    ctx.push_error(e.into());
+                    return Err(InvalidReason::ErrorThatWasPushed);
+                }
+
+                buffers[slot_index].attribs.push(RecordedWithIndex::new(
+                    Attrib::new(attr.offset, location, attr.format),
+                    location.0,
+                    call_info,
+                ));
+
+                // order important! must happen after attribs.push
+                anys.push(record_node(
+                    ctx.latest_user_caller(),
+                    ShaderIo::GetVertexInput(location).into(),
+                    &[],
+                ));
+            }
+
+            buffers[slot_index].lookup = lookup;
+            buffers[slot_index].stride = stride;
+
+            Ok(anys)
+        })
+        .unwrap_or(Err(InvalidReason::CreatedWithNoActiveEncoding));
+
+        match anys {
+            Ok(anys) => anys,
+            Err(reason) => vec![Any::new_invalid(reason); new_attribute_count],
+        }
     }
 
     #[allow(missing_docs)]
@@ -336,6 +393,51 @@ impl Any {
             );
         });
     }
+}
+
+/// checks that there are no duplicate vertex attribute locations and vertex buffer slots
+fn ensure_location_is_unique(
+    ctx: &Context,
+    slot: u32,
+    location: Location,
+    vertex_buffers: &[VertexBufferLayoutRecorded],
+) -> Result<(), PipelineError> {
+    for vbuf in vertex_buffers {
+        for existing_attrib in &vbuf.attribs {
+            if location == existing_attrib.location {
+                return Err(PipelineError::DuplicateAttribLocation {
+                    location: existing_attrib.location,
+                    buffer_a: vbuf.slot,
+                    buffer_b: slot,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// checks that there are no duplicate vertex attribute locations and vertex buffer slots
+fn ensure_locations_are_unique(
+    slot: u32,
+    ctx: &Context,
+    rp: &ir::pipeline::WipRenderPipelineDescriptor,
+    new_attribs: &[Attrib],
+) -> Result<(), PipelineError> {
+    for vbuf in &rp.vertex_buffers {
+        if vbuf.index == slot {
+            return Err(PipelineError::DuplicateVertexBufferImport(slot));
+        }
+        for existing_attrib in &vbuf.attribs {
+            if new_attribs.iter().any(|a| a.location == existing_attrib.location) {
+                return Err(PipelineError::DuplicateAttribLocation {
+                    location: existing_attrib.location,
+                    buffer_a: vbuf.index,
+                    buffer_b: slot,
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 impl Any {

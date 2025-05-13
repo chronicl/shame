@@ -18,7 +18,7 @@ use crate::{
     },
     frontend::{
         any::{
-            render_io::{Attrib, ColorTarget, Location, VertexBufferLayout},
+            render_io::{Attrib, ColorTarget, Location, VertexBufferLayout, VertexBufferLayoutRecorded},
             shared_io::{BindPath, BindingType},
         },
         encoding::{
@@ -437,6 +437,7 @@ pub struct WipSpecialization {
 
 #[derive(Default, Debug)]
 pub struct WipRenderPipelineDescriptor {
+    pub(crate) vertex_buffers_recorded: Vec<VertexBufferLayoutRecorded>,
     pub(crate) vertex_buffers: Vec<RecordedWithIndex<VertexBufferLayout>>,
     // TODO(release) test if color target multisampling works decoupled from depth/stencil buffer multisampling https://registry.khronos.org/vulkan/specs/1.2-extensions/html/chap8.html#VUID-VkRenderingInfo-imageView-06858
     pub(crate) color_targets: Vec<RecordedWithIndex<ColorTarget>>,

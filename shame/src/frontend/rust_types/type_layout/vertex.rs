@@ -1,9 +1,11 @@
 use crate::{
     any::{Attrib, Location, VertexAttribFormat, VertexBufferLayout, VertexBufferLookupIndex},
     common::iterator_ext::try_collect,
-    frontend::rust_types::{
-        len::LenEven,
-        packed_vec::{self, PackedScalarType},
+    frontend::{
+        rust_types::{
+            len::LenEven,
+            packed_vec::{self, PackedScalarType},
+        },
     },
     ir::{self, ir_type::stride_of_array_from_element_align_size, PackedVector, ScalarType},
     packed::PackedVec,
@@ -23,36 +25,24 @@ impl TypeLayout<constraint::Vertex> {
         StructLayoutBuilder::new_vertex(struct_options, field_options, layout)
     }
 
-    // TODO(chronicl) properly implement this once VertexBufferAny is merged
-    // This is just placeholder code for now, for demonstration purposes.
-    /// (no documentation - chronicl)
-    pub fn as_vertex_buffer_layout(&self) -> VertexBufferLayout {
-        let stride = {
-            let size = self.byte_size_sized();
-            stride_of_array_from_element_align_size(self.align(), size)
-        };
+    /// Locations are assigned incrementally starting with `first_location`.
+    pub fn as_vertex_attributes(&self) -> VertexAttributes {
         use TypeLayoutSemantics as TLS;
 
-        let mut location_counter = 0;
-        let mut next_location = || {
-            location_counter += 1;
-            location_counter - 1
-        };
+        let stride = stride_of_array_from_element_align_size(self.align(), self.byte_size_sized());
 
-        let attribs: Box<[Attrib]> = match &self.kind {
+        let attribs: Box<[VertexAttribute]> = match &self.kind {
             // TypeLayout<Vertex> is either a type implementing VertexAttribute or a struct of
             // VertexAttributes. A VertexAttribute is either a Vector with non-bool scalar type
             // or a packed vector.
             TLS::Matrix(..) | TLS::Array(..) | TLS::Vector(_, ir::ScalarType::Bool) => unreachable!(),
-            TLS::Vector(len, non_bool) => [Attrib {
+            TLS::Vector(len, non_bool) => [VertexAttribute {
                 offset: 0,
-                location: Location(next_location()),
                 format: VertexAttribFormat::Fine(*len, *non_bool),
             }]
             .into(),
-            TLS::PackedVector(packed_vector) => [Attrib {
+            TLS::PackedVector(packed_vector) => [VertexAttribute {
                 offset: 0,
-                location: Location(next_location()),
                 format: VertexAttribFormat::Coarse(*packed_vector),
             }]
             .into(),
@@ -60,28 +50,47 @@ impl TypeLayout<constraint::Vertex> {
                 .fields
                 .iter()
                 .map(|f| {
-                    Attrib {
+                    VertexAttribute {
                         offset: f.rel_byte_offset,
-                        location: Location(next_location()),
                         format: match f.field.ty.kind {
+                            TLS::Matrix(..) |
+                            TLS::Array(..) |
+                            TLS::Structure(..) |
                             TLS::Vector(_, ir::ScalarType::Bool) => unreachable!(), // see above
                             TLS::Vector(len, non_bool) => VertexAttribFormat::Fine(len, non_bool),
                             TLS::PackedVector(packed_vector) => VertexAttribFormat::Coarse(packed_vector),
-                            TLS::Matrix(..) | TLS::Array(..) | TLS::Structure(..) => unreachable!(), // see above
                         },
                     }
                 })
                 .collect(),
         };
 
-        VertexBufferLayout {
-            // This is not something we should determine here, just placeholder code for different
-            // VertexBufferLayout struct without this field. TODO(chronicl)
-            lookup: VertexBufferLookupIndex::VertexIndex,
-            stride,
-            attribs,
+        VertexAttributes { stride, attribs }
+    }
+
+    /// Returns the amount of vertex attributes this type layout contains.
+    pub fn vertex_attribute_count(&self) -> usize {
+        match &self.kind {
+            TypeLayoutSemantics::Structure(s) => s.fields.len(),
+            _ => 1,
         }
     }
+}
+
+/// (no documentation - chronicl)
+pub struct VertexAttributes {
+    /// (no documentation - chronicl)
+    pub stride: u64,
+    /// (no documentation - chronicl)
+    pub attribs: Box<[VertexAttribute]>,
+}
+
+/// Vertex Attribute information - offset and format.
+pub struct VertexAttribute {
+    /// (no documentation - chronicl)
+    pub offset: u64,
+    /// (no documentation - chronicl)
+    pub format: VertexAttribFormat,
 }
 
 impl TypeLayout<constraint::VertexAttribute> {

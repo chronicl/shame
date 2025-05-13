@@ -18,8 +18,8 @@ use crate::{
     ir::{
         self,
         ir_type::{
-            align_of_array, byte_size_of_array, round_up, stride_of_array, AlignedType, CanonName, LenEven,
-            PackedVectorByteSize, ScalarTypeFp, ScalarTypeInteger,
+            align_of_array, byte_size_of_array, round_up, stride_of_array, stride_of_array_from_element_align_size,
+            AlignedType, CanonName, LenEven, PackedVectorByteSize, ScalarTypeFp, ScalarTypeInteger,
         },
         recording::Context,
         Len, SizedType, Type,
@@ -403,6 +403,11 @@ impl LayoutCalculator {
 
     /// Returns the align of the struct.
     pub fn align(&self) -> u64 { self.align }
+
+    /// Returns the stride that this layout's type has as the element of an array.
+    pub fn array_element_stride(&self) -> u64 {
+        stride_of_array_from_element_align_size(self.align(), self.byte_size())
+    }
 
     /// field_align should already respect field_custom_min_align.
     /// field_custom_min_align is used to overwrite packing if self is packed.

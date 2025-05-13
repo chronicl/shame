@@ -93,7 +93,7 @@ fn main() {
     assert_eq!(&C::gpu_layout_vertex(), &c);
 
     // And we can use special methods that are only available on TypeLayout<constraint::Vertex>, like
-    let vertex_buffer_layout = c.as_vertex_buffer_layout();
+    let vertex_buffer_layout = c.as_vertex_attributes();
     // which can be used to obtain a VertexBufferAny (not on this branch) TODO(chronicl)
     // ...
 
