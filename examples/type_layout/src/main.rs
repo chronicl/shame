@@ -54,8 +54,10 @@ fn main() {
         a: f32x3,
         b: f32x3,
         #[align(16)]
-        c: f32x4,
+        c: f32x3,
     }
+
+    println!("{}", B::gpu_layout());
 
     // The arguments to struct_builder and extend are actually impl Into<StructOptions>
     // and impl Into<FieldOptions>, so that we can do the following instead
@@ -64,7 +66,7 @@ fn main() {
     let c_options = FieldOptions::new("c", Some(U32PowerOf2::_16), None);
     let b = TypeLayout::struct_builder(struct_options, "a", f32x3::gpu_layout_sized())
         .extend("b", f32x3::gpu_layout_sized())
-        .extend(c_options, f32x4::gpu_layout_sized())
+        .extend(c_options, f32x3::gpu_layout_sized())
         .finish();
 
     assert_eq!(B::gpu_layout_sized(), b);
