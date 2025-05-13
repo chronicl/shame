@@ -128,6 +128,10 @@ pub use frontend::encoding::io_iter::BindGroupIter;
 pub use frontend::encoding::io_iter::BindingIter;
 pub use frontend::encoding::io_iter::PushConstants;
 
+pub use frontend::encoding::io_iter_dynamic::VertexBufferDynamic;
+pub use frontend::encoding::io_iter_dynamic::VertexBufferElement;
+pub use frontend::encoding::io_iter_dynamic::VertexAttributeIter;
+
 pub use ir::pipeline::StageMask;
 pub use ir::pipeline::StageMaskIter;
 pub use ir::pipeline::ShaderStage;
@@ -336,6 +340,7 @@ pub use frontend::rust_types::type_traits::NoHandles;
 pub use frontend::rust_types::type_traits::VertexAttribute;
 
 pub use frontend::rust_types::layout_traits::VertexLayout;
+pub use frontend::rust_types::layout_traits::FromAnys;
 
 /// vector types [`PackedVec`] and scalar types ([`unorm8`], [`snorm8`], ...),
 /// with a smaller memory footprint than regular [`vec`] vectors,
@@ -493,8 +498,10 @@ pub mod any {
     pub use any::render_io::FragmentSamplePosition;
     pub use any::render_io::VertexBufferLookupIndex;
     pub use any::render_io::Location;
+    pub use any::render_io::VertexAttribute;
     pub use any::render_io::VertexAttribFormat;
     pub use any::render_io::VertexBufferLayoutRecorded;
+
 
     #[allow(missing_docs)]
     pub mod control_flow {

@@ -326,37 +326,47 @@ impl Any {
         let anys = Context::try_with(call_info, |ctx| -> Result<Vec<Any>, InvalidReason> {
             ctx.push_error_if_outside_encoding_scope("vertex attribute import");
 
-            let buffers = &mut ctx.render_pipeline_mut().vertex_buffers;
-
             let slot_index = slot.0?;
-            let slot = buffers[slot_index].slot;
+            let mut rp = ctx.render_pipeline_mut();
+            let buffer = &mut rp.vertex_buffers[slot_index];
+            buffer.lookup = lookup;
+            buffer.stride = stride;
+            let slot = buffer.slot;
+            drop(rp);
 
             let mut anys = Vec::<Any>::new();
+            // We need to keep iterating even upon hitting an error, so that new_attribute_count is correct.
+            let mut err = None;
             for (location, attr) in attributes.into_iter() {
                 new_attribute_count += 1;
-                if let Err(e) = ensure_location_is_unique(ctx, slot, location, buffers) {
-                    ctx.push_error(e.into());
-                    return Err(InvalidReason::ErrorThatWasPushed);
+                // Only actually doing something if no error has occured yet.
+                if err.is_none() {
+                    let mut rp = ctx.render_pipeline_mut();
+                    let mut buffers = &mut rp.vertex_buffers;
+                    if let Err(e) = ensure_location_is_unique(ctx, slot, location, buffers) {
+                        ctx.push_error(e.into());
+                        err = Some(InvalidReason::ErrorThatWasPushed);
+                    }
+
+
+                    buffers[slot_index].attribs.push(RecordedWithIndex::new(
+                        Attrib::new(attr.offset, location, attr.format),
+                        location.0,
+                        call_info,
+                    ));
+
+                    // Have to drop because record_node needs access.
+                    drop(rp);
+                    // Order important! must happen after `attribs.push`.
+                    anys.push(record_node(
+                        ctx.latest_user_caller(),
+                        ShaderIo::GetVertexInput(location).into(),
+                        &[],
+                    ));
                 }
-
-                buffers[slot_index].attribs.push(RecordedWithIndex::new(
-                    Attrib::new(attr.offset, location, attr.format),
-                    location.0,
-                    call_info,
-                ));
-
-                // order important! must happen after attribs.push
-                anys.push(record_node(
-                    ctx.latest_user_caller(),
-                    ShaderIo::GetVertexInput(location).into(),
-                    &[],
-                ));
             }
 
-            buffers[slot_index].lookup = lookup;
-            buffers[slot_index].stride = stride;
-
-            Ok(anys)
+            if let Some(e) = err { Err(e) } else { Ok(anys) }
         })
         .unwrap_or(Err(InvalidReason::CreatedWithNoActiveEncoding));
 

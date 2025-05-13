@@ -50,6 +50,7 @@ impl VertexBufferIterDynamic {
     }
 }
 
+/// (no documentation - chronicl)
 pub struct VertexBufferDynamic {
     slot: VertexBufferKey,
     location_counter: LocationCounter,
@@ -149,11 +150,13 @@ impl VertexBufferElement {
         )
     }
 
+    /// (no documentation - chronicl)
     pub fn attribute_iter(self, packed: bool) -> VertexAttributeIter {
         VertexAttributeIter::new(self.slot, self.location_counter, self.lookup, packed)
     }
 }
 
+/// (no documentation - chronicl)
 pub struct VertexAttributeIter {
     slot: VertexBufferKey,
     location_counter: LocationCounter,
@@ -176,8 +179,10 @@ impl VertexAttributeIter {
         }
     }
 
+
     // TODO(chronicl) consider methods that allow custom_min_align and custom_min_size
     /// (no documentation - chronicl)
+    #[allow(clippy::should_implement_trait)]
     pub fn next<T: VertexAttribute>(&mut self) -> T { self.at(self.location_counter.next().0) }
 
     /// (no documentation - chronicl)
