@@ -151,6 +151,7 @@ impl VertexBufferElement {
     }
 
     /// (no documentation - chronicl)
+    #[track_caller]
     pub fn attribute_iter(self, packed: bool) -> VertexAttributeIter {
         VertexAttributeIter::new(self.slot, self.location_counter, self.lookup, packed)
     }
@@ -183,9 +184,11 @@ impl VertexAttributeIter {
     // TODO(chronicl) consider methods that allow custom_min_align and custom_min_size
     /// (no documentation - chronicl)
     #[allow(clippy::should_implement_trait)]
+    #[track_caller]
     pub fn next<T: VertexAttribute>(&mut self) -> T { self.at(self.location_counter.next().0) }
 
     /// (no documentation - chronicl)
+    #[track_caller]
     pub fn at<T: VertexAttribute>(&mut self, location: u32) -> T {
         let format = T::vertex_attrib_format();
         let ty = format.type_in_shader();
