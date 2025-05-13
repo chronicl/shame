@@ -55,7 +55,7 @@ macro_rules! with_updated_latest_user_caller {
         // Therefore the incoming `$new_caller` is ignored in that case.
         let latest_user_caller = $ctx.latest_user_caller_since_first.get().unwrap_or($new_caller);
 
-        // remember whatever was in `latest_user_caller` before to 
+        // remember whatever was in `latest_user_caller` before to
         // restore it afterwards
         let restore = $ctx.latest_user_caller_since_first.replace(Some(latest_user_caller));
         let result = $expr_to_execute;
@@ -443,7 +443,7 @@ impl Context {
                         vertex_buffers: render
                             .vertex_buffers
                             .into_iter()
-                            .map(|vbuf| (vbuf.index, vbuf.into_inner()))
+                            .map(|vbuf| (vbuf.slot, vbuf))
                             .collect(),
                         bind_groups,
                         push_constants: RenderPipelinePushConstantRanges {

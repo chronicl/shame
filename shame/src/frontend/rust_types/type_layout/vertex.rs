@@ -1,7 +1,8 @@
 use crate::{
-    any::{Attrib, Location, VertexAttribFormat, VertexBufferLayout, VertexBufferLookupIndex},
+    any::{Attrib, Location, VertexAttribFormat, VertexBufferLookupIndex},
     common::iterator_ext::try_collect,
     frontend::{
+        any::render_io::{VertexAttribute, VertexAttributes},
         rust_types::{
             len::LenEven,
             packed_vec::{self, PackedScalarType},
@@ -75,22 +76,6 @@ impl TypeLayout<constraint::Vertex> {
             _ => 1,
         }
     }
-}
-
-/// (no documentation - chronicl)
-pub struct VertexAttributes {
-    /// (no documentation - chronicl)
-    pub stride: u64,
-    /// (no documentation - chronicl)
-    pub attribs: Box<[VertexAttribute]>,
-}
-
-/// Vertex Attribute information - offset and format.
-pub struct VertexAttribute {
-    /// (no documentation - chronicl)
-    pub offset: u64,
-    /// (no documentation - chronicl)
-    pub format: VertexAttribFormat,
 }
 
 impl TypeLayout<constraint::VertexAttribute> {

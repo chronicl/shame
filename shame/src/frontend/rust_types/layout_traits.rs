@@ -1,9 +1,7 @@
 use crate::call_info;
 use crate::common::po2::U32PowerOf2;
 use crate::common::proc_macro_utils::{self, repr_c_struct_layout, ReprCError, ReprCField};
-use crate::frontend::any::render_io::{
-    Attrib, VertexBufferLookupIndex, Location, VertexAttribFormat, VertexBufferLayout, VertexLayoutError,
-};
+use crate::frontend::any::render_io::{Attrib, VertexBufferLookupIndex, Location, VertexAttribFormat, VertexLayoutError};
 use crate::frontend::any::{Any, InvalidReason};
 use crate::frontend::encoding::buffer::{BufferAddressSpace, BufferInner, BufferRefInner};
 use crate::frontend::encoding::{EncodingError, EncodingErrorKind};

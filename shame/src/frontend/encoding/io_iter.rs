@@ -6,7 +6,7 @@ use crate::{
     common::integer::post_inc_u32,
     frontend::{
         any::{
-            render_io::{Attrib, Location, VertexAttribFormat, VertexBufferLayout},
+            render_io::{Attrib, Location, VertexAttribFormat},
             shared_io::{BindPath, BindingType},
             Any, InvalidReason,
         },

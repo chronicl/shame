@@ -101,7 +101,7 @@ pub fn sample_type(st: sm::TextureSampleUsageType) -> wgpu::TextureSampleType {
     }
 }
 
-/// converts `tf` into a `wgpu::TextureFormat` if supported. 
+/// converts `tf` into a `wgpu::TextureFormat` if supported.
 /// If `tf` is `ExtraTextureFormats::SurfaceFormat`, then the provided `surface_format` argument
 /// is returned if it is `Some`. Otherwise an error is returned.
 #[rustfmt::skip]
@@ -194,7 +194,7 @@ pub fn texture_format(tf: &dyn sm::TextureFormatId, surface_format: Option<wgpu:
         SmTf::EacR11Snorm          => wgpu::TextureFormat::EacR11Snorm,
         SmTf::EacRg11Unorm         => wgpu::TextureFormat::EacRg11Unorm,
         SmTf::EacRg11Snorm         => wgpu::TextureFormat::EacRg11Snorm,
-        SmTf::Astc { block, channel } => wgpu::TextureFormat::Astc { 
+        SmTf::Astc { block, channel } => wgpu::TextureFormat::Astc {
             block: match block {
                 SmASTCb::B4x4   => wgpu::AstcBlock::B4x4,
                 SmASTCb::B5x4   => wgpu::AstcBlock::B5x4,
@@ -210,12 +210,12 @@ pub fn texture_format(tf: &dyn sm::TextureFormatId, surface_format: Option<wgpu:
                 SmASTCb::B10x10 => wgpu::AstcBlock::B10x10,
                 SmASTCb::B12x10 => wgpu::AstcBlock::B12x10,
                 SmASTCb::B12x12 => wgpu::AstcBlock::B12x12,
-            }, 
+            },
             channel: match channel {
                 SmASTCc::Unorm     => wgpu::AstcChannel::Unorm,
                 SmASTCc::UnormSrgb => wgpu::AstcChannel::UnormSrgb,
                 SmASTCc::Hdr       => wgpu::AstcChannel::Hdr,
-            } 
+            }
         },
     };
     Ok(wtf)
@@ -482,7 +482,7 @@ fn vertex_format(format: smr::VertexAttribFormat) -> Result<wgpu::VertexFormat, 
 
             (S::Bool, _) => return unsupported,
         },
-        
+
         smr::VertexAttribFormat::Coarse(p) => {
             use smr::PackedScalarType as PS;
             use smr::PackedFloat as Norm;
@@ -514,7 +514,7 @@ fn vertex_format(format: smr::VertexAttribFormat) -> Result<wgpu::VertexFormat, 
 }
 
 /// returns (array_stride, step_mode, attributes) tuple
-fn vertex_buffer_layout(vbuf: smr::VertexBufferLayout) -> Result<WgpuVertexBufferLayout, ShameToWgpuError> {
+fn vertex_buffer_layout(vbuf: smr::VertexBufferLayoutRecorded) -> Result<WgpuVertexBufferLayout, ShameToWgpuError> {
     let layout = WgpuVertexBufferLayout {
         array_stride: vbuf.stride,
         step_mode: match vbuf.lookup {

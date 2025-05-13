@@ -1,9 +1,12 @@
 use std::{cell::Cell, rc::Rc};
 
 use crate::{
-    any::{Any, Attrib, Location, VertexBufferLayout, VertexBufferLookupIndex},
+    any::{Any, Attrib, Location, VertexBufferLookupIndex},
     call_info,
-    frontend::any::{render_io::VertexBufferKey, InvalidReason},
+    frontend::any::{
+        render_io::{self, VertexBufferKey},
+        InvalidReason,
+    },
     ir::{self, pipeline::PipelineError, recording::Context},
     type_layout::{self, constraint, LayoutCalculator, TypeLayoutRules},
     TypeLayout, VertexAttribute, VertexIndex,
@@ -32,7 +35,6 @@ impl VertexBufferIterDynamic {
     #[track_caller]
     pub(crate) fn at(&mut self, i: u32) -> VertexBufferDynamic {
         self.next_slot = i + 1;
-
         VertexBufferDynamic::new(i, self.location_counter.clone())
     }
 
@@ -181,13 +183,11 @@ impl VertexAttributeIter {
     /// (no documentation - chronicl)
     pub fn at<T: VertexAttribute>(&mut self, location: u32) -> T {
         let format = T::vertex_attrib_format();
-        let ty = T::gpu_layout_vertex_attribute();
+        let ty = format.type_in_shader();
         let location = Location(location);
-        let offset = self
-            .layout_calculator
-            .extend(ty.byte_size_sized(), ty.align(), None, None);
+        let offset = self.layout_calculator.extend(ty.byte_size(), ty.align(), None, None);
         let stride = self.layout_calculator.array_element_stride();
-        let attribute = type_layout::VertexAttribute { offset, format };
+        let attribute = render_io::VertexAttribute { offset, format };
 
         let anys = Any::vertex_buffer_extend(&self.slot, self.lookup, stride, [(location, attribute)]);
         T::from_anys(anys.into_iter())

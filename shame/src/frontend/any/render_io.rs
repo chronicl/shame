@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::frontend::any::Any;
 use crate::frontend::rust_types::type_layout::TypeLayout;
 use crate::{ir};
-use crate::type_layout::{constraint, LayoutCalculator, VertexAttribute};
+use crate::type_layout::{constraint, LayoutCalculator};
 use crate::{
     call_info,
     common::iterator_ext::try_collect,
@@ -50,6 +50,23 @@ pub enum VertexLayoutError {
     LocationIteratorRanOutOfLocations,
     // #[error("field `{0}` of type `{1}` cannot be part of a vertex buffer. Only scalar and vector types allowed.")]
     // FieldCannotBeVertexAttribute(CanonName, Type),
+}
+
+
+/// (no documentation - chronicl)
+pub struct VertexAttributes {
+    /// (no documentation - chronicl)
+    pub stride: u64,
+    /// (no documentation - chronicl)
+    pub attribs: Box<[VertexAttribute]>,
+}
+
+/// Vertex Attribute information - offset and format.
+pub struct VertexAttribute {
+    /// (no documentation - chronicl)
+    pub offset: u64,
+    /// (no documentation - chronicl)
+    pub format: VertexAttribFormat,
 }
 
 /// location and format of a vertex attribute
@@ -128,32 +145,6 @@ pub enum VertexAttribFormat {
 /// [`vec`]: crate::vec
 /// [`packed::PackedVec`]: crate::packed::PackedVec
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct VertexBufferLayout {
-    /// The index that is used to look up the vertex attributes within a vertex buffer
-    ///
-    /// either `vertex_index` or `instance_index`
-    pub lookup: VertexBufferLookupIndex,
-    /// The amount of bytes between the first occurence of a vertex attribute in
-    /// the buffer and the next occurence of that same attribute in the buffer.
-    pub stride: u64,
-    /// Location and layout information of each vertex attribute
-    pub attribs: Box<[Attrib]>,
-}
-
-/// The memory layout and lookup method of a vertex buffer.
-///
-/// A vertex buffer can consist of multiple vertex attributes, each of which
-/// are interleaved inside the buffer and repeated the same amount of times.
-///
-/// Each vertex attribute is of [`vec`] or [`packed::PackedVec`] type.
-///
-/// see https://docs.rs/wgpu/latest/wgpu/struct.VertexBufferLayout.html
-///
-/// or https://www.w3.org/TR/webgpu/#dictdef-gpuvertexbufferlayout
-///
-/// [`vec`]: crate::vec
-/// [`packed::PackedVec`]: crate::packed::PackedVec
-#[derive(Debug, Clone)]
 pub struct VertexBufferLayoutRecorded {
     /// Slot of the layout
     pub slot: u32,
@@ -273,9 +264,9 @@ impl VertexAttribFormat {
     }
 }
 
-/// Signifies ownership of a vertex buffer layout if `VertexBufferKey::is_valid` is true.
+/// Signifies ownership of a vertex buffer layout slot if `VertexBufferKey::is_valid` is true.
 ///
-/// Can be used to extend the vertex buffer layout via `Any::vertex_buffer_extend`.
+/// Can be used to extend the vertex buffer layout at the slot via `Any::vertex_buffer_extend`.
 /// If the key is not valid the resulting `Any`s will not be valid, but
 /// `Any::vertex_buffer_extend` is still okay to call.
 pub struct VertexBufferKey(Result<usize, InvalidReason>);
@@ -286,14 +277,14 @@ impl VertexBufferKey {
 }
 
 impl Any {
-    /// Obtains ownership over a new vertex buffer layout. The `VertexBufferKey` can
-    /// be used with `Any::vertex_buffer_extend` to add attributes to the vertex buffer layout.
+    /// Obtains ownership over a new vertex buffer layout slot. The `VertexBufferKey` can
+    /// be used with `Any::vertex_buffer_extend` to add attributes to the vertex buffer layout at the slot.
     #[track_caller]
     pub fn vertex_buffer_new(slot: u32) -> VertexBufferKey {
         let result = Context::try_with(call_info!(), |ctx| {
             ctx.push_error_if_outside_encoding_scope("vertex buffer import");
 
-            let buffers = &mut ctx.render_pipeline_mut().vertex_buffers_recorded;
+            let buffers = &mut ctx.render_pipeline_mut().vertex_buffers;
 
             match buffers.iter().position(|b| b.slot == slot) {
                 Some(_) => {
@@ -317,7 +308,7 @@ impl Any {
         VertexBufferKey(result)
     }
 
-    /// Extends the vertex buffer layout by the given vertex `attributes`.
+    /// Extends the vertex buffer layout at `slot` by the given vertex `attributes`.
     ///
     /// - Later calls to this function extending the same `slot` will overwrite
     ///   the `stride` and `lookup`.
@@ -335,7 +326,7 @@ impl Any {
         let anys = Context::try_with(call_info, |ctx| -> Result<Vec<Any>, InvalidReason> {
             ctx.push_error_if_outside_encoding_scope("vertex attribute import");
 
-            let buffers = &mut ctx.render_pipeline_mut().vertex_buffers_recorded;
+            let buffers = &mut ctx.render_pipeline_mut().vertex_buffers;
 
             let slot_index = slot.0?;
             let slot = buffers[slot_index].slot;
@@ -408,30 +399,6 @@ fn ensure_location_is_unique(
                 return Err(PipelineError::DuplicateAttribLocation {
                     location: existing_attrib.location,
                     buffer_a: vbuf.slot,
-                    buffer_b: slot,
-                });
-            }
-        }
-    }
-    Ok(())
-}
-
-/// checks that there are no duplicate vertex attribute locations and vertex buffer slots
-fn ensure_locations_are_unique(
-    slot: u32,
-    ctx: &Context,
-    rp: &ir::pipeline::WipRenderPipelineDescriptor,
-    new_attribs: &[Attrib],
-) -> Result<(), PipelineError> {
-    for vbuf in &rp.vertex_buffers {
-        if vbuf.index == slot {
-            return Err(PipelineError::DuplicateVertexBufferImport(slot));
-        }
-        for existing_attrib in &vbuf.attribs {
-            if new_attribs.iter().any(|a| a.location == existing_attrib.location) {
-                return Err(PipelineError::DuplicateAttribLocation {
-                    location: existing_attrib.location,
-                    buffer_a: vbuf.index,
                     buffer_b: slot,
                 });
             }
