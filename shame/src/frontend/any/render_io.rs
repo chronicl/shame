@@ -323,6 +323,8 @@ impl Any {
         let call_info = call_info!();
 
         let mut new_attribute_count = 0;
+        let mut attributes = attributes.into_iter();
+        let attributes_mut = &mut attributes;
         let anys = Context::try_with(call_info, |ctx| -> Result<Vec<Any>, InvalidReason> {
             ctx.push_error_if_outside_encoding_scope("vertex attribute import");
 
@@ -335,40 +337,38 @@ impl Any {
             drop(rp);
 
             let mut anys = Vec::<Any>::new();
-            // We need to keep iterating even upon hitting an error, so that new_attribute_count is correct.
-            let mut err = None;
-            for (location, attr) in attributes.into_iter() {
+            for (location, attr) in attributes_mut {
                 new_attribute_count += 1;
-                // Only actually doing something if no error has occured yet.
-                if err.is_none() {
-                    let mut rp = ctx.render_pipeline_mut();
-                    let mut buffers = &mut rp.vertex_buffers;
-                    if let Err(e) = ensure_location_is_unique(ctx, slot, location, buffers) {
-                        ctx.push_error(e.into());
-                        err = Some(InvalidReason::ErrorThatWasPushed);
-                    }
 
-
-                    buffers[slot_index].attribs.push(RecordedWithIndex::new(
-                        Attrib::new(attr.offset, location, attr.format),
-                        location.0,
-                        call_info,
-                    ));
-
-                    // Have to drop because record_node needs access.
-                    drop(rp);
-                    // Order important! must happen after `attribs.push`.
-                    anys.push(record_node(
-                        ctx.latest_user_caller(),
-                        ShaderIo::GetVertexInput(location).into(),
-                        &[],
-                    ));
+                let mut rp = ctx.render_pipeline_mut();
+                let mut buffers = &mut rp.vertex_buffers;
+                if let Err(e) = ensure_location_is_unique(ctx, slot, location, buffers) {
+                    ctx.push_error(e.into());
+                    return Err(InvalidReason::ErrorThatWasPushed);
                 }
+
+                buffers[slot_index].attribs.push(RecordedWithIndex::new(
+                    Attrib::new(attr.offset, location, attr.format),
+                    location.0,
+                    call_info,
+                ));
+
+                // Have to drop because record_node needs access.
+                drop(rp);
+                // Order important! must happen after `attribs.push`.
+                anys.push(record_node(
+                    ctx.latest_user_caller(),
+                    ShaderIo::GetVertexInput(location).into(),
+                    &[],
+                ));
             }
 
-            if let Some(e) = err { Err(e) } else { Ok(anys) }
+            Ok(anys)
         })
         .unwrap_or(Err(InvalidReason::CreatedWithNoActiveEncoding));
+        // If we returned early due to an error, we are still
+        // adding up the left over attributes here.
+        new_attribute_count += attributes.count();
 
         match anys {
             Ok(anys) => anys,
@@ -396,7 +396,7 @@ impl Any {
     }
 }
 
-/// checks that there are no duplicate vertex attribute locations and vertex buffer slots
+/// Checks that the vertex attribute location is unique - doesn't exist yet.
 fn ensure_location_is_unique(
     ctx: &Context,
     slot: u32,
