@@ -21,6 +21,7 @@ use crate::{
         buffer::{BufferAddressSpace, BufferInner, BufferRefInner},
         rasterizer::Gradient,
     },
+    hs,
     ir::{
         pipeline::StageMask,
         recording::{CallInfoScope, Context, NodeRecordingError},
@@ -542,6 +543,11 @@ impl<T: ScalarType, L: Len> GpuSized for vec<T, L> {
 
     fn gpu_layout_sized() -> TypeLayout<super::type_layout::constraint::Sized> {
         TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &ir::SizedType::Vector(L::LEN, T::SCALAR_TYPE))
+    }
+
+    fn host_shareable_sized() -> hs::SizedType {
+        // TODO(chronicl) remove unchecked
+        hs::Vector::new(T::SCALAR_TYPE.as_host_shareable_unchecked(), L::LEN).into()
     }
 }
 
@@ -1104,7 +1110,9 @@ impl<T: ScalarType, L: Len> VertexAttribute for vec<T, L>
 where
     Self: NoBools,
 {
-    fn vertex_attrib_format() -> VertexAttribFormat { VertexAttribFormat::Fine(L::LEN, T::SCALAR_TYPE) }
+    fn vertex_attrib_format() -> VertexAttribFormat {
+        VertexAttribFormat::Fine(L::LEN, T::SCALAR_TYPE.as_host_shareable_unchecked())
+    }
 
     fn gpu_layout_vertex_attribute() -> TypeLayout<super::type_layout::constraint::VertexAttribute> {
         TypeLayout::from_vec::<T, L>(TypeLayoutRules::Wgsl)

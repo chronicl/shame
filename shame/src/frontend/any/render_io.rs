@@ -4,6 +4,7 @@ use thiserror::Error;
 
 use crate::frontend::any::Any;
 use crate::frontend::rust_types::type_layout::TypeLayout;
+use crate::hs;
 use crate::{
     call_info,
     common::iterator_ext::try_collect,
@@ -108,7 +109,7 @@ impl Any {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VertexAttribFormat {
     /// regular [`crate::vec`] types
-    Fine(Len, ScalarType),
+    Fine(Len, hs::ScalarType),
     /// packed [`crate::packed::PackedVec`] types
     Coarse(PackedVector),
 }
@@ -238,7 +239,7 @@ impl VertexAttribFormat {
     #[allow(missing_docs)]
     pub fn type_in_shader(self) -> SizedType {
         match self {
-            VertexAttribFormat::Fine(l, t) => SizedType::Vector(l, t),
+            VertexAttribFormat::Fine(l, t) => SizedType::Vector(l, t.into()),
             VertexAttribFormat::Coarse(coarse) => coarse.decompressed_ty(),
         }
     }
@@ -256,11 +257,11 @@ impl Attrib {
         use TypeLayoutSemantics as TLS;
 
         let attribs: Box<[Attrib]> = match &layout.kind {
-            TLS::Matrix(..) | TLS::Array(..) | TLS::Vector(_, ScalarType::Bool) => return None,
+            TLS::Matrix(..) | TLS::Array(..) => return None,
             TLS::Vector(len, non_bool) => [Attrib {
                 offset: 0,
                 location: location_counter.next(),
-                format: VertexAttribFormat::Fine(*len, *non_bool),
+                format: VertexAttribFormat::Fine(*len, non_bool.as_host_shareable_unchecked()),
             }]
             .into(),
             TLS::PackedVector(packed_vector) => [Attrib {
@@ -274,8 +275,9 @@ impl Attrib {
                     offset: f.rel_byte_offset,
                     location: location_counter.next(),
                     format: match f.field.ty.kind {
-                        TLS::Vector(_, ScalarType::Bool) => return None,
-                        TLS::Vector(len, non_bool) => Some(VertexAttribFormat::Fine(len, non_bool)),
+                        TLS::Vector(len, non_bool) => {
+                            Some(VertexAttribFormat::Fine(len, non_bool.as_host_shareable_unchecked()))
+                        }
                         TLS::PackedVector(packed_vector) => Some(VertexAttribFormat::Coarse(packed_vector)),
                         TLS::Matrix(..) | TLS::Array(..) | TLS::Structure(..) => None,
                     }?,

@@ -30,6 +30,7 @@ pub use crate::frontend::rust_types::type_layout::StructOptions;
 pub use crate::frontend::rust_types::type_layout::StructLayout;
 pub use crate::frontend::rust_types::type_layout::StructLayoutError;
 pub use crate::frontend::rust_types::type_layout::constraint;
+pub use crate::frontend::rust_types::type_layout2::hs;
 pub use crate::frontend::rust_types::type_layout::TypeLayout;
 pub use crate::frontend::rust_types::type_layout::TypeLayoutUnconstraint;
 pub use crate::frontend::rust_types::type_layout::StructLayoutBuilder;

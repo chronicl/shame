@@ -73,23 +73,11 @@ impl PartialEq<Len2> for Len {
 }
 
 impl From<Len2> for u64 {
-    fn from(value: Len2) -> Self {
-        match value {
-            Len2::X2 => 2,
-            Len2::X3 => 3,
-            Len2::X4 => 4,
-        }
-    }
+    fn from(value: Len2) -> Self { value.as_u64() }
 }
 
 impl From<Len2> for NonZeroU32 {
-    fn from(value: Len2) -> Self {
-        match value {
-            Len2::X2 => NonZeroU32::new(2).unwrap(),
-            Len2::X3 => NonZeroU32::new(3).unwrap(),
-            Len2::X4 => NonZeroU32::new(4).unwrap(),
-        }
-    }
+    fn from(value: Len2) -> Self { value.as_non_zero_u32() }
 }
 
 impl PartialEq<Len> for Len2 {
@@ -101,6 +89,54 @@ impl Len {
     pub fn iter_components(self) -> impl ExactSizeIterator<Item = Comp4> {
         use Comp4::*;
         [X, Y, Z, W].into_iter().take(self.into())
+    }
+
+    /// as u8
+    pub const fn as_u8(self) -> u8 {
+        match self {
+            Len::X1 => 1,
+            Len::X2 => 2,
+            Len::X3 => 3,
+            Len::X4 => 4,
+        }
+    }
+    /// as u32
+    pub const fn as_u32(self) -> u32 { self.as_u8() as u32 }
+    /// as u64
+    pub const fn as_u64(self) -> u64 { self.as_u8() as u64 }
+    /// as `NonZeroU32`
+    pub const fn as_non_zero_u32(self) -> NonZeroU32 {
+        match self {
+            Len::X1 => NonZeroU32::new(1).unwrap(),
+            Len::X2 => NonZeroU32::new(2).unwrap(),
+            Len::X3 => NonZeroU32::new(3).unwrap(),
+            Len::X4 => NonZeroU32::new(4).unwrap(),
+        }
+    }
+}
+
+impl Len2 {
+    /// as u8
+    pub const fn as_u8(self) -> u8 {
+        match self {
+            Len2::X2 => 2,
+            Len2::X3 => 3,
+            Len2::X4 => 4,
+        }
+    }
+    /// as u32
+    pub const fn as_u32(self) -> u32 { self.as_u8() as u32 }
+    /// as u64
+    pub const fn as_u64(self) -> u64 { self.as_u8() as u64 }
+    /// as `NonZeroU32`
+    pub const fn as_non_zero_u32(self) -> NonZeroU32 { self.as_len().as_non_zero_u32() }
+    /// as [`Len`]
+    pub const fn as_len(self) -> Len {
+        match self {
+            Len2::X2 => Len::X2,
+            Len2::X3 => Len::X3,
+            Len2::X4 => Len::X4,
+        }
     }
 }
 

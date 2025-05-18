@@ -371,6 +371,10 @@ pub fn impl_for_struct(
                         )*
                         .finish()
                     }
+
+                    fn host_shareable_sized() -> #re::hs::SizedType {
+                        todo!() // TODO(chronicl)
+                    }
                 }
 
                 impl<#generics_decl> #re::GpuAligned for #derive_struct_ident<#(#idents_of_generics),*>

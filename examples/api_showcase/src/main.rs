@@ -56,6 +56,8 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
         proj: f32x4x4,
     }
 
+    let a = sm::vec::<bool, x1>::one();
+
     // this struct contains "packed" vectors (snorm, unorm etc.) which are
     // only supported in vertex buffers, not storage/uniform buffers.
     // This is reflected in the traits that are derived for `MyVertexFormat`.

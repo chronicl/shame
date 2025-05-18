@@ -47,7 +47,7 @@ impl TypeLayout<constraint::Vertex> {
             TLS::Vector(len, non_bool) => [Attrib {
                 offset: 0,
                 location: Location(next_location()),
-                format: VertexAttribFormat::Fine(*len, *non_bool),
+                format: VertexAttribFormat::Fine(*len, non_bool.as_host_shareable_unchecked()),
             }]
             .into(),
             TLS::PackedVector(packed_vector) => [Attrib {
@@ -65,7 +65,9 @@ impl TypeLayout<constraint::Vertex> {
                         location: Location(next_location()),
                         format: match f.field.ty.kind {
                             TLS::Vector(_, ir::ScalarType::Bool) => unreachable!(), // see above
-                            TLS::Vector(len, non_bool) => VertexAttribFormat::Fine(len, non_bool),
+                            TLS::Vector(len, non_bool) => {
+                                VertexAttribFormat::Fine(len, non_bool.as_host_shareable_unchecked())
+                            }
                             TLS::PackedVector(packed_vector) => VertexAttribFormat::Coarse(packed_vector),
                             TLS::Matrix(..) | TLS::Array(..) | TLS::Structure(..) => unreachable!(), // see above
                         },

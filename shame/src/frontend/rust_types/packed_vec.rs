@@ -123,6 +123,13 @@ impl<T: PackedScalarType, L: LenEven> GpuSized for PackedVec<T, L> {
     fn gpu_layout_sized() -> TypeLayout<super::type_layout::constraint::Sized> {
         TypeLayout::from_packed_vector(TypeLayoutRules::Wgsl, get_type_description::<L, T>())
     }
+
+    fn host_shareable_sized() -> crate::hs::SizedType
+    where
+        Self: GpuType,
+    {
+        unreachable!("Self: !GpuType")
+    }
 }
 
 impl<T: PackedScalarType, L: LenEven> GpuAligned for PackedVec<T, L> {

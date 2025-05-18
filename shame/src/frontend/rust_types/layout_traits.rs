@@ -670,6 +670,11 @@ impl GpuSized for GpuT {
             .extend("c", Array::<vec<i32, x1>, Size<4>>::gpu_layout_sized())
             .finish()
     }
+
+    fn host_shareable_sized() -> crate::hs::SizedType {
+        // TODO(chronicl)
+        todo!()
+    }
 }
 
 // #[derive(HostLayout)]
