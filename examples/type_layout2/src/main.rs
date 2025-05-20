@@ -99,7 +99,7 @@ fn main() {
 
     // Let's end on a pretty error message
     let mut sized_struct = cs::SizedStruct::new("D", "a", f32x2::cpu_shareable_sized())
-        // This has align of 4 for storage, and align of 16 for uniform
+        // This has align of 4 for storage and align of 16 for uniform.
         .extend("b", Array::<f32x1, shame::Size<1>>::cpu_shareable_sized());
     let s_layout = TypeLayout::<constraint::Storage>::new_layout_for(sized_struct);
     let result = TypeLayout::<constraint::Uniform>::try_from(&s_layout);
