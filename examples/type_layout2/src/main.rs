@@ -36,7 +36,7 @@ fn main() {
     }
 
     // Be default structs are #[gpu_repr(Storage)], which means that it follows
-    // the wgsl storage alignment rules (std430). To obtain a corresponding TypeLayout<Storage>
+    // the wgsl storage layout rules (std430). To obtain a corresponding TypeLayout<Storage>
     // we first need to build a `CpuShareableType`, in our case an `UnsizedStruct`.
     let unsized_struct = cs::UnsizedStruct {
         name: "A".into(),
@@ -48,11 +48,12 @@ fn main() {
     };
     // And now we can get the `TypeLayout<Storage>`.
     let s_layout = TypeLayout::<constraint::Storage>::new_layout_for(unsized_struct.clone());
-    // For now TypeLayout::<constraint::Uniform>::new_layout_for only accepts sized types,
-    // however TypeLayout::<constraint::Uniform>::new_layout_for_unchecked allows to obtain the
-    // the uniform layout of an unsized cpu-shareable. Using this with wgsl as your target language will cause an error.
+    // For now `TypeLayout::<constraint::Uniform>::new_layout_for` only accepts sized types,
+    // however `TypeLayout::<constraint::Uniform>::new_layout_for_unchecked` allows to obtain the
+    // the uniform layout of an unsized cpu-shareable. Using that layout with wgsl as your
+    // target language will cause an error.
     let u_layout = TypeLayout::<constraint::Uniform>::new_layout_for_unchecked(unsized_struct);
-    // This struct has differently aligned fields with the different alignment rules. The array
+    // This struct's field offsets are different for storage and uniform layout rules. The array
     // has an alignment of 4 with storage alignment and an alignment of 16 with uniform alignment.
     assert_ne!(s_layout, u_layout);
 
@@ -70,15 +71,15 @@ fn main() {
     // Since this struct is sized we can use TypeLayout::<constraint::Uniform>::new_layout_for.
     let u_layout = TypeLayout::<constraint::Uniform>::new_layout_for(sized_struct.clone());
     let s_layout = TypeLayout::<constraint::Storage>::new_layout_for(sized_struct);
-    // And this time they are equal, despite different alignment rules.
+    // And this time they are equal, despite different layout rules.
     assert_eq!(s_layout, u_layout);
-    // We can also check whether constraint::Storage could also be used as constraint::Uniform
-    // via `TryFrom::try_from`.
-    // Which in this case will succeed, but if it doesn't we get a very nice error message about
-    // why the layout is not compatible with the uniform alignment rules (WIP).
+    // Using `TryFrom::try_from` we can check whether the storage type layout also follows
+    // uniform layout rules despite not being `TypeLayout<constraint::Uniform>`,
+    // which in this case will succeed, but if it doesn't we get a very nice error message about
+    // why the layout is not compatible with the uniform layout rules.
     let u_layout = TypeLayout::<constraint::Uniform>::try_from(&s_layout).unwrap();
 
-    // Let's replicate a more complex example with implicit field size and align.
+    // Let's replicate a more complex example with explicit field size and align.
     #[derive(shame::GpuLayout)]
     struct C {
         a: f32x2,

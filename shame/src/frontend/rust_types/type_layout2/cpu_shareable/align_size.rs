@@ -148,7 +148,7 @@ impl UnsizedStruct {
         (offset, struct_align(align, offsets.repr))
     }
 
-    /// This is an expensive as it calculates the byte align from scratch.
+    /// This is expensive as it calculates the byte align from scratch.
     pub fn byte_align(&self, repr: Repr) -> U32PowerOf2 {
         let offsets = self.sized_field_offsets(repr);
         self.last_field_offset_and_struct_align(offsets).1

@@ -32,6 +32,7 @@ impl TypeLayout<constraint::Uniform> {
         type_layout_internal::cast_unchecked(from_runtime_sized_array(ty, Repr::Uniform))
     }
 
+    /// Get the `CpuShareableType` this layout is based on.
     pub fn cpu_shareable(&self) -> &CpuShareableType {
         self.cpu_shareable
             .as_ref()
@@ -47,7 +48,6 @@ impl TypeLayout<constraint::Storage> {
             CpuShareableType::RuntimeSizedArray(ty) => Self::from_runtime_sized_array(ty),
         }
     }
-
 
     fn from_sized_type(ty: cs::SizedType) -> Self {
         type_layout_internal::cast_unchecked(from_sized_type(ty, Repr::Storage))
@@ -127,7 +127,6 @@ fn from_unsized_struct(s: UnsizedStruct, repr: Repr) -> TypeLayout {
             ty: from_runtime_sized_array(s.last_unsized.array.clone(), repr),
         },
     });
-
 
     TypeLayout::new(
         None,
@@ -257,7 +256,6 @@ impl<'a> TryFrom<&'a TypeLayout<constraint::Storage>> for TypeLayout<constraint:
                 };
 
                 use UniformLayoutError as U;
-
                 let e = match e {
                     Mismatch::ArrayStride(e) => U::ArrayStride(WithContext::new(ctx, e)),
                     Mismatch::StructureFieldOffset(e) => U::StructureFieldOffset(WithContext::new(ctx, e)),
@@ -418,7 +416,6 @@ impl Display for WithContext<StructureFieldOffsetError> {
             self.field_name, expected_alignment
         );
         writeln!(f)?;
-
 
         writeln!(
             f,

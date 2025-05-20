@@ -121,11 +121,17 @@ impl SizedField {
 }
 
 impl RuntimeSizedArrayField {
-    pub fn new(name: impl Into<CanonName>, custom_min_align: Option<U32PowerOf2>, ty: impl Into<SizedType>) -> Self {
+    pub fn new(
+        name: impl Into<CanonName>,
+        custom_min_align: Option<U32PowerOf2>,
+        element_ty: impl Into<SizedType>,
+    ) -> Self {
         Self {
             name: name.into(),
             custom_min_align,
-            array: RuntimeSizedArray { element: ty.into() },
+            array: RuntimeSizedArray {
+                element: element_ty.into(),
+            },
         }
     }
 }
@@ -298,6 +304,7 @@ impl From<UnsizedStruct> for ir::ir_type::BufferBlock {
 
         let last_unsized = host.last_unsized.into();
 
+        // TODO(chronicl)
         // Note: This might throw an error in real usage if the struct isn't valid
         // We're assuming it's valid in the conversion
         match ir::ir_type::BufferBlock::new(host.name, sized_fields, Some(last_unsized)) {
