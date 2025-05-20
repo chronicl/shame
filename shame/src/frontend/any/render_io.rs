@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::frontend::any::Any;
 use crate::frontend::rust_types::type_layout::TypeLayout;
-use crate::hs;
+use crate::cs;
 use crate::{
     call_info,
     common::iterator_ext::try_collect,
@@ -109,7 +109,7 @@ impl Any {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VertexAttribFormat {
     /// regular [`crate::vec`] types
-    Fine(Len, hs::ScalarType),
+    Fine(Len, cs::ScalarType),
     /// packed [`crate::packed::PackedVec`] types
     Coarse(PackedVector),
 }

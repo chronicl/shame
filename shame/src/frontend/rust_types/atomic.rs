@@ -14,7 +14,7 @@ use super::{
     vec::vec,
     AsAny, GpuType, To, ToGpuType,
 };
-use crate::{frontend::rust_types::reference::Ref, hs};
+use crate::{frontend::rust_types::reference::Ref, cs};
 use crate::{
     boolx1,
     frontend::{
@@ -73,16 +73,6 @@ impl<T: ScalarTypeInteger> GpuSized for Atomic<T> {
 
     fn gpu_layout_sized() -> TypeLayout<super::type_layout::constraint::Sized> {
         TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &Self::sized_ty())
-    }
-
-    fn host_shareable_sized() -> crate::hs::SizedType
-    where
-        Self: GpuType,
-    {
-        hs::Atomic {
-            scalar: T::SCALAR_TYPE_INTEGER,
-        }
-        .into()
     }
 }
 

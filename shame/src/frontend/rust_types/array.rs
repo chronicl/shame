@@ -24,7 +24,7 @@ use crate::frontend::rust_types::vec::vec;
 use crate::ir::ir_type::stride_of_array_from_element_align_size;
 use crate::ir::pipeline::StageMask;
 use crate::ir::recording::Context;
-use crate::{call_info, for_count, hs, ir};
+use crate::{call_info, for_count, cs, ir};
 use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
@@ -157,14 +157,6 @@ impl<T: GpuType + GpuSized, const N: usize> GpuSized for Array<T, Size<N>> {
             &T::sized_ty(),
             Size::<N>::LEN.expect("known length at compile time"),
         )
-    }
-
-    fn host_shareable_sized() -> crate::hs::SizedType {
-        hs::SizedArray {
-            element: Rc::new(T::host_shareable_sized()),
-            len: Size::<N>::LEN.expect("known length at compile time"),
-        }
-        .into()
     }
 }
 

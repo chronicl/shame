@@ -1,4 +1,5 @@
 #![allow(unused, clippy::no_effect)]
+use shame::GpuSized;
 use shame as sm;
 use shame::prelude::*;
 use shame::aliases::*;
@@ -49,11 +50,17 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     //    `NoAtomics` - if there are no atomics (for instantiable structs)
     // etc...
     #[derive(sm::GpuLayout)]
-    #[cpu(TransformsOnCpu)] // (optional) specify a corresponding CPU type for layout checks
+    // #[cpu(TransformsOnCpu)] // (optional) specify a corresponding CPU type for layout checks
     struct Transforms {
         world: f32x4x4,
         view: f32x4x4,
         proj: f32x4x4,
+        a: sm::Array<f32x1>
+    }
+
+    #[derive(sm::GpuLayout)]
+    struct B {
+        a: sm::Array<f32x1>
     }
 
     let a = sm::vec::<bool, x1>::one();
@@ -85,22 +92,23 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     // The check happens at shader-generation time, so that a nice error
     // message can be generated, pointing to the field that doesn't match.
     // (once rusts const-generics are more powerful this may be moved to compile-time)
-    let xforms_sto: sm::Buffer<Transforms, sm::mem::Storage> = group0.next();
-    let xforms_uni: sm::Buffer<Transforms, sm::mem::Uniform> = group0.next();
+    let xforms_sto: sm::BufferRef<Transforms, sm::mem::Storage> = group0.next();
+    // let xforms_uni: sm::Buffer<Transforms, sm::mem::Uniform> = group0.next();
 
     // conditional code generation based on pipeline parameter
     if some_param > 0 {
         // if not further specified, defaults to `sm::mem::Storage`
-        let xforms_sto2: sm::Buffer<Transforms> = group0.next();
+        // let xforms_sto2: sm::Buffer<Transforms> = group0.next();
     }
 
     // result types of matrix multiplications are inferred
-    let xform = xforms_sto.proj * xforms_sto.view * xforms_sto.world;
+    let xform = xforms_sto.proj.get() * xforms_sto.view.get() * xforms_sto.world.get();
 
     // here are some examples of how vector and matrix types behave
     let my_vec3 = sm::vec!(1.0, 2.0, 3.0);
     let my_vec4 = sm::vec!(my_vec3, 0.0); // component concatenation, like usual in shaders
     let my_vec4 = my_vec3.extend(0.0); // or like this
+    let a = sm::vec::new((true, false));
 
     let my_normal = sm::vec!(1.0, 1.0, 0.0).normalize();
     let rgb = my_normal.remap(-1.0..=1.0, 0.0..=1.0); // remap linear ranges (instead of " * 0.5 + 0.5")

@@ -2,6 +2,7 @@ use std::{fmt::Display, num::NonZeroU32};
 
 use crate::{
     common::floating_point::{f16, f32_eq_where_nans_are_equal, f64_eq_where_nans_are_equal},
+    cs,
     ir::Comp4,
 };
 

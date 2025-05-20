@@ -8,7 +8,7 @@ use super::{
 };
 use crate::{
     frontend::any::shared_io::{BindPath, BindingType},
-    hs::{self, HostShareableType},
+    cs::{self, CpuShareableType},
     TypeLayout,
 };
 use crate::{
@@ -169,11 +169,6 @@ pub trait GpuSized: GpuAligned {
 
     /// Returns the `TypeLayout` of Self, with a marker that guarantees that the layout is of a sized type.
     fn gpu_layout_sized() -> TypeLayout<type_layout::constraint::Sized>;
-
-    /// TODO(chronicl) this will probably replace `sized_ty` from above.
-    fn host_shareable_sized() -> hs::SizedType
-    where
-        Self: GpuType;
 }
 
 #[diagnostic::on_unimplemented(

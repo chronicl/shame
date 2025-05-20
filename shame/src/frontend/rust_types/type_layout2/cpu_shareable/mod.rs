@@ -4,7 +4,7 @@ use std::{num::NonZeroU32, rc::Rc};
 use crate::{
     any::U32PowerOf2,
     ir::{self, ir_type::BufferBlockDefinitionError, StructureFieldNamesMustBeUnique},
-    GpuSized, GpuType,
+    GpuAligned, GpuSized, GpuStore, GpuType, NoBools, NoHandles,
 };
 
 // TODO(chronicl)
@@ -12,21 +12,20 @@ use crate::{
 // - We borrow these types from `StoreType` currently. Maybe it would be better the other
 //   way around - `StoreType` should borrow from `HostShareableType`.
 pub use crate::ir::{Len, Len2, ScalarTypeFp, ScalarTypeInteger, ir_type::CanonName};
-
-mod builder;
-mod layout;
-
-pub use layout::*;
-pub use builder::*;
-
 use super::FieldOptions;
+
+mod align_size;
+mod builder;
+
+pub use align_size::*;
+pub use builder::*;
 
 /// This reprsents a wgsl spec compliant host-shareable type with the addition
 /// that f64 is a supported scalar type.
 ///
 /// https://www.w3.org/TR/WGSL/#host-shareable-types
 #[derive(Debug, Clone)]
-pub enum HostShareableType {
+pub enum CpuShareableType {
     Sized(SizedType),
     UnsizedStruct(UnsizedStruct),
     RuntimeSizedArray(RuntimeSizedArray),
@@ -41,13 +40,13 @@ pub enum SizedType {
     Struct(SizedStruct),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Vector {
     pub scalar: ScalarType,
     pub len: Len,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Matrix {
     pub scalar: ScalarTypeFp,
     pub columns: Len2,
@@ -131,20 +130,34 @@ impl RuntimeSizedArrayField {
     }
 }
 
-/// Used in the `GpuLayout` derive macro to ensure that the last field of a struct is
-/// not an `UnsizedStruct`. Auto implemented for all `GpuSized` types and manually implemented
-/// for runtime sized arrays.
-pub trait HostshareableSizedOrArray {
-    fn sized_or_array() -> SizedOrArray;
+pub trait AsCpuShareableSized: GpuSized + NoBools + NoHandles {
+    fn cpu_shareable_sized() -> SizedType
+    where
+        Self: GpuType;
 }
 
-pub enum SizedOrArray {
-    Sized(SizedType),
-    RuntimeSizedArray(SizedType),
+impl<T: GpuSized + NoBools + NoHandles> AsCpuShareableSized for T {
+    fn cpu_shareable_sized() -> SizedType
+    where
+        T: GpuType,
+    {
+        T::sized_ty().try_into().unwrap() // is no bools and no handles
+    }
 }
 
-impl<T: GpuSized + GpuType> HostshareableSizedOrArray for T {
-    fn sized_or_array() -> SizedOrArray { SizedOrArray::Sized(Self::host_shareable_sized()) }
+pub trait AsCpuShareable: GpuStore + NoBools + NoHandles {
+    fn cpu_shareable() -> CpuShareableType
+    where
+        Self: GpuType;
+}
+
+impl<T: GpuStore + NoBools + NoHandles> AsCpuShareable for T {
+    fn cpu_shareable() -> CpuShareableType
+    where
+        T: GpuType,
+    {
+        T::store_ty().try_into().unwrap() // is no bools and no handles
+    }
 }
 
 impl std::fmt::Display for ScalarType {
@@ -168,8 +181,8 @@ macro_rules! impl_into_sized_type {
                /// Const conversion to [`SizedType`]
                pub const fn into_sized_type(self) -> SizedType { $variant(self) }
                /// Const conversion to [`HostshareableType`]
-               pub const fn into_hostshareable(self) -> HostShareableType {
-                   HostShareableType::Sized(self.into_sized_type())
+               pub const fn into_cpu_shareable(self) -> CpuShareableType {
+                   CpuShareableType::Sized(self.into_sized_type())
                }
            }
 
@@ -187,18 +200,18 @@ impl_into_sized_type!(
     SizedStruct -> SizedType::Struct
 );
 
-impl<T> From<T> for HostShareableType
+impl<T> From<T> for CpuShareableType
 where
     SizedType: From<T>,
 {
-    fn from(value: T) -> Self { HostShareableType::Sized(SizedType::from(value)) }
+    fn from(value: T) -> Self { CpuShareableType::Sized(SizedType::from(value)) }
 }
 
-impl From<UnsizedStruct> for HostShareableType {
-    fn from(s: UnsizedStruct) -> Self { HostShareableType::UnsizedStruct(s) }
+impl From<UnsizedStruct> for CpuShareableType {
+    fn from(s: UnsizedStruct) -> Self { CpuShareableType::UnsizedStruct(s) }
 }
-impl From<RuntimeSizedArray> for HostShareableType {
-    fn from(a: RuntimeSizedArray) -> Self { HostShareableType::RuntimeSizedArray(a) }
+impl From<RuntimeSizedArray> for CpuShareableType {
+    fn from(a: RuntimeSizedArray) -> Self { CpuShareableType::RuntimeSizedArray(a) }
 }
 
 impl ScalarTypeInteger {
@@ -226,26 +239,14 @@ impl From<ScalarTypeFp> for ScalarType {
 }
 
 
-//     Conversions from/to ir types     //
-impl ir::ScalarType {
-    pub fn as_host_shareable_unchecked(self) -> ScalarType {
-        match self {
-            Self::F16 => ScalarType::F16,
-            Self::F32 => ScalarType::F32,
-            Self::F64 => ScalarType::F64,
-            Self::U32 => ScalarType::U32,
-            Self::I32 => ScalarType::I32,
-            Self::Bool => panic!("ScalarType was bool"),
-        }
-    }
-}
+//     Conversions to ir types     //
 
-impl From<HostShareableType> for ir::StoreType {
-    fn from(host: HostShareableType) -> Self {
+impl From<CpuShareableType> for ir::StoreType {
+    fn from(host: CpuShareableType) -> Self {
         match host {
-            HostShareableType::Sized(s) => ir::StoreType::Sized(s.into()),
-            HostShareableType::RuntimeSizedArray(s) => ir::StoreType::RuntimeSizedArray(s.element.into()),
-            HostShareableType::UnsizedStruct(s) => ir::StoreType::BufferBlock(s.into()),
+            CpuShareableType::Sized(s) => ir::StoreType::Sized(s.into()),
+            CpuShareableType::RuntimeSizedArray(s) => ir::StoreType::RuntimeSizedArray(s.element.into()),
+            CpuShareableType::UnsizedStruct(s) => ir::StoreType::BufferBlock(s.into()),
         }
     }
 }
@@ -311,14 +312,152 @@ impl From<UnsizedStruct> for ir::ir_type::BufferBlock {
     }
 }
 
+impl From<RuntimeSizedArray> for ir::StoreType {
+    fn from(array: RuntimeSizedArray) -> Self { ir::StoreType::RuntimeSizedArray(array.element.into()) }
+}
+
 impl From<SizedField> for ir::ir_type::SizedField {
-    fn from(host: SizedField) -> Self {
-        ir::ir_type::SizedField::new(host.name, host.custom_min_size, host.custom_min_align, host.ty.into())
-    }
+    fn from(f: SizedField) -> Self { ir::SizedField::new(f.name, f.custom_min_size, f.custom_min_align, f.ty.into()) }
 }
 
 impl From<RuntimeSizedArrayField> for ir::ir_type::RuntimeSizedArrayField {
-    fn from(host: RuntimeSizedArrayField) -> Self {
-        ir::ir_type::RuntimeSizedArrayField::new(host.name, host.custom_min_align, host.array.element.into())
+    fn from(f: RuntimeSizedArrayField) -> Self {
+        ir::RuntimeSizedArrayField::new(f.name, f.custom_min_align, f.array.element.into())
+    }
+}
+
+
+//     Conversions from ir types     //
+
+#[derive(thiserror::Error, Debug)]
+#[error("Type contains bools, which isn't cpu shareable.")]
+pub struct ContainsBools;
+
+impl TryFrom<ir::ScalarType> for ScalarType {
+    type Error = ContainsBools;
+
+    fn try_from(value: ir::ScalarType) -> Result<Self, Self::Error> {
+        Ok(match value {
+            ir::ScalarType::F16 => ScalarType::F16,
+            ir::ScalarType::F32 => ScalarType::F32,
+            ir::ScalarType::F64 => ScalarType::F64,
+            ir::ScalarType::U32 => ScalarType::U32,
+            ir::ScalarType::I32 => ScalarType::I32,
+            ir::ScalarType::Bool => return Err(ContainsBools),
+        })
+    }
+}
+
+impl ir::ScalarType {
+    // TODO(chronicl) remove
+    pub fn as_host_shareable_unchecked(self) -> ScalarType { self.try_into().unwrap() }
+}
+
+impl TryFrom<ir::SizedType> for SizedType {
+    type Error = ContainsBools;
+
+    fn try_from(value: ir::SizedType) -> Result<Self, Self::Error> {
+        Ok(match value {
+            ir::SizedType::Vector(len, scalar) => SizedType::Vector(Vector {
+                scalar: scalar.try_into()?,
+                len,
+            }),
+            ir::SizedType::Matrix(columns, rows, scalar) => SizedType::Matrix(Matrix { scalar, columns, rows }),
+            ir::SizedType::Array(element, len) => SizedType::Array(SizedArray {
+                element: Rc::new((*element).clone().try_into()?),
+                len,
+            }),
+            ir::SizedType::Atomic(scalar_type) => SizedType::Atomic(Atomic { scalar: scalar_type }),
+            ir::SizedType::Structure(structure) => SizedType::Struct(structure.try_into()?),
+        })
+    }
+}
+
+impl TryFrom<ir::ir_type::SizedStruct> for SizedStruct {
+    type Error = ContainsBools;
+
+    fn try_from(structure: ir::ir_type::SizedStruct) -> Result<Self, Self::Error> {
+        let mut fields = Vec::new();
+
+        for field in structure.sized_fields() {
+            fields.push(SizedField {
+                name: field.name.clone(),
+                custom_min_size: field.custom_min_size,
+                custom_min_align: field.custom_min_align,
+                ty: field.ty.clone().try_into()?,
+            });
+        }
+
+        Ok(SizedStruct {
+            name: structure.name().clone(),
+            fields,
+        })
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum CpuShareableConversionError {
+    #[error("Type contains bools, which isn't cpu shareable.")]
+    ContainsBool,
+    #[error("Type is a handle, which isn't cpu shareable.")]
+    IsHandle,
+}
+
+impl From<ContainsBools> for CpuShareableConversionError {
+    fn from(_: ContainsBools) -> Self { Self::ContainsBool }
+}
+
+impl TryFrom<ir::StoreType> for CpuShareableType {
+    type Error = CpuShareableConversionError;
+
+    fn try_from(value: ir::StoreType) -> Result<Self, Self::Error> {
+        Ok(match value {
+            ir::StoreType::Sized(sized_type) => CpuShareableType::Sized(sized_type.try_into()?),
+            ir::StoreType::RuntimeSizedArray(element) => CpuShareableType::RuntimeSizedArray(RuntimeSizedArray {
+                element: element.try_into()?,
+            }),
+            ir::StoreType::BufferBlock(buffer_block) => buffer_block.try_into()?,
+            ir::StoreType::Handle(_) => return Err(CpuShareableConversionError::IsHandle),
+        })
+    }
+}
+
+impl TryFrom<ir::ir_type::BufferBlock> for CpuShareableType {
+    type Error = ContainsBools;
+
+    fn try_from(buffer_block: ir::ir_type::BufferBlock) -> Result<Self, Self::Error> {
+        let mut sized_fields = Vec::new();
+
+        for field in buffer_block.sized_fields() {
+            sized_fields.push(SizedField {
+                name: field.name.clone(),
+                custom_min_size: field.custom_min_size,
+                custom_min_align: field.custom_min_align,
+                ty: field.ty.clone().try_into()?,
+            });
+        }
+
+        let last_unsized = if let Some(last_field) = buffer_block.last_unsized_field() {
+            RuntimeSizedArrayField {
+                name: last_field.name.clone(),
+                custom_min_align: last_field.custom_min_align,
+                array: RuntimeSizedArray {
+                    element: last_field.element_ty.clone().try_into()?,
+                },
+            }
+        } else {
+            return Ok(SizedStruct {
+                name: buffer_block.name().clone(),
+                fields: sized_fields,
+            }
+            .into());
+        };
+
+        Ok(UnsizedStruct {
+            name: buffer_block.name().clone(),
+            sized_fields,
+            last_unsized,
+        }
+        .into())
     }
 }

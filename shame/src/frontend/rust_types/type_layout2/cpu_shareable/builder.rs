@@ -44,7 +44,7 @@ impl SizedStruct {
         custom_min_size: Option<u64>,
         custom_min_align: Option<U32PowerOf2>,
         field: SizedOrArray,
-    ) -> HostShareableType {
+    ) -> CpuShareableType {
         match field {
             SizedOrArray::Sized(ty) => self
                 .extend(
@@ -64,6 +64,12 @@ impl SizedStruct {
 
     pub fn fields(&self) -> &[SizedField] { &self.fields }
 }
+
+pub enum SizedOrArray {
+    Sized(SizedType),
+    RuntimeSizedArray(SizedType),
+}
+
 
 impl<T: Into<CanonName>> From<(T, SizedType)> for SizedField {
     fn from(value: (T, SizedType)) -> Self {

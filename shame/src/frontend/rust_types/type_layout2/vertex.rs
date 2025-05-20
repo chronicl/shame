@@ -1,15 +1,15 @@
-use crate::{any::VertexAttribFormat, hs::TypeLayoutRules};
-use super::{*, host_shareable as hs};
+use crate::{any::VertexAttribFormat, cs::Repr, cs};
+use super::{*};
 
 impl TypeLayout<constraint::Vertex> {
     pub fn from_vertex_attribute(attribute: VertexAttribFormat) -> TypeLayout<constraint::Vertex> {
         let (size, align, kind) = match attribute {
             VertexAttribFormat::Fine(len, scalar) => {
-                let sized = hs::Vector::new(scalar, len);
+                let sized = cs::Vector::new(scalar, len);
                 (
                     sized.byte_size(),
                     sized.byte_align(),
-                    TypeLayoutSemantics::Vector(len, scalar),
+                    TypeLayoutSemantics::Vector(sized),
                 )
             }
             VertexAttribFormat::Coarse(packed) => (
@@ -31,7 +31,7 @@ impl TypeLayout<constraint::Vertex> {
         struct_name: impl Into<CanonName>,
         field_options: impl Into<FieldOptions>,
         attribute: VertexAttribFormat,
-        rules: TypeLayoutRules,
+        rules: Repr,
     ) -> VertexLayoutBuilder {
         VertexLayoutBuilder::new(struct_name, field_options, attribute, rules)
     }
@@ -40,7 +40,7 @@ impl TypeLayout<constraint::Vertex> {
 pub struct VertexLayoutBuilder {
     name: CanonName,
     attributes: Vec<FieldLayout>,
-    rules: TypeLayoutRules,
+    rules: Repr,
 }
 
 impl VertexLayoutBuilder {
@@ -53,7 +53,7 @@ impl VertexLayoutBuilder {
         struct_name: impl Into<CanonName>,
         field_options: impl Into<FieldOptions>,
         attribute: VertexAttribFormat,
-        rules: TypeLayoutRules,
+        rules: Repr,
     ) -> Self {
         let this = VertexLayoutBuilder {
             name: struct_name.into(),
@@ -76,14 +76,14 @@ impl VertexLayoutBuilder {
     }
 
     pub fn finish(self) -> TypeLayout<constraint::Vertex> {
-        let mut calc = LayoutCalculator::new(matches!(self.rules, TypeLayoutRules::Packed));
+        let mut calc = LayoutCalculator::new(matches!(self.rules, Repr::Packed));
         let fields = self
             .attributes
             .into_iter()
             .map(|field| {
                 let rel_byte_offset = calc.extend(
                     field.byte_size().unwrap(), // attributes are always sized
-                    field.align(),
+                    field.byte_align(),
                     *field.custom_min_size,
                     *field.custom_min_align,
                 );

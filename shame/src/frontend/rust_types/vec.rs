@@ -21,7 +21,7 @@ use crate::{
         buffer::{BufferAddressSpace, BufferInner, BufferRefInner},
         rasterizer::Gradient,
     },
-    hs,
+    cs,
     ir::{
         pipeline::StageMask,
         recording::{CallInfoScope, Context, NodeRecordingError},
@@ -74,7 +74,7 @@ pub type scalar<T> = vec<T, x1>;
 /// let rgb = my_normal.remap(-1.0..=1.0, 0.0..=1.0); // remap linear ranges (instead of " * 0.5 + 0.5")
 ///
 /// let alpha = 0.4.to_gpu(); // convert from rust to `shame` types (also works for arrays and structs)
-/// let smooth: f32x1 = alpha.smoothstep(0.4..0.8);
+/// let smooth: f32x1 = alpha.smootcstep(0.4..0.8);
 ///
 /// // clamp as generalized min, max, clamp via half open ranges
 /// let upper = alpha.clamp(..=0.8);
@@ -543,11 +543,6 @@ impl<T: ScalarType, L: Len> GpuSized for vec<T, L> {
 
     fn gpu_layout_sized() -> TypeLayout<super::type_layout::constraint::Sized> {
         TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &ir::SizedType::Vector(L::LEN, T::SCALAR_TYPE))
-    }
-
-    fn host_shareable_sized() -> hs::SizedType {
-        // TODO(chronicl) remove unchecked
-        hs::Vector::new(T::SCALAR_TYPE.as_host_shareable_unchecked(), L::LEN).into()
     }
 }
 

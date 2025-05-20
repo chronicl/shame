@@ -15,7 +15,7 @@ use super::{
     vec::{scalar, vec, ToInteger},
     AsAny, GpuType, To, ToGpuType,
 };
-use crate::{frontend::rust_types::reference::Ref, hs, ir::recording::CallInfoScope};
+use crate::{frontend::rust_types::reference::Ref, cs, ir::recording::CallInfoScope};
 use crate::{
     call_info,
     frontend::{
@@ -73,18 +73,6 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuSized for mat<T, C, R> {
 
     fn gpu_layout_sized() -> TypeLayout<super::type_layout::constraint::Sized> {
         TypeLayout::from_sized_ty(TypeLayoutRules::Wgsl, &Self::sized_ty())
-    }
-
-    fn host_shareable_sized() -> crate::hs::SizedType
-    where
-        Self: GpuType,
-    {
-        hs::Matrix {
-            columns: C::LEN2,
-            rows: R::LEN2,
-            scalar: T::SCALAR_TYPE_FP,
-        }
-        .into()
     }
 }
 

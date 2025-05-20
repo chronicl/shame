@@ -321,7 +321,7 @@ pub use frontend::rust_types::type_layout2;
 pub use frontend::rust_types::type_layout::TypeLayout;
 pub use frontend::rust_types::type_layout::TypeLayoutUnconstraint;
 pub use frontend::rust_types::type_layout::TypeLayoutError;
-pub use frontend::rust_types::type_layout2::hs;
+pub use frontend::rust_types::type_layout2::cs;
 pub use frontend::rust_types::layout_traits::ArrayElementsUnsizedError;
 
 // derived traits
@@ -429,6 +429,7 @@ pub mod results {
 pub mod any {
     use crate::frontend::any;
     use crate::ir;
+    use crate::cs;
 
     // type erased
     pub use any::Any;
