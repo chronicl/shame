@@ -211,11 +211,6 @@ impl<T: BufferFields + NoAtomics + NoBools + GpuLayout<GpuRepr = repr::Storage>,
         bind_ty: BufferBindingType,
         has_dynamic_offset: bool,
     ) -> Self {
-        // let init_any = |as_ref, store_ty| match args {
-        //     Err(reason) => Any::new_invalid(reason),
-        //     Ok(BindingArgs { path, visibility }) => Any::binding(path, visibility, store_ty, bind_ty, as_ref),
-        // };
-
         let block = T::get_bufferblock_type();
         match ir::SizedStruct::try_from(block.clone()) {
             Ok(struct_) => {
@@ -251,9 +246,6 @@ impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized, AS: BufferA
         bind_ty: BufferBindingType,
         has_dynamic_offset: bool,
     ) -> Self {
-        let call_info = call_info!();
-
-        let store_ty = <Array<T, L> as GpuStore>::store_ty();
         match L::LEN {
             // GpuSized
             Some(_) => {
