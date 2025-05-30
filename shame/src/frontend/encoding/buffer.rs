@@ -38,6 +38,20 @@ pub trait BufferAddressSpace: AddressSpace + SupportsAccess<Read> {}
 impl BufferAddressSpace for mem::Uniform {}
 impl BufferAddressSpace for mem::Storage {}
 
+pub struct BufferV2<Content, AS = mem::Storage, AM = ReadWrite, const DYNAMIC_OFFSET: bool = false>
+where
+    Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+{
+    content: Content::BufferContent,
+    _phantom: PhantomData<(AS, AM)>,
+}
+
+pub trait BufferContent {
+    type BufferContent;
+}
+
 /// A read-only buffer binding, for writeable buffers and atomics use [`BufferRef`] instead.
 ///
 /// Buffer contents are accessible via [`std::ops::Deref`] `*`.
