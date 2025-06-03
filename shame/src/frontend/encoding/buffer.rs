@@ -1,4 +1,4 @@
-use crate::any::layout::{repr, GpuTypeLayout, LayoutableSized};
+use crate::any::layout::{repr, GpuTypeLayout, LayoutableSized, LayoutableType};
 use crate::common::proc_macro_reexports::GpuStoreImplCategory;
 use crate::frontend::any::shared_io::{BindPath, BindingType, BufferBindingType};
 use crate::frontend::any::{Any, InvalidReason};
@@ -49,7 +49,25 @@ where
 }
 
 pub trait BufferContent {
+    const IS_REPR: bool;
     type BufferContent;
+
+    fn from_any(any: Any) -> Self::BufferContent;
+}
+
+impl<Content, AS, AM, const DYNAMIC_OFFSET: bool> BufferV2<Content, AS, AM, DYNAMIC_OFFSET>
+where
+    Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+{
+    pub fn new() -> Self {
+        let layoutable = Content::layoutable_type();
+
+        match layoutable {
+            LayoutableType::
+        }
+    }
 }
 
 /// A read-only buffer binding, for writeable buffers and atomics use [`BufferRef`] instead.
@@ -192,6 +210,7 @@ fn create_buffer_any<T: GpuLayout<GpuRepr = repr::Storage>>(
                     return Any::new_invalid(invalid);
                 }
             };
+            // TODO(chronicl) throw error or panic if as_ref == true here
             Any::uniform_buffer_binding(path, visibility, uniform, has_dynamic_offset)
         }
         BufferBindingType::Storage(access) => {
