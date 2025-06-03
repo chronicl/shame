@@ -1,4 +1,6 @@
 #![allow(unused, clippy::no_effect)]
+use std::ops::Deref;
+
 use shame::gpu_layout;
 use shame as sm;
 use shame::prelude::*;

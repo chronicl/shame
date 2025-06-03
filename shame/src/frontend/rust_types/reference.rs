@@ -13,7 +13,11 @@ use super::{
     vec::ToInteger,
     AsAny, GpuType, To,
 };
-use crate::{any::layout::LayoutableSized, frontend::any::Any, GpuLayout};
+use crate::{
+    any::layout::{Layoutable, LayoutableSized},
+    frontend::any::Any,
+    GpuLayout,
+};
 use crate::frontend::rust_types::len::x1;
 use crate::frontend::rust_types::vec::vec;
 use crate::{
@@ -162,6 +166,29 @@ where
     type Target = T::RefFields<AS, AM>;
 
     fn deref(&self) -> &Self::Target { &self.fields_as_refs }
+}
+
+impl<T, AS, AM> Layoutable for Ref<T, AS, AM>
+where
+    T: GpuStore + Layoutable,
+    AS: AddressSpace,
+    AM: AccessMode,
+{
+    fn layoutable_type() -> crate::any::layout::LayoutableType { T::layoutable_type() }
+}
+impl<T, AS, AM> GpuLayout for Ref<T, AS, AM>
+where
+    T: GpuStore + GpuLayout,
+    AS: AddressSpace,
+    AM: AccessMode,
+{
+    type GpuRepr = T::GpuRepr;
+
+    fn cpu_type_name_and_layout() -> Option<
+        Result<(std::borrow::Cow<'static, str>, crate::TypeLayout), super::layout_traits::ArrayElementsUnsizedError>,
+    > {
+        T::cpu_type_name_and_layout()
+    }
 }
 
 impl<T, AS, AM> Ref<T, AS, AM>

@@ -26,7 +26,7 @@ use crate::frontend::rust_types::vec::vec;
 use crate::ir::ir_type::stride_of_array_from_element_align_size;
 use crate::ir::pipeline::StageMask;
 use crate::ir::recording::Context;
-use crate::{call_info, for_count, ir};
+use crate::{call_info, for_count, ir, BufferV3};
 use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
@@ -353,7 +353,7 @@ fn push_buffer_of_array_has_wrong_variant_error(is_ref: bool, expected_variant: 
     ))
 }
 
-impl<Idx, T, AS, const DYN_OFFSET: bool> GpuIndex<Idx> for Buffer<Array<T>, AS, DYN_OFFSET>
+impl<Idx, T, AS, const DYN_OFFSET: bool> GpuIndex<Idx> for BufferV3<Array<T>, AS, DYN_OFFSET>
 where
     Idx: ToInteger,
     T: GpuType + GpuSized + NoAtomics + NoHandles + GpuStore + 'static + GpuLayout + LayoutableSized,
@@ -392,7 +392,7 @@ where
     }
 }
 
-impl<T: GpuType + GpuSized, AS: BufferAddressSpace + 'static, const DYN_OFFSET: bool> Buffer<Array<T>, AS, DYN_OFFSET>
+impl<T: GpuType + GpuSized, AS: BufferAddressSpace + 'static, const DYN_OFFSET: bool> BufferV3<Array<T>, AS, DYN_OFFSET>
 where
     Array<T>: GpuStore + NoAtomics + NoBools + NoHandles,
     T: GpuType + GpuSized + NoAtomics + NoHandles + GpuStore + 'static + GpuLayout + LayoutableSized,

@@ -19,7 +19,7 @@ pub trait AsBindingResource: sm::Binding {
     }
 }
 
-impl<T, AS, const DYNAMIC_OFFSET: bool> AsBindingResource for sm::Buffer<T, AS, DYNAMIC_OFFSET>
+impl<T, AS, const DYNAMIC_OFFSET: bool> AsBindingResource for sm::BufferV3<T, AS, DYNAMIC_OFFSET>
 where
     Self: sm::Binding,
     T: sm::GpuStore + sm::NoHandles + sm::NoAtomics + sm::NoBools,

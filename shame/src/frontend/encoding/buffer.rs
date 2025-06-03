@@ -13,13 +13,14 @@ use crate::frontend::rust_types::reference::Ref;
 use crate::frontend::rust_types::reference::{AccessMode, Read, ReadWrite};
 use crate::frontend::rust_types::scalar_type::{ScalarType, ScalarTypeFp, ScalarTypeNumber};
 use crate::frontend::rust_types::struct_::{BufferFields, SizedFields, Struct};
+use crate::frontend::rust_types::type_layout::layoutable;
 use crate::frontend::rust_types::type_traits::{BindingArgs, GpuSized, GpuStore, NoAtomics, NoBools, NoHandles};
 use crate::frontend::rust_types::vec::vec;
 use crate::frontend::rust_types::{mat::mat, GpuType};
 use crate::frontend::rust_types::{reference::AccessModeReadable, scalar_type::ScalarTypeInteger};
 use crate::ir::pipeline::StageMask;
 use crate::ir::recording::{Context, MemoryRegion};
-use crate::ir::Type;
+use crate::ir::{Type};
 use crate::{self as shame, call_info, ir, GpuLayout};
 
 use std::borrow::Borrow;
@@ -34,41 +35,278 @@ use super::EncodingErrorKind;
 /// Implemented by the marker types
 /// - [`mem::Uniform`]
 /// - [`mem::Storage`]
-pub trait BufferAddressSpace: AddressSpace + SupportsAccess<Read> {}
-impl BufferAddressSpace for mem::Uniform {}
-impl BufferAddressSpace for mem::Storage {}
+pub trait BufferAddressSpace: AddressSpace + SupportsAccess<Read> {
+    /// Either Storage or Uniform address space.
+    const BUFFER_ADDRESS_SPACE: BufferAddressSpaceEnum;
+}
+/// Either Storage or Uniform address space.
+#[derive(Debug)]
+pub enum BufferAddressSpaceEnum {
+    Storage,
+    Uniform,
+}
+impl BufferAddressSpace for mem::Uniform {
+    const BUFFER_ADDRESS_SPACE: BufferAddressSpaceEnum = BufferAddressSpaceEnum::Uniform;
+}
+impl BufferAddressSpace for mem::Storage {
+    const BUFFER_ADDRESS_SPACE: BufferAddressSpaceEnum = BufferAddressSpaceEnum::Storage;
+}
 
-pub struct BufferV2<Content, AS = mem::Storage, AM = ReadWrite, const DYNAMIC_OFFSET: bool = false>
+#[diagnostic::on_unimplemented(message = "The uniform address space is read only. Change `ReadWrite` to `Read`.")]
+pub trait UniformIsRead {}
+impl<AM: AccessModeReadable> UniformIsRead for (mem::Storage, AM) {}
+impl UniformIsRead for (mem::Uniform, Read) {}
+
+// Diagnostics carry over from `NoAtomics`.
+pub trait AtomicInStorageOnly {}
+impl<T> AtomicInStorageOnly for (mem::Storage, T) {}
+impl<T: NoAtomics> AtomicInStorageOnly for (mem::Uniform, T) {}
+
+#[diagnostic::on_unimplemented(
+    message = "Access mode `ReadWrite` requires the buffer content to be wrapped in `Ref`. Change `Buffer<T, ...>` to `Buffer<shame::Ref<T>, ...>`."
+)]
+pub trait WriteRequiresRef {}
+impl<T: GpuStore, AS: AddressSpace, AM: AccessMode> WriteRequiresRef for (ReadWrite, Ref<T, AS, AM>) {}
+impl<T: GpuStore> WriteRequiresRef for (Read, T) {}
+
+/// TODO(chronicl)
+pub struct Buffer<Content, AS = mem::Storage, AM = Read, const DYNAMIC_OFFSET: bool = false>
 where
     Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
+    (AS, AM): UniformIsRead,
+    (AS, Content): AtomicInStorageOnly,
+    (AM, Content): WriteRequiresRef,
 {
-    content: Content::BufferContent,
+    content: Content::BufferContent<AS, AM>,
     _phantom: PhantomData<(AS, AM)>,
 }
 
 pub trait BufferContent {
-    const IS_REPR: bool;
-    type BufferContent;
-
-    fn from_any(any: Any) -> Self::BufferContent;
+    const IS_REF: bool = false;
+    type BufferContent<AS: AddressSpace, AM: AccessMode>;
+    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM>;
 }
 
-impl<Content, AS, AM, const DYNAMIC_OFFSET: bool> BufferV2<Content, AS, AM, DYNAMIC_OFFSET>
+impl<Content, AS, AM, const DYNAMIC_OFFSET: bool> std::ops::Deref for Buffer<Content, AS, AM, DYNAMIC_OFFSET>
 where
     Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
+    (AS, AM): UniformIsRead,
+    (AS, Content): AtomicInStorageOnly,
+    (AM, Content): WriteRequiresRef,
 {
-    pub fn new() -> Self {
-        let layoutable = Content::layoutable_type();
+    type Target = Content::BufferContent<AS, AM>;
 
-        match layoutable {
-            LayoutableType::
+    fn deref(&self) -> &Self::Target { &self.content }
+}
+
+impl<Content, AS, AM, const DYNAMIC_OFFSET: bool> Buffer<Content, AS, AM, DYNAMIC_OFFSET>
+where
+    Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+    (AS, AM): UniformIsRead,
+    (AS, Content): AtomicInStorageOnly,
+    (AM, Content): WriteRequiresRef,
+{
+    /// TODO(chronicl)
+    pub fn new(args: Result<BindingArgs, InvalidReason>) -> Self {
+        let bind_ty = match AS::BUFFER_ADDRESS_SPACE {
+            BufferAddressSpaceEnum::Storage => BufferBindingType::Storage(AM::ACCESS_MODE_READABLE),
+            BufferAddressSpaceEnum::Uniform => {
+                // TODO(chronicl) check AM is readable
+                BufferBindingType::Uniform
+            }
+        };
+
+        let any = create_buffer_any::<Content>(args, bind_ty, DYNAMIC_OFFSET, Content::IS_REF);
+
+        Self {
+            content: Content::from_any(any),
+            _phantom: PhantomData,
         }
     }
 }
+
+#[track_caller]
+fn create_buffer_any<T: GpuLayout<GpuRepr = repr::Storage>>(
+    args: Result<BindingArgs, InvalidReason>,
+    bind_ty: BufferBindingType,
+    has_dynamic_offset: bool,
+    as_ref: bool,
+) -> Any {
+    let BindingArgs { path, visibility } = match args {
+        Ok(a) => a,
+        Err(e) => return Any::new_invalid(e),
+    };
+
+    let storage = gpu_type_layout::<T>();
+    match bind_ty {
+        BufferBindingType::Uniform => {
+            let uniform = match GpuTypeLayout::<repr::Uniform>::try_from(storage) {
+                Ok(u) => u,
+                Err(e) => {
+                    let invalid = Context::try_with(call_info!(), |ctx| {
+                        ctx.push_error(e.into());
+                        InvalidReason::ErrorThatWasPushed
+                    })
+                    .unwrap_or(InvalidReason::CreatedWithNoActiveEncoding);
+
+                    return Any::new_invalid(invalid);
+                }
+            };
+            // TODO(chronicl) throw error or panic if as_ref == true here
+            Any::uniform_buffer_binding(path, visibility, uniform, has_dynamic_offset)
+        }
+        BufferBindingType::Storage(access) => {
+            Any::storage_buffer_binding(path, visibility, storage, access, as_ref, has_dynamic_offset)
+        }
+    }
+}
+
+impl<Content, AS, AM, const DYNAMIC_OFFSET: bool> Binding for Buffer<Content, AS, AM, DYNAMIC_OFFSET>
+where
+    Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+    (AS, AM): UniformIsRead,
+    (AS, Content): AtomicInStorageOnly,
+    (AM, Content): WriteRequiresRef,
+{
+    fn binding_type() -> BindingType {
+        BindingType::Buffer {
+            ty: match AS::BUFFER_ADDRESS_SPACE {
+                BufferAddressSpaceEnum::Storage => BufferBindingType::Storage(AM::ACCESS_MODE_READABLE),
+                BufferAddressSpaceEnum::Uniform => {
+                    // TODO(chronicl) check AM is readable
+                    BufferBindingType::Uniform
+                }
+            },
+            has_dynamic_offset: DYNAMIC_OFFSET,
+        }
+    }
+
+    // TODO(chronicl) probably remove entirely
+    fn store_ty() -> ir::StoreType { Content::layoutable_type().try_into().unwrap() }
+
+    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self { Self::new(args) }
+}
+
+trait BufferContentPlain: From<Any> {}
+
+// Trivial implementations of BufferContent.
+macro_rules! impl_buffer_content_plain {
+    ($(
+        impl<$($t:ident : $bound:tt),*> BufferContent for $type:ty;
+    )*) => {
+        $(
+        impl<$($t: $bound),*> BufferContent for $type {
+            const IS_REF: bool = false;
+            type BufferContent<AS: AddressSpace, AM: AccessMode> = Self;
+            fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
+        }
+
+        impl<$($t: $bound),*> BufferContent for $crate::Ref<$type> {
+            const IS_REF: bool = true;
+            type BufferContent<AS: AddressSpace, AM: AccessMode> = Self;
+            fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
+        }
+        )*
+    };
+}
+impl_buffer_content_plain!(
+    impl<T: ScalarTypeFp, C: Len2, R: Len2> BufferContent for mat<T, C, R>;
+    impl<T: SizedFields>                    BufferContent for Struct<T>  ;
+    impl<T: ScalarType, L: Len>             BufferContent for vec<T, L>  ;
+    impl<T: ScalarTypeInteger>              BufferContent for Atomic<T>  ;
+);
+
+// Implementations of BufferContent for structs that aren't wrapped in shame::Struct.
+impl<T: BufferFields> BufferContent for T {
+    const IS_REF: bool = false;
+    type BufferContent<AS: AddressSpace, AM: AccessMode> = T;
+
+    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> {
+        let fields_anys = <T as GetAllFields>::fields_as_anys_unchecked(any);
+        let fields_anys = (fields_anys.borrow() as &[Any]).iter().cloned();
+        <T as FromAnys>::from_anys(fields_anys)
+    }
+}
+impl<T: BufferFields> BufferContent for Ref<T> {
+    const IS_REF: bool = true;
+    type BufferContent<AS: AddressSpace, AM: AccessMode> = T::RefFields<AS, AM>;
+
+    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> {
+        let fields_anys_refs = <T as GetAllFields>::fields_as_anys_unchecked(any);
+        let fields_anys_refs = (fields_anys_refs.borrow() as &[Any]).iter().cloned();
+        <T::RefFields<AS, AM> as FromAnys>::from_anys(fields_anys_refs)
+    }
+}
+
+// Implementations of BufferContent for arrays. Starting with fixed size.
+impl<T: GpuType + GpuSized + GpuLayout + LayoutableSized, const N: usize> BufferContent for Array<T, Size<N>> {
+    const IS_REF: bool = false;
+    type BufferContent<AS: AddressSpace, AM: AccessMode> = T;
+
+    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
+}
+impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized, const N: usize> BufferContent
+    for Ref<Array<T, Size<N>>>
+{
+    const IS_REF: bool = true;
+    type BufferContent<AS: AddressSpace, AM: AccessMode> = T;
+
+    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
+}
+// Runtime sized only with Ref.
+impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized> BufferContent for Ref<Array<T, RuntimeSize>> {
+    const IS_REF: bool = true;
+    type BufferContent<AS: AddressSpace, AM: AccessMode> = T;
+
+    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
+}
+
+
+#[cfg(test)]
+mod buffer_v2_tests {
+    use crate::BufferAddressSpace;
+    use crate as shame;
+    use shame as sm;
+    use shame::prelude::*;
+    use shame::aliases::*;
+
+
+    #[derive(sm::GpuLayout)]
+    struct Transforms {
+        world: f32x4x4,
+        view: f32x4x4,
+        proj: f32x4x4,
+    }
+
+    #[test]
+    fn buffer_v2_test() -> Result<(), sm::EncodingErrors> {
+        let mut encoder = sm::start_encoding(sm::Settings::default())?;
+        let mut drawcall = encoder.new_render_pipeline(sm::Indexing::BufferU16);
+
+        let mut group = drawcall.bind_groups.next();
+
+        let xforms_sto: sm::Buffer<Transforms, sm::mem::Storage> = group.next();
+        let xforms_uni: sm::Buffer<Transforms, sm::mem::Uniform> = group.next();
+
+        // let _: sm::BufferV2<sm::f32x1, sm::mem::Uniform, sm::ReadWrite> = todo!();
+        // println!(
+        //     "{}",
+        //     sm::BufferV2::<shame::f32x1, sm::mem::Uniform, sm::ReadWrite>::UNIFORM_IS_READ
+        // );
+        // println!("{:?}", <sm::mem::Uniform as BufferAddressSpace>::BUFFER_ADDRESS_SPACE);
+
+        Ok(())
+    }
+}
+
 
 /// A read-only buffer binding, for writeable buffers and atomics use [`BufferRef`] instead.
 ///
@@ -123,7 +361,7 @@ where
 /// > maintainer note:
 /// > the precise trait bounds of buffer bindings are found in the `Binding` impl blocks.
 #[derive(Clone, Copy)]
-pub struct Buffer<Content, AS = mem::Storage, const DYNAMIC_OFFSET: bool = false>
+pub struct BufferV3<Content, AS = mem::Storage, const DYNAMIC_OFFSET: bool = false>
 where
     Content: GpuStore + NoHandles + NoAtomics + NoBools,
     AS: BufferAddressSpace,
@@ -131,7 +369,7 @@ where
     pub(crate) inner: BufferInner<Content, AS>,
 }
 
-impl<T, AS, const DYN_OFFSET: bool> Buffer<T, AS, DYN_OFFSET>
+impl<T, AS, const DYN_OFFSET: bool> BufferV3<T, AS, DYN_OFFSET>
 where
     T: GpuStore + NoHandles + NoAtomics + NoBools + GpuLayout<GpuRepr = repr::Storage>,
     AS: BufferAddressSpace,
@@ -181,42 +419,6 @@ pub enum BufferInner<T: GpuStore, AS: BufferAddressSpace> {
 pub enum BufferRefInner<T: GpuStore, AS: BufferAddressSpace, AM: AccessModeReadable> {
     Fields(T::RefFields<AS, AM>),
     Plain(Ref<T, AS, AM>),
-}
-
-#[track_caller]
-fn create_buffer_any<T: GpuLayout<GpuRepr = repr::Storage>>(
-    args: Result<BindingArgs, InvalidReason>,
-    bind_ty: BufferBindingType,
-    has_dynamic_offset: bool,
-    as_ref: bool,
-) -> Any {
-    let BindingArgs { path, visibility } = match args {
-        Ok(a) => a,
-        Err(e) => return Any::new_invalid(e),
-    };
-
-    let storage = gpu_type_layout::<T>();
-    match bind_ty {
-        BufferBindingType::Uniform => {
-            let uniform = match GpuTypeLayout::<repr::Uniform>::try_from(storage) {
-                Ok(u) => u,
-                Err(e) => {
-                    let invalid = Context::try_with(call_info!(), |ctx| {
-                        ctx.push_error(e.into());
-                        InvalidReason::ErrorThatWasPushed
-                    })
-                    .unwrap_or(InvalidReason::CreatedWithNoActiveEncoding);
-
-                    return Any::new_invalid(invalid);
-                }
-            };
-            // TODO(chronicl) throw error or panic if as_ref == true here
-            Any::uniform_buffer_binding(path, visibility, uniform, has_dynamic_offset)
-        }
-        BufferBindingType::Storage(access) => {
-            Any::storage_buffer_binding(path, visibility, storage, access, as_ref, has_dynamic_offset)
-        }
-    }
 }
 
 impl<T: GpuType + GpuStore + GpuSized + NoBools + GpuLayout<GpuRepr = repr::Storage>, AS: BufferAddressSpace>
@@ -364,7 +566,7 @@ impl<T: GpuStore, AS: BufferAddressSpace, AM: AccessModeReadable> BufferRefInner
 // cannot exist outside of a reference.
 // however, as an exception to that rule, it seems like we can allow `Buffer<Array<T, RuntimeSize>>` directly
 #[rustfmt::skip] impl<T: GpuStore + NoHandles + NoAtomics + NoBools, AS: BufferAddressSpace, const DYN_OFFSET: bool>
-Binding for Buffer<T, AS, DYN_OFFSET>
+Binding for BufferV3<T, AS, DYN_OFFSET>
 where
     T: GpuSized+ GpuLayout<GpuRepr = repr::Storage>
 {
@@ -376,7 +578,7 @@ where
     }
 
     #[track_caller]
-    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self { Buffer::new(args) }
+    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self { BufferV3::new(args) }
 
     fn store_ty() -> ir::StoreType {
         store_type_from_impl_category(T::impl_category())
@@ -394,7 +596,7 @@ fn store_type_from_impl_category(category: GpuStoreImplCategory) -> ir::StoreTyp
 }
 
 #[rustfmt::skip] impl<T: GpuStore + NoHandles + NoAtomics + NoBools, AS: BufferAddressSpace, const DYN_OFFSET: bool>
-Binding for Buffer<Array<T>, AS, DYN_OFFSET>
+Binding for BufferV3<Array<T>, AS, DYN_OFFSET>
 where
     T: GpuType + GpuSized + GpuLayout + LayoutableSized
 {
@@ -406,7 +608,7 @@ where
     }
 
     #[track_caller]
-    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self { Buffer::new(args) }
+    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self { BufferV3::new(args) }
 
     fn store_ty() -> ir::StoreType {
         ir::StoreType::RuntimeSizedArray(T::sized_ty())
@@ -414,7 +616,7 @@ where
 }
 
 impl<T: GpuStore + NoHandles + NoAtomics + NoBools, AS, const DYN_OFFSET: bool> std::ops::Deref
-    for Buffer<T, AS, DYN_OFFSET>
+    for BufferV3<T, AS, DYN_OFFSET>
 where
     T: GpuSized,
     AS: BufferAddressSpace,
