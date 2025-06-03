@@ -62,41 +62,32 @@ pub trait AtomicInStorageOnly {}
 impl<T> AtomicInStorageOnly for (mem::Storage, T) {}
 impl<T: NoAtomics> AtomicInStorageOnly for (mem::Uniform, T) {}
 
-#[diagnostic::on_unimplemented(
-    message = "Access mode `ReadWrite` requires the buffer content to be wrapped in `Ref`. Change `Buffer<T, ...>` to `Buffer<shame::Ref<T>, ...>`."
-)]
-pub trait WriteRequiresRef {}
-impl<T: GpuStore, AS: AddressSpace, AM: AccessMode> WriteRequiresRef for (ReadWrite, Ref<T, AS, AM>) {}
-impl<T: GpuStore> WriteRequiresRef for (Read, T) {}
-
 /// TODO(chronicl)
 pub struct Buffer<Content, AS = mem::Storage, AM = Read, const DYNAMIC_OFFSET: bool = false>
 where
-    Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
+    Content: BufferContent<AM> + GpuLayout<GpuRepr = repr::Storage>,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
     (AS, AM): UniformIsRead,
     (AS, Content): AtomicInStorageOnly,
-    (AM, Content): WriteRequiresRef,
 {
     content: Content::BufferContent<AS, AM>,
     _phantom: PhantomData<(AS, AM)>,
 }
 
-pub trait BufferContent {
+pub trait BufferContent<AM: AccessMode> {
     const IS_REF: bool = false;
-    type BufferContent<AS: AddressSpace, AM: AccessMode>;
-    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM>;
+    type BufferContent<AS: AddressSpace, AM2: AccessMode>;
+    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, AM>;
 }
 
 impl<Content, AS, AM, const DYNAMIC_OFFSET: bool> std::ops::Deref for Buffer<Content, AS, AM, DYNAMIC_OFFSET>
 where
-    Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
+    Content: BufferContent<AM> + GpuLayout<GpuRepr = repr::Storage>,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
     (AS, AM): UniformIsRead,
     (AS, Content): AtomicInStorageOnly,
-    (AM, Content): WriteRequiresRef,
 {
     type Target = Content::BufferContent<AS, AM>;
 
@@ -105,12 +96,11 @@ where
 
 impl<Content, AS, AM, const DYNAMIC_OFFSET: bool> Buffer<Content, AS, AM, DYNAMIC_OFFSET>
 where
-    Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
+    Content: BufferContent<AM> + GpuLayout<GpuRepr = repr::Storage>,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
     (AS, AM): UniformIsRead,
     (AS, Content): AtomicInStorageOnly,
-    (AM, Content): WriteRequiresRef,
 {
     /// TODO(chronicl)
     pub fn new(args: Result<BindingArgs, InvalidReason>) -> Self {
@@ -169,12 +159,11 @@ fn create_buffer_any<T: GpuLayout<GpuRepr = repr::Storage>>(
 
 impl<Content, AS, AM, const DYNAMIC_OFFSET: bool> Binding for Buffer<Content, AS, AM, DYNAMIC_OFFSET>
 where
-    Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
+    Content: BufferContent<AM> + GpuLayout<GpuRepr = repr::Storage>,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
     (AS, AM): UniformIsRead,
     (AS, Content): AtomicInStorageOnly,
-    (AM, Content): WriteRequiresRef,
 {
     fn binding_type() -> BindingType {
         BindingType::Buffer {
@@ -203,16 +192,16 @@ macro_rules! impl_buffer_content_plain {
         impl<$($t:ident : $bound:tt),*> BufferContent for $type:ty;
     )*) => {
         $(
-        impl<$($t: $bound),*> BufferContent for $type {
+        impl<$($t: $bound),*> BufferContent<Read> for $type {
             const IS_REF: bool = false;
             type BufferContent<AS: AddressSpace, AM: AccessMode> = Self;
-            fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
+            fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, Read> { any.into() }
         }
 
-        impl<$($t: $bound),*> BufferContent for $crate::Ref<$type> {
+        impl<$($t: $bound),*> BufferContent<ReadWrite> for $type {
             const IS_REF: bool = true;
-            type BufferContent<AS: AddressSpace, AM: AccessMode> = Self;
-            fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
+            type BufferContent<AS: AddressSpace, AM: AccessMode> = $crate::Ref<Self>;
+            fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, ReadWrite> { any.into() }
         }
         )*
     };
@@ -225,48 +214,56 @@ impl_buffer_content_plain!(
 );
 
 // Implementations of BufferContent for structs that aren't wrapped in shame::Struct.
-impl<T: BufferFields> BufferContent for T {
+impl<T: BufferFields> BufferContent<Read> for T {
     const IS_REF: bool = false;
     type BufferContent<AS: AddressSpace, AM: AccessMode> = T;
 
-    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> {
+    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, Read> {
         let fields_anys = <T as GetAllFields>::fields_as_anys_unchecked(any);
         let fields_anys = (fields_anys.borrow() as &[Any]).iter().cloned();
         <T as FromAnys>::from_anys(fields_anys)
     }
 }
-impl<T: BufferFields> BufferContent for Ref<T> {
+impl<T: BufferFields> BufferContent<ReadWrite> for T {
     const IS_REF: bool = true;
     type BufferContent<AS: AddressSpace, AM: AccessMode> = T::RefFields<AS, AM>;
 
-    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> {
+    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, ReadWrite> {
         let fields_anys_refs = <T as GetAllFields>::fields_as_anys_unchecked(any);
         let fields_anys_refs = (fields_anys_refs.borrow() as &[Any]).iter().cloned();
-        <T::RefFields<AS, AM> as FromAnys>::from_anys(fields_anys_refs)
+        <T::RefFields<AS, ReadWrite> as FromAnys>::from_anys(fields_anys_refs)
     }
 }
 
 // Implementations of BufferContent for arrays. Starting with fixed size.
-impl<T: GpuType + GpuSized + GpuLayout + LayoutableSized, const N: usize> BufferContent for Array<T, Size<N>> {
+impl<T: GpuType + GpuSized + GpuLayout + LayoutableSized, const N: usize> BufferContent<Read> for Array<T, Size<N>> {
     const IS_REF: bool = false;
     type BufferContent<AS: AddressSpace, AM: AccessMode> = T;
 
-    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
+    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, Read> { any.into() }
 }
-impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized, const N: usize> BufferContent
-    for Ref<Array<T, Size<N>>>
+impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized, const N: usize> BufferContent<ReadWrite>
+    for Array<T, Size<N>>
 {
     const IS_REF: bool = true;
     type BufferContent<AS: AddressSpace, AM: AccessMode> = T;
 
-    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
+    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, ReadWrite> { any.into() }
 }
 // Runtime sized only with Ref.
-impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized> BufferContent for Ref<Array<T, RuntimeSize>> {
+impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized> BufferContent<Read> for Array<T, RuntimeSize> {
     const IS_REF: bool = true;
-    type BufferContent<AS: AddressSpace, AM: AccessMode> = T;
+    type BufferContent<AS: AddressSpace, AM: AccessMode> = Ref<Array<T, RuntimeSize>>;
 
-    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
+    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, Read> { any.into() }
+}
+impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized> BufferContent<ReadWrite>
+    for Array<T, RuntimeSize>
+{
+    const IS_REF: bool = true;
+    type BufferContent<AS: AddressSpace, AM: AccessMode> = Ref<Array<T, RuntimeSize>>;
+
+    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, ReadWrite> { any.into() }
 }
 
 
