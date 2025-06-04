@@ -19,25 +19,14 @@ pub trait AsBindingResource: sm::Binding {
     }
 }
 
-impl<T, AS, const DYNAMIC_OFFSET: bool> AsBindingResource for sm::BufferV3<T, AS, DYNAMIC_OFFSET>
+impl<T, AS, AM, const DYNAMIC_OFFSET: bool> AsBindingResource for sm::Buffer<T, AS, AM, DYNAMIC_OFFSET>
 where
-    Self: sm::Binding,
-    T: sm::GpuStore + sm::NoHandles + sm::NoAtomics + sm::NoBools,
-    AS: sm::BufferAddressSpace,
-{
-    type BindingResource<'a> = wgpu::BufferBinding<'a>;
-
-    fn binding_resource<'a>(resource: &'a Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
-        wgpu::BindingResource::Buffer(resource.clone())
-    }
-}
-
-impl<T, AS, AM, const DYNAMIC_OFFSET: bool> AsBindingResource for sm::BufferRef<T, AS, AM, DYNAMIC_OFFSET>
-where
-    Self: sm::Binding,
-    T: sm::GpuStore + sm::NoHandles + sm::NoBools,
+    T: sm::BufferContent + sm::GpuLayout<GpuRepr = sm::any::layout::repr::Storage>,
     AS: sm::BufferAddressSpace,
     AM: sm::AccessModeReadable,
+    (AS, AM): sm::UniformIsRead,
+    (AS, T): sm::AtomicInStorageOnly,
+    (AM, T): sm::WriteRequiresRef,
 {
     type BindingResource<'a> = wgpu::BufferBinding<'a>;
 

@@ -264,9 +264,12 @@ pub mod mem {
 pub use frontend::encoding::binding::Binding;
 
 // Buffer
-pub use frontend::encoding::buffer::BufferV3;
 pub use frontend::encoding::buffer::Buffer;
-pub use frontend::encoding::buffer::BufferRef;
+pub use frontend::encoding::buffer::BufferContent;
+pub use frontend::encoding::buffer::BufferAddressSpaceEnum;
+pub use frontend::encoding::buffer::UniformIsRead;
+pub use frontend::encoding::buffer::AtomicInStorageOnly;
+pub use frontend::encoding::buffer::WriteRequiresRef;
 pub use frontend::encoding::buffer::BufferAddressSpace;
 
 // `Sampler`

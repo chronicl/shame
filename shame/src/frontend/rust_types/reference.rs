@@ -208,6 +208,23 @@ where
     }
 }
 
+impl<T, AS, AM> Ref<T, AS, AM>
+where
+    T: GpuStore,
+    AS: AddressSpace,
+    AM: AccessMode,
+{
+    pub(crate) fn from_any_unchecked(any: Any) -> Self {
+        Self {
+            any,
+            fields_as_refs: {
+                let field_anys = <T as GetAllFields>::fields_as_anys_unchecked(any);
+                FromAnys::from_anys((field_anys.borrow() as &[Any]).iter().copied())
+            },
+        }
+    }
+}
+
 impl<T, AS, AM> From<Any> for Ref<T, AS, AM>
 where
     T: GpuType + GpuStore,
@@ -216,22 +233,17 @@ where
 {
     #[track_caller]
     fn from(any: Any) -> Self {
-        let from_any_unchecked = |any| Self {
-            any,
-            fields_as_refs: {
-                let field_anys = <T as GetAllFields>::fields_as_anys_unchecked(any);
-                FromAnys::from_anys((field_anys.borrow() as &[Any]).iter().copied())
-            },
-        };
         Context::with(call_info!(), |ctx| {
-            let invalid = |e| from_any_unchecked(ctx.push_error_get_invalid_any(e));
+            let invalid = |e| Self::from_any_unchecked(ctx.push_error_get_invalid_any(e));
             let expected_store_ty = T::store_ty();
 
             match any.ty() {
                 Some(Type::Ref(alloc, store_ty, access)) => match alloc.address_space == AS::ADDRESS_SPACE {
-                    true => {
-                        typecheck_downcast(any, Type::Ref(alloc, expected_store_ty, AM::ACCESS), from_any_unchecked)
-                    }
+                    true => typecheck_downcast(
+                        any,
+                        Type::Ref(alloc, expected_store_ty, AM::ACCESS),
+                        Self::from_any_unchecked,
+                    ),
                     false => invalid(
                         FrontendError::DowncastWithInvalidAddressSpace {
                             dynamic_as: alloc.address_space,
@@ -247,7 +259,7 @@ where
                     }
                     .into(),
                 ),
-                None => from_any_unchecked(any), // already invalid.
+                None => Self::from_any_unchecked(any), // already invalid.
             }
         })
     }

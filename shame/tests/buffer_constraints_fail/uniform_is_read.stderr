@@ -1,35 +1,36 @@
-error[E0277]: The uniform address space is read only. Change ReadWrite to Read.
+error[E0277]: The uniform address space is read only. Change `ReadWrite` to `Read`.
  --> tests/buffer_constraints_fail/uniform_is_read.rs:1:20
   |
-1 | fn main() { let _: shame::BufferV2<shame::f32x1, shame::mem::Uniform, shame::ReadWrite> = todo!(); }
-  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `shame::frontend::encoding::buffer::UniformIsRead` is not implemented for `(shame::mem::Uniform, shame::ReadWrite)`
+1 | fn main() { let _: shame::Buffer<shame::f32x1, shame::mem::Uniform, shame::ReadWrite> = todo!(); }
+  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `shame::frontend::encoding::buffer::UniformIsRead` is not implemented for `(shame::mem::Uniform, shame::ReadWrite)`
   |
   = help: the following other types implement trait `shame::frontend::encoding::buffer::UniformIsRead`:
             (shame::mem::Storage, AM)
             (shame::mem::Uniform, shame::Read)
-note: required by a bound in `BufferV2`
+note: required by a bound in `shame::Buffer`
  --> src/frontend/encoding/buffer.rs
   |
-  | pub struct BufferV2<Content, AS = mem::Storage, AM = Read, const DYNAMIC_OFFSET: bool = false>
-  |            -------- required by a bound in this struct
+  | pub struct Buffer<Content, AS = mem::Storage, AM = Read, const DYNAMIC_OFFSET: bool = false>
+  |            ------ required by a bound in this struct
 ...
   |     (AS, AM): UniformIsRead,
-  |               ^^^^^^^^^^^^^ required by this bound in `BufferV2`
+  |               ^^^^^^^^^^^^^ required by this bound in `Buffer`
 
-error[E0277]: Access mode `ReadWrite` requires the buffer content to be wrapped in `Ref`. Change `Buffer<T, ...>` to `Buffer<Ref<T>, ...>`.
+error[E0277]: Access mode `ReadWrite` requires the buffer content to be wrapped in `Ref`. Change `Buffer<T, ...>` to `Buffer<shame::Ref<T>, ...>`.
  --> tests/buffer_constraints_fail/uniform_is_read.rs:1:20
   |
-1 | fn main() { let _: shame::BufferV2<shame::f32x1, shame::mem::Uniform, shame::ReadWrite> = todo!(); }
-  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `shame::frontend::encoding::buffer::WriteRequiresRef` is not implemented for `(shame::ReadWrite, shame::vec<f32, x1>)`
+1 | fn main() { let _: shame::Buffer<shame::f32x1, shame::mem::Uniform, shame::ReadWrite> = todo!(); }
+  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `shame::frontend::encoding::buffer::WriteRequiresRef` is not implemented for `(shame::ReadWrite, shame::vec<f32, x1>)`
   |
   = help: the following other types implement trait `shame::frontend::encoding::buffer::WriteRequiresRef`:
             (shame::Read, T)
-            (shame::ReadWrite, shame::Ref<T>)
-note: required by a bound in `BufferV2`
+            (shame::Read, shame::Ref<T, AS, AM>)
+            (shame::ReadWrite, shame::Ref<T, AS, AM>)
+note: required by a bound in `shame::Buffer`
  --> src/frontend/encoding/buffer.rs
   |
-  | pub struct BufferV2<Content, AS = mem::Storage, AM = Read, const DYNAMIC_OFFSET: bool = false>
-  |            -------- required by a bound in this struct
+  | pub struct Buffer<Content, AS = mem::Storage, AM = Read, const DYNAMIC_OFFSET: bool = false>
+  |            ------ required by a bound in this struct
 ...
   |     (AM, Content): WriteRequiresRef,
-  |                    ^^^^^^^^^^^^^^^^ required by this bound in `BufferV2`
+  |                    ^^^^^^^^^^^^^^^^ required by this bound in `Buffer`

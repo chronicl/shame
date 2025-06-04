@@ -16,7 +16,7 @@ use crate::{
     common::proc_macro_utils::push_wrong_amount_of_args_error,
     frontend::{
         any::{render_io::VertexAttribFormat, Any, InvalidReason},
-        encoding::buffer::{BufferAddressSpace, BufferInner, BufferRefInner},
+        encoding::buffer::{BufferAddressSpace},
         error::InternalError,
     },
     ir::{
@@ -99,32 +99,6 @@ pub trait GpuStore: GpuAligned + GetAllFields + FromAnys {
     /// [`Ref<Foo, _, _>`]: crate::Ref
     /// [`shame::Ref<Self>`]: crate::Ref
     type RefFields<AS: AddressSpace, AM: AccessMode>: FromAnys + Copy;
-
-    /// internal function that aids in the construction of `Buffer` as a `Binding`.
-    ///
-    /// constructs an object containing an invalid `Any` if args is `Err`
-    #[doc(hidden)]
-    fn instantiate_buffer_inner<AS: BufferAddressSpace>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BufferBindingType,
-        has_dynamic_offset: bool,
-    ) -> BufferInner<Self, AS>
-    where
-        Self: std::marker::Sized /*not GpuSized, this is deliberate*/ + NoAtomics
-            + NoBools
-            + GpuLayout<GpuRepr = repr::Storage>;
-
-    /// internal function that aids in the construction of `BufferRef` as a `Binding`
-    ///
-    /// constructs an object containing an invalid `Any` if args is `Err`
-    #[doc(hidden)]
-    fn instantiate_buffer_ref_inner<AS: BufferAddressSpace, AM: AccessModeReadable>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BufferBindingType,
-        has_dynamic_offset: bool,
-    ) -> BufferRefInner<Self, AS, AM>
-    where
-        Self: std::marker::Sized /*not GpuSized, this is deliberate*/ + NoBools + GpuLayout<GpuRepr = repr::Storage>;
 
     #[doc(hidden)] // runtime api
     fn store_ty() -> ir::StoreType

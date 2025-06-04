@@ -1,8 +1,8 @@
 error[E0277]: `shame::Atomic<u32>` may be or contain a `shame::Atomic` type. Atomics are usable via `shame::BufferRef<_, Storage, ReadWrite>` or via allocations in workgroup memory
  --> tests/buffer_constraints_fail/atomic_in_storage_only.rs:1:20
   |
-1 | fn main() { let _: shame::BufferV2<shame::Atomic<u32>, shame::mem::Uniform> = todo!(); }
-  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `NoAtomics` is not implemented for `shame::Atomic<u32>`
+1 | fn main() { let _: shame::Buffer<shame::Atomic<u32>, shame::mem::Uniform> = todo!(); }
+  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `NoAtomics` is not implemented for `shame::Atomic<u32>`
   |
   = help: the following other types implement trait `NoAtomics`:
             mat<T, C, R>
@@ -12,11 +12,11 @@ error[E0277]: `shame::Atomic<u32>` may be or contain a `shame::Atomic` type. Ato
             shame::packed::PackedVec<T, L>
             shame::vec<T, L>
   = note: required for `(shame::mem::Uniform, shame::Atomic<u32>)` to implement `shame::frontend::encoding::buffer::AtomicInStorageOnly`
-note: required by a bound in `BufferV2`
+note: required by a bound in `shame::Buffer`
  --> src/frontend/encoding/buffer.rs
   |
-  | pub struct BufferV2<Content, AS = mem::Storage, AM = Read, const DYNAMIC_OFFSET: bool = false>
-  |            -------- required by a bound in this struct
+  | pub struct Buffer<Content, AS = mem::Storage, AM = Read, const DYNAMIC_OFFSET: bool = false>
+  |            ------ required by a bound in this struct
 ...
   |     (AS, Content): AtomicInStorageOnly,
-  |                    ^^^^^^^^^^^^^^^^^^^ required by this bound in `BufferV2`
+  |                    ^^^^^^^^^^^^^^^^^^^ required by this bound in `Buffer`

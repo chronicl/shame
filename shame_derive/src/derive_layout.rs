@@ -482,30 +482,6 @@ pub fn impl_for_struct(
                             unreachable!("Self: !GpuType")
                         }
 
-                        fn instantiate_buffer_inner<AS: #re::BufferAddressSpace>(
-                            args: Result<#re::BindingArgs, #re::InvalidReason>,
-                            bind_ty: #re::BufferBindingType,
-                            has_dynamic_offset: bool,
-                        ) -> #re::BufferInner<Self, AS>
-                        where
-                            #triv Self:
-                                #re::NoAtomics +
-                                #re::NoBools
-                        {
-                            #re::BufferInner::new_fields(args, bind_ty, has_dynamic_offset)
-                        }
-
-                        fn instantiate_buffer_ref_inner<AS: #re::BufferAddressSpace, AM: #re::AccessModeReadable>(
-                            args: Result<#re::BindingArgs, #re::InvalidReason>,
-                            bind_ty: #re::BufferBindingType,
-                            has_dynamic_offset: bool,
-                        ) -> #re::BufferRefInner<Self, AS, AM>
-                        where
-                            #triv Self: #re::NoBools,
-                        {
-                            #re::BufferRefInner::new_fields(args, bind_ty, has_dynamic_offset)
-                        }
-
                         fn impl_category() -> #re::GpuStoreImplCategory {
                             #re::GpuStoreImplCategory::Fields(<Self as #re::BufferFields>::get_bufferblock_type())
                         }

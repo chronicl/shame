@@ -3,12 +3,11 @@ use crate::any::BufferBindingType;
 use crate::common::small_vec::SmallVec;
 use crate::frontend::any::shared_io::{BindPath, BindingType};
 use crate::frontend::any::{Any, InvalidReason};
-use crate::frontend::encoding::buffer::BufferRefInner;
 use crate::{
     call_info,
     frontend::{
         encoding::{
-            buffer::{BufferAddressSpace, BufferInner},
+            buffer::{BufferAddressSpace},
             EncodingErrorKind,
         },
         error::InternalError,
@@ -96,27 +95,6 @@ impl<T: SizedFields + GpuStore> Clone for Struct<T> {
 impl<T: SizedFields + GpuStore> GpuStore for Struct<T> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = T::RefFields<AS, AM>;
     fn store_ty() -> ir::StoreType { ir::StoreType::Sized(<Self as GpuSized>::sized_ty()) }
-    fn instantiate_buffer_inner<AS: BufferAddressSpace>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BufferBindingType,
-        has_dynamic_offset: bool,
-    ) -> BufferInner<Self, AS>
-    where
-        Self: NoAtomics + NoBools + GpuLayout<GpuRepr = repr::Storage>,
-    {
-        BufferInner::new_plain(args, bind_ty, has_dynamic_offset)
-    }
-
-    fn instantiate_buffer_ref_inner<AS: BufferAddressSpace, AM: AccessModeReadable>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BufferBindingType,
-        has_dynamic_offset: bool,
-    ) -> BufferRefInner<Self, AS, AM>
-    where
-        Self: NoBools + GpuLayout<GpuRepr = repr::Storage>,
-    {
-        BufferRefInner::new_plain(args, bind_ty, has_dynamic_offset)
-    }
 
     fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
 }

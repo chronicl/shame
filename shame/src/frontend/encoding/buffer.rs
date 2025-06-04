@@ -42,7 +42,9 @@ pub trait BufferAddressSpace: AddressSpace + SupportsAccess<Read> {
 /// Either Storage or Uniform address space.
 #[derive(Debug)]
 pub enum BufferAddressSpaceEnum {
+    /// Storage address space
     Storage,
+    /// Uniform address space
     Uniform,
 }
 impl BufferAddressSpace for mem::Uniform {
@@ -53,41 +55,132 @@ impl BufferAddressSpace for mem::Storage {
 }
 
 #[diagnostic::on_unimplemented(message = "The uniform address space is read only. Change `ReadWrite` to `Read`.")]
+/// TODO(chronicl)
+#[allow(missing_docs)]
 pub trait UniformIsRead {}
 impl<AM: AccessModeReadable> UniformIsRead for (mem::Storage, AM) {}
 impl UniformIsRead for (mem::Uniform, Read) {}
 
 // Diagnostics carry over from `NoAtomics`.
+/// TODO(chronicl)
+#[allow(missing_docs)]
 pub trait AtomicInStorageOnly {}
 impl<T> AtomicInStorageOnly for (mem::Storage, T) {}
 impl<T: NoAtomics> AtomicInStorageOnly for (mem::Uniform, T) {}
 
+#[diagnostic::on_unimplemented(message = "One of two things happened.\n\
+    1. Access mode `ReadWrite` was used and the buffer content was not wrapped `Ref`. Change `Buffer<T, ...>` to `Buffer<shame::Ref<T>, ...>`.\n\
+    2. A runtime sized array was used without `Ref`. Change `Buffer<Array<T>, ...>` to `Buffer<shame::Ref<Array<T>>, ...>`.")]
 /// TODO(chronicl)
+#[allow(missing_docs)]
+pub trait WriteRequiresRef {}
+impl<T: GpuStore, AS: AddressSpace, AM: AccessMode> WriteRequiresRef for (ReadWrite, Ref<T, AS, AM>) {}
+impl<T: GpuStore> WriteRequiresRef for (Read, T) {}
+// This includes the requirement of
+impl<T: GpuStore + GpuType + GpuSized + GpuLayout + LayoutableSized, AS: AddressSpace, AM: AccessMode> WriteRequiresRef
+    for (Read, Ref<Array<T>, AS, AM>)
+{
+}
+
+/// A buffer binding.
+///
+/// Buffer contents are accessible via [`std::ops::Deref`] `*`.
+///
+/// Only the [`mem::Storage`] address space supports [`ReadWrite`] access.
+///
+/// ## Generic arguments
+/// - `Content`: the buffer content. May not contain bools
+/// - `DYNAMIC_OFFSET`: whether an offset into the bound buffer can be specified when binding its bind-group in the graphics api.
+/// - `AS`: the address space can be either of
+///     - `mem::Uniform`
+///         - read only access
+///         - has special memory layout requirements, see https://www.w3.org/TR/WGSL/#address-space-layout-constraints
+///         - check the uniform buffer size limitations via the graphics api
+///     - `mem::Storage`
+///         - readwrite or read-only access
+///         - for large buffers
+/// # Example
+/// ```
+/// use shame as sm;
+/// use sm::f32x4x4;
+/// use sm::f32x4;
+/// use sm::Ref;
+///
+/// // storage buffers
+/// let buffer: sm::Buffer<Ref<f32x4>, sm::mem::Storage, sm::ReadWrite> = bind_group_iter.next();
+/// // same as above but only readable. Storage and Read are the default.
+/// // let buffer: sm::Buffer<f32x4>> = bind_group_iter.next();
+///
+/// // read access via `.get()`
+/// let value = buffer.get() + sm::vec!(1.0, 2.0, 3.0, 4.0);
+///
+/// // write access via `.set()`
+/// buffer.set(sm::vec!(1.0, 2.0, 3.0, 4.0));
+///
+/// // uniform buffers
+/// let buffer: sm::Buffer<f32x4, sm::mem::Uniform> = bind_group_iter.next();
+///
+/// // fixed size array buffer
+/// let buffer: sm::Buffer<sm::Array<f32x4, sm::Size<512>>> = bind_group_iter.next();
+///
+/// // runtime-sized array buffer
+/// let buffer: sm::Buffer<Ref<sm::Array<f32x4>>, _, ReadWrite> = bind_group_iter.next();
+///
+/// // array lookup returns reference
+/// let element: sm::Ref<f32x4> = buffer.at(4u32);
+/// buffer.at(8u32).set(sm::vec!(1.0, 2.0, 3.0, 4.0));
+///
+/// // custom struct type buffer
+/// #[derive(sm::GpuLayout)]
+/// struct Transforms {
+///     world: f32x4x4,
+///     view: f32x4x4,
+///     proj: f32x4x4,
+/// }
+/// let buffer: sm::Buffer<Ref<Transforms>, _, ReadWrite> = bind_group_iter.next();
+///
+/// // field access returns references
+/// let world: sm::Ref<f32x4x4> = buffer.world;
+///
+/// // get fields via `.get()`
+/// let matrix: f32x4x4 = buffer.world.get();
+///
+/// // write to fields via `.set(_)`
+/// buffer.world.set(mat::zero())
+///
+/// // array of structs
+/// let buffer: sm::Buffer<sm::Array<sm::Struct<Transforms>>> = bind_group_iter.next();
+///
+/// ```
 pub struct Buffer<Content, AS = mem::Storage, AM = Read, const DYNAMIC_OFFSET: bool = false>
 where
-    Content: BufferContent<AM> + GpuLayout<GpuRepr = repr::Storage>,
+    Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
     (AS, AM): UniformIsRead,
     (AS, Content): AtomicInStorageOnly,
+    (AM, Content): WriteRequiresRef,
 {
     content: Content::BufferContent<AS, AM>,
     _phantom: PhantomData<(AS, AM)>,
 }
 
-pub trait BufferContent<AM: AccessMode> {
+/// TODO(chronicl)
+#[allow(missing_docs)]
+pub trait BufferContent {
     const IS_REF: bool = false;
-    type BufferContent<AS: AddressSpace, AM2: AccessMode>;
-    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, AM>;
+    type BufferContent<AS: AddressSpace, AM: AccessMode>;
+    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM>;
 }
 
 impl<Content, AS, AM, const DYNAMIC_OFFSET: bool> std::ops::Deref for Buffer<Content, AS, AM, DYNAMIC_OFFSET>
 where
-    Content: BufferContent<AM> + GpuLayout<GpuRepr = repr::Storage>,
+    Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
     (AS, AM): UniformIsRead,
     (AS, Content): AtomicInStorageOnly,
+    (AM, Content): WriteRequiresRef,
 {
     type Target = Content::BufferContent<AS, AM>;
 
@@ -96,11 +189,12 @@ where
 
 impl<Content, AS, AM, const DYNAMIC_OFFSET: bool> Buffer<Content, AS, AM, DYNAMIC_OFFSET>
 where
-    Content: BufferContent<AM> + GpuLayout<GpuRepr = repr::Storage>,
+    Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
     (AS, AM): UniformIsRead,
     (AS, Content): AtomicInStorageOnly,
+    (AM, Content): WriteRequiresRef,
 {
     /// TODO(chronicl)
     pub fn new(args: Result<BindingArgs, InvalidReason>) -> Self {
@@ -159,11 +253,12 @@ fn create_buffer_any<T: GpuLayout<GpuRepr = repr::Storage>>(
 
 impl<Content, AS, AM, const DYNAMIC_OFFSET: bool> Binding for Buffer<Content, AS, AM, DYNAMIC_OFFSET>
 where
-    Content: BufferContent<AM> + GpuLayout<GpuRepr = repr::Storage>,
+    Content: BufferContent + GpuLayout<GpuRepr = repr::Storage>,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
     (AS, AM): UniformIsRead,
     (AS, Content): AtomicInStorageOnly,
+    (AM, Content): WriteRequiresRef,
 {
     fn binding_type() -> BindingType {
         BindingType::Buffer {
@@ -192,78 +287,70 @@ macro_rules! impl_buffer_content_plain {
         impl<$($t:ident : $bound:tt),*> BufferContent for $type:ty;
     )*) => {
         $(
-        impl<$($t: $bound),*> BufferContent<Read> for $type {
+        impl<$($t: $bound),*> BufferContent for $type {
             const IS_REF: bool = false;
             type BufferContent<AS: AddressSpace, AM: AccessMode> = Self;
-            fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, Read> { any.into() }
+            fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
         }
 
-        impl<$($t: $bound),*> BufferContent<ReadWrite> for $type {
+        impl<$($t: $bound),*> BufferContent for $crate::Ref<$type> {
             const IS_REF: bool = true;
-            type BufferContent<AS: AddressSpace, AM: AccessMode> = $crate::Ref<Self>;
-            fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, ReadWrite> { any.into() }
+            type BufferContent<AS: AddressSpace, AM: AccessMode> = $crate::Ref<$type, AS, AM>;
+            fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
         }
         )*
     };
 }
 impl_buffer_content_plain!(
     impl<T: ScalarTypeFp, C: Len2, R: Len2> BufferContent for mat<T, C, R>;
-    impl<T: SizedFields>                    BufferContent for Struct<T>  ;
-    impl<T: ScalarType, L: Len>             BufferContent for vec<T, L>  ;
-    impl<T: ScalarTypeInteger>              BufferContent for Atomic<T>  ;
+    impl<T: SizedFields>                    BufferContent for Struct<T>   ;
+    impl<T: ScalarType, L: Len>             BufferContent for vec<T, L>   ;
+    impl<T: ScalarTypeInteger>              BufferContent for Atomic<T>   ;
 );
 
 // Implementations of BufferContent for structs that aren't wrapped in shame::Struct.
-impl<T: BufferFields> BufferContent<Read> for T {
+impl<T: BufferFields> BufferContent for T {
     const IS_REF: bool = false;
     type BufferContent<AS: AddressSpace, AM: AccessMode> = T;
 
-    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, Read> {
+    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> {
         let fields_anys = <T as GetAllFields>::fields_as_anys_unchecked(any);
         let fields_anys = (fields_anys.borrow() as &[Any]).iter().cloned();
         <T as FromAnys>::from_anys(fields_anys)
     }
 }
-impl<T: BufferFields> BufferContent<ReadWrite> for T {
+impl<T: BufferFields> BufferContent for Ref<T> {
     const IS_REF: bool = true;
-    type BufferContent<AS: AddressSpace, AM: AccessMode> = T::RefFields<AS, AM>;
+    type BufferContent<AS: AddressSpace, AM: AccessMode> = Ref<T, AS, AM>;
 
-    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, ReadWrite> {
-        let fields_anys_refs = <T as GetAllFields>::fields_as_anys_unchecked(any);
-        let fields_anys_refs = (fields_anys_refs.borrow() as &[Any]).iter().cloned();
-        <T::RefFields<AS, ReadWrite> as FromAnys>::from_anys(fields_anys_refs)
+    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> {
+        // TODO, ideally this could just use From::from, but the GpuType requirement
+        // on GpuStore::store_type() doesn't allow it.
+        Ref::<T, AS, AM>::from_any_unchecked(any)
     }
 }
 
 // Implementations of BufferContent for arrays. Starting with fixed size.
-impl<T: GpuType + GpuSized + GpuLayout + LayoutableSized, const N: usize> BufferContent<Read> for Array<T, Size<N>> {
+impl<T: GpuType + GpuSized + GpuLayout + LayoutableSized, const N: usize> BufferContent for Array<T, Size<N>> {
     const IS_REF: bool = false;
     type BufferContent<AS: AddressSpace, AM: AccessMode> = T;
 
-    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, Read> { any.into() }
+    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
 }
-impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized, const N: usize> BufferContent<ReadWrite>
-    for Array<T, Size<N>>
+impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized, const N: usize> BufferContent
+    for Ref<Array<T, Size<N>>>
 {
     const IS_REF: bool = true;
-    type BufferContent<AS: AddressSpace, AM: AccessMode> = T;
+    type BufferContent<AS: AddressSpace, AM: AccessMode> = Ref<Array<T, Size<N>>, AS, AM>;
 
-    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, ReadWrite> { any.into() }
+    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
 }
 // Runtime sized only with Ref.
-impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized> BufferContent<Read> for Array<T, RuntimeSize> {
+impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized> BufferContent for Ref<Array<T>> {
     const IS_REF: bool = true;
-    type BufferContent<AS: AddressSpace, AM: AccessMode> = Ref<Array<T, RuntimeSize>>;
+    type BufferContent<AS: AddressSpace, AM: AccessMode> = Ref<Array<T>, AS, AM>;
 
-    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, Read> { any.into() }
-}
-impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized> BufferContent<ReadWrite>
-    for Array<T, RuntimeSize>
-{
-    const IS_REF: bool = true;
-    type BufferContent<AS: AddressSpace, AM: AccessMode> = Ref<Array<T, RuntimeSize>>;
-
-    fn from_any<AS: AddressSpace>(any: Any) -> Self::BufferContent<AS, ReadWrite> { any.into() }
+    fn from_any<AS: AddressSpace, AM: AccessMode>(any: Any) -> Self::BufferContent<AS, AM> { any.into() }
 }
 
 
@@ -303,497 +390,3 @@ mod buffer_v2_tests {
         Ok(())
     }
 }
-
-
-/// A read-only buffer binding, for writeable buffers and atomics use [`BufferRef`] instead.
-///
-/// Buffer contents are accessible via [`std::ops::Deref`] `*`.
-///
-/// ## Generic arguments
-/// - `Content`: the buffer content. May not contain atomics or bools
-/// - `DYNAMIC_OFFSET`: whether an offset into the bound buffer can be specified when binding its bind-group in the graphics api.
-/// - `AS`: the address space can be either of
-///     - `mem::Uniform`
-///         - has special memory layout requirements, see https://www.w3.org/TR/WGSL/#address-space-layout-constraints
-///         - check the uniform buffer size limitations via the graphics api
-///     - `mem::Storage`
-///         - for large buffers
-///
-/// ## Example
-/// ```
-/// use shame as sm;
-///
-/// // storage buffers
-/// let buffer: sm::Buffer<sm::f32x4, sm::mem::Storage> = bind_group_iter.next();
-/// // same as above, since `mem::Storage` is the default
-/// let buffer: sm::Buffer<sm::f32x4> = bind_group_iter.next();
-///
-/// // access via `std::ops::Deref` `*`
-/// let value = *buffer + sm::vec!(1.0, 2.0, 3.0, 4.0);
-///
-/// // uniform buffers
-/// let buffer: sm::Buffer<sm::f32x4, sm::mem::Uniform> = bind_group_iter.next();
-///
-/// // runtime-sized array buffer
-/// let buffer: sm::Buffer<sm::Array<sm::f32x4>> = bind_group_iter.next();
-///
-/// // fixed size array buffer
-/// let buffer: sm::Buffer<sm::Array<sm::f32x4, sm::Size<512>>> = bind_group_iter.next();
-///
-/// // custom struct type buffer
-/// #[derive(sm::GpuLayout)]
-/// struct Transforms {
-///     world: f32x4x4,
-///     view: f32x4x4,
-///     proj: f32x4x4,
-/// }
-/// let buffer: sm::Buffer<Transforms> = bind_group_iter.next();
-/// // equivalent to
-/// let buffer: sm::Buffer<sm::Struct<Transforms>> = bind_group_iter.next();
-///
-/// // array of structs
-/// let buffer: sm::Buffer<sm::Array<sm::Struct<Transforms>>> = bind_group_iter.next();
-/// ```
-///
-/// > maintainer note:
-/// > the precise trait bounds of buffer bindings are found in the `Binding` impl blocks.
-#[derive(Clone, Copy)]
-pub struct BufferV3<Content, AS = mem::Storage, const DYNAMIC_OFFSET: bool = false>
-where
-    Content: GpuStore + NoHandles + NoAtomics + NoBools,
-    AS: BufferAddressSpace,
-{
-    pub(crate) inner: BufferInner<Content, AS>,
-}
-
-impl<T, AS, const DYN_OFFSET: bool> BufferV3<T, AS, DYN_OFFSET>
-where
-    T: GpuStore + NoHandles + NoAtomics + NoBools + GpuLayout<GpuRepr = repr::Storage>,
-    AS: BufferAddressSpace,
-{
-    #[track_caller]
-    fn new(args: Result<BindingArgs, InvalidReason>) -> Self {
-        let skip_stride_check = true; // not a vertex buffer
-        Context::try_with(call_info!(), |ctx| {
-            get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check)
-        });
-        Self {
-            inner: T::instantiate_buffer_inner(args, BufferInner::<T, AS>::binding_type(), DYN_OFFSET),
-        }
-    }
-}
-
-impl<T, AS, AM, const DYN_OFFSET: bool> BufferRef<T, AS, AM, DYN_OFFSET>
-where
-    T: GpuStore + NoHandles + NoBools + GpuLayout<GpuRepr = repr::Storage>,
-    AS: BufferAddressSpace,
-    AM: AccessModeReadable,
-{
-    #[track_caller]
-    fn new(args: Result<BindingArgs, InvalidReason>) -> Self {
-        let skip_stride_check = true; // not a vertex buffer
-        Context::try_with(call_info!(), |ctx| {
-            get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check)
-        });
-        Self {
-            inner: T::instantiate_buffer_ref_inner(args, BufferRefInner::<T, AS, AM>::binding_type(), DYN_OFFSET),
-        }
-    }
-}
-
-#[doc(hidden)]
-#[derive(Clone, Copy)]
-pub enum BufferInner<T: GpuStore, AS: BufferAddressSpace> {
-    FieldsSized(T),
-    /// unused, `BufferRef` must be used for this case
-    FieldsRuntimeSized(T::RefFields<AS, Read>),
-    PlainSized(T),
-    RuntimeSizedArray(Ref<T, AS, Read>),
-}
-
-#[doc(hidden)]
-#[derive(Clone, Copy)]
-pub enum BufferRefInner<T: GpuStore, AS: BufferAddressSpace, AM: AccessModeReadable> {
-    Fields(T::RefFields<AS, AM>),
-    Plain(Ref<T, AS, AM>),
-}
-
-impl<T: GpuType + GpuStore + GpuSized + NoBools + GpuLayout<GpuRepr = repr::Storage>, AS: BufferAddressSpace>
-    BufferInner<T, AS>
-{
-    #[track_caller]
-    pub(crate) fn new_plain(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BufferBindingType,
-        has_dynamic_offset: bool,
-    ) -> Self {
-        let as_ref = false;
-        let any = create_buffer_any::<T>(args, bind_ty, has_dynamic_offset, as_ref);
-        BufferInner::PlainSized(any.into())
-    }
-}
-
-impl<T: BufferFields + NoAtomics + NoBools + GpuLayout<GpuRepr = repr::Storage>, AS: BufferAddressSpace>
-    BufferInner<T, AS>
-{
-    #[track_caller]
-    #[doc(hidden)]
-    pub fn new_fields(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BufferBindingType,
-        has_dynamic_offset: bool,
-    ) -> Self {
-        let block = T::get_bufferblock_type();
-        match ir::SizedStruct::try_from(block.clone()) {
-            Ok(struct_) => {
-                let as_ref = false;
-                // TODO(chronicl) does not require BufferFields. consider unifying with other methods
-                let block_any = create_buffer_any::<T>(args, bind_ty, has_dynamic_offset, as_ref);
-                let fields_anys = <T as GetAllFields>::fields_as_anys_unchecked(block_any);
-                let fields_anys = (fields_anys.borrow() as &[Any]).iter().cloned();
-                let fields = <T as FromAnys>::from_anys(fields_anys);
-                BufferInner::FieldsSized(fields)
-            }
-            Err(_) => {
-                // TODO(release) test this! A `Buffer<Foo> where Foo's last field is a runtime sized array`
-                let as_ref = true;
-                // TODO(chronicl) does not require BufferFields. consider unifying with other methods
-                let block_any_ref = create_buffer_any::<T>(args, bind_ty, has_dynamic_offset, as_ref);
-                let fields_anys_refs = <T as GetAllFields>::fields_as_anys_unchecked(block_any_ref);
-                let fields_anys_refs = (fields_anys_refs.borrow() as &[Any]).iter().cloned();
-                let fields_refs = <T::RefFields<AS, Read> as FromAnys>::from_anys(fields_anys_refs);
-                BufferInner::FieldsRuntimeSized(fields_refs)
-            }
-        }
-    }
-}
-
-impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized, AS: BufferAddressSpace, L: ArrayLen>
-    BufferInner<Array<T, L>, AS>
-{
-    #[track_caller]
-    #[doc(hidden)]
-    pub(crate) fn new_array(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BufferBindingType,
-        has_dynamic_offset: bool,
-    ) -> Self {
-        match L::LEN {
-            // GpuSized
-            Some(_) => {
-                let as_ref = false;
-                let any = create_buffer_any::<Array<T, L>>(args, bind_ty, has_dynamic_offset, as_ref);
-                BufferInner::PlainSized(any.into())
-            }
-            // RuntimeSize
-            None => {
-                let as_ref = true;
-                let any_ref = create_buffer_any::<Array<T, L>>(args, bind_ty, has_dynamic_offset, as_ref);
-                BufferInner::RuntimeSizedArray(any_ref.into())
-            }
-        }
-    }
-}
-
-impl<T: GpuStore + NoBools + GpuLayout<GpuRepr = repr::Storage>, AS: BufferAddressSpace, AM: AccessModeReadable>
-    BufferRefInner<T, AS, AM>
-{
-    #[track_caller]
-    pub(crate) fn new_plain(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BufferBindingType,
-        has_dynamic_offset: bool,
-    ) -> Self
-    where
-        T: GpuType,
-    {
-        let as_ref = true;
-        let store_ty = <T as GpuStore>::store_ty();
-        let any = create_buffer_any::<T>(args, bind_ty, has_dynamic_offset, as_ref);
-        BufferRefInner::Plain(any.into())
-    }
-
-    #[track_caller]
-    #[doc(hidden)]
-    pub fn new_fields(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BufferBindingType,
-        has_dynamic_offset: bool,
-    ) -> Self
-    where
-        T: BufferFields,
-    {
-        let as_ref = true;
-        // TODO(chronicl) this does not require buffer fields. reconsider unifying impls and
-        // just matching on `LayoutableType` variants.
-        let block_any_ref = create_buffer_any::<T>(args, bind_ty, has_dynamic_offset, as_ref);
-        let fields_anys_refs = <T as GetAllFields>::fields_as_anys_unchecked(block_any_ref);
-        let fields_anys_refs = (fields_anys_refs.borrow() as &[Any]).iter().cloned();
-        let fields_refs = <T::RefFields<AS, AM> as FromAnys>::from_anys(fields_anys_refs);
-        BufferRefInner::Fields(fields_refs)
-    }
-}
-
-impl<T: GpuStore, AS: BufferAddressSpace> BufferInner<T, AS> {
-    fn binding_type() -> BufferBindingType {
-        match AS::ADDRESS_SPACE {
-            ir::AddressSpace::Uniform => BufferBindingType::Uniform,
-            ir::AddressSpace::Storage => BufferBindingType::Storage(Read::ACCESS_MODE_READABLE),
-            _ => unreachable!("AS: BufferAddressSpace"),
-        }
-    }
-}
-
-impl<T: GpuStore, AS: BufferAddressSpace, AM: AccessModeReadable> BufferRefInner<T, AS, AM> {
-    fn binding_type() -> BufferBindingType {
-        match AS::ADDRESS_SPACE {
-            ir::AddressSpace::Uniform => BufferBindingType::Uniform,
-            ir::AddressSpace::Storage => BufferBindingType::Storage(AM::ACCESS_MODE_READABLE),
-            _ => unreachable!("AS: BufferAddressSpace"),
-        }
-    }
-}
-
-// maintainer note:
-//
-// ## Why the `GpuSized` requirement?
-//
-// in shame a buffer-as-value (= `Buffer`) may not contain **fields** of
-// Array<_, RuntimeSize>/Atomic<_> since in WGSL this type
-// cannot exist outside of a reference.
-// however, as an exception to that rule, it seems like we can allow `Buffer<Array<T, RuntimeSize>>` directly
-#[rustfmt::skip] impl<T: GpuStore + NoHandles + NoAtomics + NoBools, AS: BufferAddressSpace, const DYN_OFFSET: bool>
-Binding for BufferV3<T, AS, DYN_OFFSET>
-where
-    T: GpuSized+ GpuLayout<GpuRepr = repr::Storage>
-{
-    fn binding_type() -> BindingType {
-        BindingType::Buffer {
-            ty:  BufferInner::<T, AS>::binding_type(),
-            has_dynamic_offset: DYN_OFFSET
-        }
-    }
-
-    #[track_caller]
-    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self { BufferV3::new(args) }
-
-    fn store_ty() -> ir::StoreType {
-        store_type_from_impl_category(T::impl_category())
-    }
-}
-
-fn store_type_from_impl_category(category: GpuStoreImplCategory) -> ir::StoreType {
-    match category {
-        GpuStoreImplCategory::GpuType(ty) => ty,
-        GpuStoreImplCategory::Fields(buffer_block) => match buffer_block.clone().try_into() {
-            Ok(sized) => ir::StoreType::Sized(ir::SizedType::Structure(sized)),
-            Err(_) => ir::StoreType::BufferBlock(buffer_block),
-        },
-    }
-}
-
-#[rustfmt::skip] impl<T: GpuStore + NoHandles + NoAtomics + NoBools, AS: BufferAddressSpace, const DYN_OFFSET: bool>
-Binding for BufferV3<Array<T>, AS, DYN_OFFSET>
-where
-    T: GpuType + GpuSized + GpuLayout + LayoutableSized
-{
-    fn binding_type() -> BindingType {
-        BindingType::Buffer {
-            ty:  BufferInner::<T, AS>::binding_type(),
-            has_dynamic_offset: DYN_OFFSET
-        }
-    }
-
-    #[track_caller]
-    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self { BufferV3::new(args) }
-
-    fn store_ty() -> ir::StoreType {
-        ir::StoreType::RuntimeSizedArray(T::sized_ty())
-    }
-}
-
-impl<T: GpuStore + NoHandles + NoAtomics + NoBools, AS, const DYN_OFFSET: bool> std::ops::Deref
-    for BufferV3<T, AS, DYN_OFFSET>
-where
-    T: GpuSized,
-    AS: BufferAddressSpace,
-{
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        use BufferInner as B;
-        match &self.inner {
-            B::FieldsRuntimeSized(_) | B::RuntimeSizedArray(_) => unreachable!("T: GpuSized"),
-            B::FieldsSized(t) | B::PlainSized(t) => t,
-        }
-    }
-}
-
-macro_rules! impl_deref_for_bufferref_of_gputypes {
-    (
-        $(impl<$(
-            $gen: ident : $bound: ident $(+ $bounds: ident)*
-        ),*> Deref for BufferRef<$type_name: ty, ...>;)*
-    ) => {
-        $(
-            impl<
-                $($gen: $bound $(+ $bounds)*,)*
-                AS, AM, const DYN_OFFSET: bool> std::ops::Deref for BufferRef<$type_name, AS, AM, DYN_OFFSET>
-            where
-                $type_name: GpuStore + NoHandles + NoBools,
-                AS: BufferAddressSpace,
-                AM: AccessModeReadable
-            {
-                type Target = Ref<$type_name, AS, AM>;
-
-                fn deref(&self) -> &Self::Target {
-                    use BufferRefInner as B;
-                    match &self.inner {
-                        B::Fields(_) => unreachable!("`Self: GpuType` + the `GpuStore` impl of all `GpuType` types sets this up as `Plain`"),
-                        B::Plain(ref_t) => &ref_t,
-                    }
-                }
-            }
-        )*
-    };
-}
-
-impl_deref_for_bufferref_of_gputypes! {
-    impl<T: SizedFields>                     Deref for BufferRef<Struct<T>   , ...>;
-    impl<T: GpuType + GpuSized, L: ArrayLen> Deref for BufferRef<Array<T, L> , ...>;
-    impl<T: ScalarType, L: Len>              Deref for BufferRef<vec<T, L>   , ...>;
-    impl<T: ScalarTypeFp, C: Len2, R: Len2>  Deref for BufferRef<mat<T, C, R>, ...>;
-    impl<T: ScalarTypeInteger>               Deref for BufferRef<Atomic<T>   , ...>;
-}
-
-impl<T: GpuStore + NoHandles + NoBools, AS, AM, const DYN_OFFSET: bool> std::ops::Deref
-    for BufferRef<T, AS, AM, DYN_OFFSET>
-where
-    T: BufferFields,
-    AS: BufferAddressSpace,
-    AM: AccessModeReadable,
-{
-    type Target = T::RefFields<AS, AM>;
-
-    fn deref(&self) -> &Self::Target {
-        use BufferRefInner as B;
-        match &self.inner {
-            B::Fields(t_ref_fields) => t_ref_fields,
-            B::Plain(_) => unreachable!("T: BufferFields + creation in derive macro `Store` impl have the same bound"),
-        }
-    }
-}
-
-// TODO(release) targeting WebGPU, push error if T's last field is an `Array<_, RuntimeSize>` in a `Buffer<T, mem::Unifrom>`
-// TODO(release) targeting WebGPU, push an error if `Buffer<Array<_, RuntimeSize>, mem::Uniform>` is created
-
-/// A read-write or read-only buffer binding.
-///
-/// [`BufferRef`] is required for writeable buffers and buffers containing [`Atomic`]s.
-/// For read-only buffers [`Buffer`] may be more ergonomic, as it don't requires `.get()`.
-///
-/// only the [`mem::Storage`] address space supports [`ReadWrite`] access.
-///
-/// ## Generic arguments
-/// - `Content`: the buffer content. May not contain bools
-/// - `DYNAMIC_OFFSET`: whether an offset into the bound buffer can be specified when binding its bind-group in the graphics api.
-/// - `AS`: the address space can be either of
-///     - `mem::Uniform`
-///         - read only access
-///         - has special memory layout requirements, see https://www.w3.org/TR/WGSL/#address-space-layout-constraints
-///         - check the uniform buffer size limitations via the graphics api
-///     - `mem::Storage`
-///         - readwrite or read-only access
-///         - for large buffers
-///
-/// # Example
-/// ```
-/// use shame as sm;
-/// use sm::f32x4x4;
-/// use sm::f32x4;
-///
-/// // storage buffers
-/// let buffer: sm::BufferRef<f32x4, sm::mem::Storage, sm::ReadWrite> = bind_group_iter.next();
-/// // same as above, since `mem::Storage` and `ReadWrite` is the default
-/// let buffer: sm::BufferRef<f32x4> = bind_group_iter.next();
-///
-/// // read access via `.get()`
-/// let value = buffer.get() + sm::vec!(1.0, 2.0, 3.0, 4.0);
-///
-/// // write access via `.set()`
-/// buffer.set(sm::vec!(1.0, 2.0, 3.0, 4.0));
-///
-/// // uniform buffers
-/// let buffer: sm::BufferRef<f32x4, sm::mem::Uniform, sm::Read> = bind_group_iter.next();
-///
-/// // fixed size array buffer
-/// let buffer: sm::BufferRef<sm::Array<f32x4, sm::Size<512>>> = bind_group_iter.next();
-///
-/// // runtime-sized array buffer
-/// let buffer: sm::BufferRef<sm::Array<f32x4>> = bind_group_iter.next();
-///
-/// // array lookup returns reference
-/// let element: sm::Ref<f32x4> = buffer.at(4u32);
-/// buffer.at(8u32).set(sm::vec!(1.0, 2.0, 3.0, 4.0));
-///
-/// // custom struct type buffer
-/// #[derive(sm::GpuLayout)]
-/// struct Transforms {
-///     world: f32x4x4,
-///     view: f32x4x4,
-///     proj: f32x4x4,
-/// }
-/// let buffer: sm::BufferRef<Transforms> = bind_group_iter.next();
-///
-/// // field access returns references
-/// let world: sm::Ref<f32x4x4> = buffer.world;
-///
-/// // get fields via `.get()`
-/// let matrix: f32x4x4 = buffer.world.get();
-///
-/// // write to fields via `.set(_)`
-/// buffer.world.set(mat::zero())
-///
-/// // array of structs
-/// let buffer: sm::Buffer<sm::Array<sm::Struct<Transforms>>> = bind_group_iter.next();
-///
-/// ```
-///
-/// > maintainer note:
-/// > the precise trait bounds of buffer bindings are found in the `Binding` impl blocks.
-#[derive(Clone, Copy)]
-pub struct BufferRef<Content, AS = mem::Storage, AM = ReadWrite, const DYNAMIC_OFFSET: bool = false>
-where
-    Content: GpuStore + NoHandles + NoBools,
-    AS: BufferAddressSpace,
-    AM: AccessModeReadable,
-{
-    pub(crate) inner: BufferRefInner<Content, AS, AM>,
-}
-
-#[rustfmt::skip] impl<T: GpuStore + NoBools + NoHandles + GpuLayout<GpuRepr = repr::Storage>, AS, AM, const DYN_OFFSET: bool>
-Binding for BufferRef<T, AS, AM, DYN_OFFSET>
-where
-    AS: BufferAddressSpace + SupportsAccess<AM>,
-    AM: AccessModeReadable + AtomicsRequireWriteable<T>
-{
-    fn binding_type() -> BindingType {
-        BindingType::Buffer {
-            ty:  BufferInner::<T, AS>::binding_type(),
-            has_dynamic_offset: DYN_OFFSET
-        }
-    }
-    #[track_caller]
-    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self { BufferRef::new(args) }
-
-    fn store_ty() -> ir::StoreType {
-        store_type_from_impl_category(T::impl_category())
-    }
-}
-
-#[diagnostic::on_unimplemented(
-    message = "atomics can only be used in read-write storage buffers. Use `ReadWrite` instead of `Read`."
-)]
-trait AtomicsRequireWriteable<T> {}
-impl<T> AtomicsRequireWriteable<T> for ReadWrite {}
-impl<T> AtomicsRequireWriteable<T> for Read where T: NoAtomics {}

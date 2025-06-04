@@ -7,7 +7,7 @@ use crate::frontend::any::render_io::{
     Attrib, VertexBufferLookupIndex, Location, VertexAttribFormat, VertexBufferLayout, VertexLayoutError,
 };
 use crate::frontend::any::{Any, InvalidReason};
-use crate::frontend::encoding::buffer::{BufferAddressSpace, BufferInner, BufferRefInner};
+use crate::frontend::encoding::buffer::{BufferAddressSpace};
 use crate::frontend::encoding::{EncodingError, EncodingErrorKind};
 use crate::frontend::error::InternalError;
 use crate::frontend::rust_types::len::*;
@@ -634,28 +634,6 @@ impl GpuStore for GpuT {
         Self: for<'triv> GpuType,
     {
         unreachable!()
-    }
-
-    fn instantiate_buffer_inner<AS: BufferAddressSpace>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BufferBindingType,
-        has_dynamic_offset: bool,
-    ) -> BufferInner<Self, AS>
-    where
-        Self: for<'trivial_bound> NoAtomics + for<'trivial_bound> NoBools,
-    {
-        BufferInner::new_fields(args, bind_ty, has_dynamic_offset)
-    }
-
-    fn instantiate_buffer_ref_inner<AS: BufferAddressSpace, AM: AccessModeReadable>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BufferBindingType,
-        has_dynamic_offset: bool,
-    ) -> BufferRefInner<Self, AS, AM>
-    where
-        Self: for<'trivial_bound> NoBools,
-    {
-        BufferRefInner::new_fields(args, bind_ty, has_dynamic_offset)
     }
 
     fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::Fields(Self::get_bufferblock_type()) }

@@ -10,8 +10,6 @@ pub use crate::frontend::any::shared_io::BufferBindingType;
 pub use crate::frontend::any::Any;
 pub use crate::frontend::any::InvalidReason;
 pub use crate::frontend::encoding::buffer::BufferAddressSpace;
-pub use crate::frontend::encoding::buffer::BufferInner;
-pub use crate::frontend::encoding::buffer::BufferRefInner;
 pub use crate::frontend::rust_types::layout_traits::ArrayElementsUnsizedError;
 pub use crate::frontend::rust_types::layout_traits::CpuAligned;
 pub use crate::frontend::rust_types::layout_traits::CpuLayout;
