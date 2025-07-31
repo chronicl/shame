@@ -55,6 +55,8 @@ impl StoreType {
             T::Sized(s) | T::RuntimeSizedArray(s) => s.is_host_shareable(),
             T::BufferBlock(def) => def.is_host_shareable(),
             T::Handle(_) => false,
+            // TODO(chronicl) check if this is correct
+            T::BindingArray(s, n) => s.is_host_shareable(),
         }
     }
 
@@ -65,6 +67,8 @@ impl StoreType {
             Sized(_) => true,
             RuntimeSizedArray(_) | Handle(_) => false,
             BufferBlock(block) => block.is_creation_fixed_footprint(),
+            // TODO(chronicl) check if this is correct
+            BindingArray(s, n) => s.is_creation_fixed_footprint(),
         }
     }
 
@@ -75,6 +79,8 @@ impl StoreType {
             Sized(_) => true,
             RuntimeSizedArray(_) | Handle(_) => false,
             BufferBlock(blk) => blk.is_fixed_footprint(),
+            // TODO(chronicl) check if this is correct
+            BindingArray(s, n) => s.is_plain_and_fixed_footprint(),
         }
     }
 
@@ -84,6 +90,8 @@ impl StoreType {
             StoreType::Sized(s) | StoreType::RuntimeSizedArray(s) => s.contains_atomics(),
             StoreType::Handle(_) => false,
             StoreType::BufferBlock(blk) => blk.contains_atomics(),
+            // TODO(chronicl) check if this is correct
+            StoreType::BindingArray(s, n) => s.contains_atomics(),
         }
     }
 
@@ -94,6 +102,8 @@ impl StoreType {
             Sized(sized) => sized.is_constructible(),
             RuntimeSizedArray(_) | Handle(_) => false,
             BufferBlock(blk) => blk.is_constructible(),
+            // TODO(chronicl) check if this is correct
+            BindingArray(s, n) => s.is_constructible(),
         }
     }
 }

@@ -33,6 +33,8 @@ pub enum StoreType {
     Handle(HandleType),
     RuntimeSizedArray(SizedType),
     BufferBlock(BufferBlock),
+    /// TODO(chronicl) may only contain xyz
+    BindingArray(Rc<StoreType>, Option<NonZeroU32>),
 }
 
 /// types that have a size which is known at shader creation time.
@@ -111,6 +113,12 @@ impl Display for StoreType {
             StoreType::Handle(x) => write!(f, "{x}"),
             StoreType::RuntimeSizedArray(x) => write!(f, "Array<{x}>"),
             StoreType::BufferBlock(x) => write!(f, "{}", x.name()),
+            StoreType::BindingArray(s, n) => write!(
+                f,
+                "binding_array<{}, {}>",
+                s,
+                n.map_or("".to_string(), |n| n.to_string())
+            ),
         }
     }
 }
@@ -146,6 +154,8 @@ impl StoreType {
             StoreType::Handle(handle_type) => None,
             StoreType::RuntimeSizedArray(sized_type) => NonZeroU64::new(sized_type.byte_size()),
             StoreType::BufferBlock(buffer_block) => NonZeroU64::new(buffer_block.min_byte_size()),
+            // binding arrays only contain handles, so they have no statically defined byte size
+            StoreType::BindingArray(s, n) => None,
         }
     }
 }

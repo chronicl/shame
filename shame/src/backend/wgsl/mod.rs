@@ -436,7 +436,10 @@ fn write_binding_def(
                 write!(code, ">")?;
             }
         },
-        BindingType::Sampler(_) | BindingType::SampledTexture { .. } | BindingType::StorageTexture { .. } => (),
+        BindingType::Sampler(_) |
+        BindingType::SampledTexture { .. } |
+        BindingType::StorageTexture { .. } |
+        BindingType::BindingArray(_, _) => (),
     }
     write!(code, " ")?;
     write_binding_ident(&mut code, *path, store_ty)?;

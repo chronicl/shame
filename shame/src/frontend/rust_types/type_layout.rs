@@ -177,6 +177,8 @@ impl TypeLayout {
             ir::StoreType::Handle(handle) => Err(TypeLayoutError::LayoutUndefined(ir::Type::Store(ty.clone()), rules)),
             ir::StoreType::RuntimeSizedArray(element) => Ok(Self::from_array(rules, element, None)),
             ir::StoreType::BufferBlock(s) => Ok(Self::from_struct(rules, s)),
+            // TODO(chronicl) this is wrong
+            ir::StoreType::BindingArray(store_type, n) => Self::from_store_ty(rules, ty),
         }
     }
 

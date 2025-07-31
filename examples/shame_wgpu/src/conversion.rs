@@ -2,6 +2,8 @@
 //! output structs/enums to their wgpu counterparts. Features that are unsupported
 //! by wgpu are returned as [`ShameToWgpuError`]s
 
+use std::num::NonZero;
+
 use shame::{self as sm, TextureFormatId};
 use shame::__private::SmallVec; // just to avoid some .collect() allocations.
 use shame::results as smr;
@@ -101,7 +103,7 @@ pub fn sample_type(st: sm::TextureSampleUsageType) -> wgpu::TextureSampleType {
     }
 }
 
-/// converts `tf` into a `wgpu::TextureFormat` if supported. 
+/// converts `tf` into a `wgpu::TextureFormat` if supported.
 /// If `tf` is `ExtraTextureFormats::SurfaceFormat`, then the provided `surface_format` argument
 /// is returned if it is `Some`. Otherwise an error is returned.
 #[rustfmt::skip]
@@ -194,7 +196,7 @@ pub fn texture_format(tf: &dyn sm::TextureFormatId, surface_format: Option<wgpu:
         SmTf::EacR11Snorm          => wgpu::TextureFormat::EacR11Snorm,
         SmTf::EacRg11Unorm         => wgpu::TextureFormat::EacRg11Unorm,
         SmTf::EacRg11Snorm         => wgpu::TextureFormat::EacRg11Snorm,
-        SmTf::Astc { block, channel } => wgpu::TextureFormat::Astc { 
+        SmTf::Astc { block, channel } => wgpu::TextureFormat::Astc {
             block: match block {
                 SmASTCb::B4x4   => wgpu::AstcBlock::B4x4,
                 SmASTCb::B5x4   => wgpu::AstcBlock::B5x4,
@@ -210,12 +212,12 @@ pub fn texture_format(tf: &dyn sm::TextureFormatId, surface_format: Option<wgpu:
                 SmASTCb::B10x10 => wgpu::AstcBlock::B10x10,
                 SmASTCb::B12x10 => wgpu::AstcBlock::B12x10,
                 SmASTCb::B12x12 => wgpu::AstcBlock::B12x12,
-            }, 
+            },
             channel: match channel {
                 SmASTCc::Unorm     => wgpu::AstcChannel::Unorm,
                 SmASTCc::UnormSrgb => wgpu::AstcChannel::UnormSrgb,
                 SmASTCc::Hdr       => wgpu::AstcChannel::Hdr,
-            } 
+            }
         },
     };
     Ok(wtf)
@@ -231,67 +233,86 @@ pub fn binding_layout(index: u32, bl: &smr::BindingLayout) -> Result<wgpu::BindG
         smr::TextureShape::CubeArray(count) => (Some(count), wgpu::TextureViewDimension::CubeArray),
     };
 
+    let non_binding_array_to_wgpu =
+        |binding_type: &smr::BindingType| -> Result<(wgpu::BindingType, Option<NonZero<u32>>), ShameToWgpuError> {
+            match binding_type {
+                smr::BindingType::Buffer { ty, has_dynamic_offset } => {
+                    let ty = match ty {
+                        smr::BufferBindingType::Uniform => wgpu::BufferBindingType::Uniform,
+                        smr::BufferBindingType::Storage(am) => wgpu::BufferBindingType::Storage {
+                            read_only: match am {
+                                smr::AccessModeReadable::Read => true,
+                                smr::AccessModeReadable::ReadWrite => false,
+                            },
+                        },
+                    };
+                    Ok((
+                        wgpu::BindingType::Buffer {
+                            ty,
+                            has_dynamic_offset: *has_dynamic_offset,
+                            min_binding_size: bl.shader_ty.min_byte_size(),
+                        },
+                        None,
+                    ))
+                }
+                smr::BindingType::Sampler(method) => Ok((
+                    wgpu::BindingType::Sampler(match method {
+                        smr::SamplingMethod::Filtering => wgpu::SamplerBindingType::Filtering,
+                        smr::SamplingMethod::NonFiltering => wgpu::SamplerBindingType::NonFiltering,
+                        smr::SamplingMethod::Comparison => wgpu::SamplerBindingType::Comparison,
+                    }),
+                    None,
+                )),
+                smr::BindingType::SampledTexture {
+                    shape,
+                    sample_type: st,
+                    samples_per_pixel: spp,
+                } => {
+                    let (count, dim) = tex_shape_to_count_dim(*shape);
+
+                    let ty = wgpu::BindingType::Texture {
+                        sample_type: sample_type(*st),
+                        view_dimension: dim,
+                        multisampled: match spp {
+                            smr::SamplesPerPixel::Single => false,
+                            smr::SamplesPerPixel::Multi => true,
+                        },
+                    };
+
+                    Ok((ty, count))
+                }
+                smr::BindingType::StorageTexture { shape, format, access } => {
+                    let (count, dim) = tex_shape_to_count_dim(*shape);
+
+                    let ty = wgpu::BindingType::StorageTexture {
+                        access: match access {
+                            smr::AccessMode::Read => wgpu::StorageTextureAccess::ReadOnly,
+                            smr::AccessMode::Write => wgpu::StorageTextureAccess::WriteOnly,
+                            smr::AccessMode::ReadWrite => wgpu::StorageTextureAccess::ReadWrite,
+                        },
+                        format: texture_format(format.as_dyn(), None)?,
+                        view_dimension: dim,
+                    };
+
+                    Ok((ty, count))
+                }
+                smr::BindingType::BindingArray(_, _) => {
+                    unreachable!("closure must only be called for non binding arrays")
+                }
+            }
+        };
+
     let (ty, count) = {
         match &bl.binding_ty {
-            smr::BindingType::Buffer { ty, has_dynamic_offset } => {
-                let ty = match ty {
-                    smr::BufferBindingType::Uniform => wgpu::BufferBindingType::Uniform,
-                    smr::BufferBindingType::Storage(am) => wgpu::BufferBindingType::Storage {
-                        read_only: match am {
-                            smr::AccessModeReadable::Read => true,
-                            smr::AccessModeReadable::ReadWrite => false,
-                        },
-                    },
-                };
-                (
-                    wgpu::BindingType::Buffer {
-                        ty,
-                        has_dynamic_offset: *has_dynamic_offset,
-                        min_binding_size: bl.shader_ty.min_byte_size(),
-                    },
-                    None,
-                )
-            }
-            smr::BindingType::Sampler(method) => (
-                wgpu::BindingType::Sampler(match method {
-                    smr::SamplingMethod::Filtering => wgpu::SamplerBindingType::Filtering,
-                    smr::SamplingMethod::NonFiltering => wgpu::SamplerBindingType::NonFiltering,
-                    smr::SamplingMethod::Comparison => wgpu::SamplerBindingType::Comparison,
-                }),
-                None,
-            ),
-            smr::BindingType::SampledTexture {
-                shape,
-                sample_type: st,
-                samples_per_pixel: spp,
-            } => {
-                let (count, dim) = tex_shape_to_count_dim(*shape);
-
-                let ty = wgpu::BindingType::Texture {
-                    sample_type: sample_type(*st),
-                    view_dimension: dim,
-                    multisampled: match spp {
-                        smr::SamplesPerPixel::Single => false,
-                        smr::SamplesPerPixel::Multi => true,
-                    },
-                };
-
-                (ty, count)
-            }
-            smr::BindingType::StorageTexture { shape, format, access } => {
-                let (count, dim) = tex_shape_to_count_dim(*shape);
-
-                let ty = wgpu::BindingType::StorageTexture {
-                    access: match access {
-                        smr::AccessMode::Read => wgpu::StorageTextureAccess::ReadOnly,
-                        smr::AccessMode::Write => wgpu::StorageTextureAccess::WriteOnly,
-                        smr::AccessMode::ReadWrite => wgpu::StorageTextureAccess::ReadWrite,
-                    },
-                    format: texture_format(format.as_dyn(), None)?,
-                    view_dimension: dim,
-                };
-
-                (ty, count)
+            smr::BindingType::Buffer { .. } |
+            smr::BindingType::Sampler(_) |
+            smr::BindingType::SampledTexture { .. } |
+            smr::BindingType::StorageTexture { .. } => non_binding_array_to_wgpu(&bl.binding_ty)?,
+            smr::BindingType::BindingArray(ty, n) => {
+                // binding arrays can't contain other binding arrays
+                let (layout, count) = non_binding_array_to_wgpu(ty)?;
+                assert_eq!(count, None, "binding array can't contain a type that also has a count");
+                (layout, *n)
             }
         }
     };
@@ -482,7 +503,7 @@ fn vertex_format(format: smr::VertexAttribFormat) -> Result<wgpu::VertexFormat, 
 
             (S::Bool, _) => return unsupported,
         },
-        
+
         smr::VertexAttribFormat::Coarse(p) => {
             use smr::PackedScalarType as PS;
             use smr::PackedFloat as Norm;

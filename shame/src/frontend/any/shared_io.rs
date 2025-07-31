@@ -1,5 +1,6 @@
 use std::fmt::Display;
-use std::num::NonZeroU64;
+use std::num::{NonZeroU32, NonZeroU64};
+use std::rc::Rc;
 
 use crate::backend::language::Language;
 use crate::call_info;
@@ -63,6 +64,8 @@ pub enum BindingType {
         /// (no documentation yet)
         access: AccessMode,
     },
+    /// (no documentation yet)
+    BindingArray(Rc<BindingType>, Option<NonZeroU32>),
 }
 
 impl BindingType {
@@ -79,6 +82,10 @@ impl BindingType {
             BindingType::Sampler(_) => false,
             BindingType::SampledTexture { .. } => false,
             BindingType::StorageTexture { .. } => true,
+            // TODO(chronicl) check if correct
+            BindingType::BindingArray(b, _) => {
+                return b.max_supported_stage_visibility(vertex_writable_storage_supported);
+            }
         };
 
         if is_writeable_storage {
@@ -111,6 +118,8 @@ impl BindingType {
                 format: _,
                 access,
             } => access.is_writeable(),
+            // TODO(chronicl) check if correct
+            BindingType::BindingArray(b, _) => b.can_produce_side_effects(),
         }
     }
 }
@@ -228,6 +237,13 @@ impl Any {
                         Ok(record_handle_node(Type::Store(ty.clone()), call_info))
                     }
 
+                    _ => Err(BindingError::InvalidTypeForBinding(ty.clone(), binding_ty.clone())),
+                },
+                // TODO(chronicl) check if correct
+                BindingType::BindingArray(b, _) => match &ty {
+                    StoreType::BindingArray(binding_array, n) => {
+                        Ok(record_handle_node(Type::Store(ty.clone()), call_info))
+                    }
                     _ => Err(BindingError::InvalidTypeForBinding(ty.clone(), binding_ty.clone())),
                 },
             };

@@ -231,6 +231,7 @@ pub(super) fn write_binding_ident(
             },
             StoreType::RuntimeSizedArray(sized_type) => code.write_str("buffer")?,
             StoreType::BufferBlock(buffer_block) => code.write_str("buffer")?,
+            StoreType::BindingArray(binding_array, n) => code.write_str("binding_array")?,
         };
         Ok(())
     };

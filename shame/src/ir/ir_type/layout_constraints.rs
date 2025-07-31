@@ -244,6 +244,8 @@ pub fn check_layout(ctx: &LayoutErrorContext, ty: &StoreType) -> Result<(), Layo
         StoreType::Handle(_) => Err(LayoutError::NotHostShareable(ty.clone())),
         StoreType::RuntimeSizedArray(e) => check_array_layout(ctx, e),
         StoreType::BufferBlock(s) => check_structure_layout(ctx, &LayoutStructureKind::BufferBlock(s.clone())),
+        // TODO(chronicl) check this
+        StoreType::BindingArray(s, n) => check_layout(ctx, s),
     }
 }
 
