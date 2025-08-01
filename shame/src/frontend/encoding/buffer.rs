@@ -69,7 +69,7 @@ impl<T> AtomicInStorageOnly for (mem::Storage, T) {}
 impl<T: NoAtomics> AtomicInStorageOnly for (mem::Uniform, T) {}
 
 #[diagnostic::on_unimplemented(message = "One of two things happened.\n\
-    1. Access mode `ReadWrite` was used and the buffer content was not wrapped `Ref`. Change `Buffer<T, ...>` to `Buffer<shame::Ref<T>, ...>`.\n\
+    1. Access mode `ReadWrite` was used and the buffer content was not wrapped in `Ref`. Change `Buffer<T, ...>` to `Buffer<shame::Ref<T>, ...>`.\n\
     2. A runtime sized array was used without `Ref`. Change `Buffer<Array<T>, ...>` to `Buffer<shame::Ref<Array<T>>, ...>`.")]
 /// TODO(chronicl)
 #[allow(missing_docs)]
@@ -357,6 +357,7 @@ impl<T: GpuType + GpuStore + GpuSized + GpuLayout + LayoutableSized> BufferConte
 #[cfg(test)]
 mod buffer_v2_tests {
     use crate::BufferAddressSpace;
+    use crate::Ref;
     use crate as shame;
     use shame as sm;
     use shame::prelude::*;
@@ -380,7 +381,8 @@ mod buffer_v2_tests {
         let xforms_sto: sm::Buffer<Transforms, sm::mem::Storage> = group.next();
         let xforms_uni: sm::Buffer<Transforms, sm::mem::Uniform> = group.next();
 
-        // let _: sm::BufferV2<sm::f32x1, sm::mem::Uniform, sm::ReadWrite> = todo!();
+        let _: sm::Buffer<Ref<sm::f32x1>, sm::mem::Storage, sm::ReadWrite> = group.next();
+        let a: sm::Buffer<Ref<sm::Array<f32x1>>, sm::mem::Storage, sm::ReadWrite> = group.next();
         // println!(
         //     "{}",
         //     sm::BufferV2::<shame::f32x1, sm::mem::Uniform, sm::ReadWrite>::UNIFORM_IS_READ
