@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::num::NonZeroU64;
 
+use crate::any::layout::TypeLayoutRecipe;
 use crate::backend::language::Language;
 use crate::call_info;
 use crate::common::po2::U32PowerOf2;
@@ -8,6 +9,8 @@ use crate::frontend::any::Any;
 use crate::frontend::any::{record_node, InvalidReason};
 use crate::frontend::encoding::{EncodingErrorKind, EncodingGuard};
 use crate::frontend::error::InternalError;
+use crate::frontend::rust_types::type_layout::compatible_with::{self, TypeLayoutCompatibleWith};
+use crate::frontend::rust_types::type_layout::recipe::ir_compat::IRConversionError;
 use crate::ir::expr::Binding;
 use crate::ir::expr::Expr;
 use crate::ir::ir_type::{
@@ -15,8 +18,8 @@ use crate::ir::ir_type::{
     LayoutErrorContext, SamplesPerPixel,
 };
 use crate::ir::pipeline::{PipelineError, StageMask, WipBinding, WipPushConstantsField};
-use crate::ir::recording::Context;
-use crate::ir::{self, StoreType, TextureFormatWrapper, TextureSampleUsageType, Type};
+use crate::ir::recording::{Context, MemoryRegion};
+use crate::ir::{self, AddressSpace, StoreType, TextureFormatWrapper, TextureSampleUsageType, Type};
 use crate::ir::{ir_type::TextureShape, AccessMode};
 use std::collections::btree_map::Entry;
 use thiserror::Error;
@@ -149,11 +152,178 @@ impl Display for SamplingMethod {
 pub enum BindingError {
     #[error("invalid type `{0:?}` for binding of kind `{1:?}`")]
     InvalidTypeForBinding(ir::StoreType, BindingType),
-    #[error("the type `{0:?}` cannot be used for a binding of kind `{1:?}` because of its layout.\n{2}")]
-    TypeHasInvalidLayoutForBinding(ir::StoreType, BindingType, LayoutError),
+    #[error("the type `{0:?}` cannot be used for a binding of kind `{1:?}` because of it's not storeable.\n{2}")]
+    TypeNotStoreable(TypeLayoutRecipe, BindingType, IRConversionError),
+    #[error("a non-reference buffer (non `BufferRef`) must be both read-only and constructible")]
+    NonRefBufferRequiresReadOnlyAndConstructible,
+}
+
+fn layout_to_store_type(recipe: &TypeLayoutRecipe, binding_ty: &BindingType) -> Result<StoreType, EncodingErrorKind> {
+    let store_type: ir::StoreType = recipe
+        .clone()
+        .try_into()
+        .map_err(|e| BindingError::TypeNotStoreable(recipe.clone(), binding_ty.clone(), e))?;
+
+    // https://www.w3.org/TR/WGSL/#host-shareable-types
+    if !store_type.is_host_shareable() {
+        return Err(InternalError::new(
+            true,
+            format!(
+                "TypeLayoutRecipe to StoreType conversion did not result in a host-shareable type. TypeLayoutRecipe:\n{}",
+                recipe
+            ),
+        )
+        .into());
+    }
+
+    Ok(store_type)
+}
+
+fn record_and_register_binding(
+    ctx: &Context,
+    path: BindPath,
+    visibility: StageMask,
+    binding_ty: BindingType,
+    store_type: StoreType,
+    ty: Type,
+) -> Result<Any, EncodingErrorKind> {
+    let any = record_node(
+        ctx.latest_user_caller(),
+        Expr::PipelineIo(PipelineIo::Binding(Binding { bind_path: path, ty })),
+        &[],
+    );
+
+    match ctx.pipeline_layout_mut().bindings.entry(path) {
+        Entry::Occupied(entry) => Err(PipelineError::DuplicateBindPath(path, entry.get().shader_ty.clone()).into()),
+        Entry::Vacant(entry) => match any.node() {
+            Some(node) => {
+                entry.insert(WipBinding {
+                    call_info: call_info!(),
+                    user_defined_visibility: visibility,
+                    binding_ty,
+                    shader_ty: store_type,
+                    node,
+                });
+                Ok(any)
+            }
+            None => Err(InternalError::new(true, format!("binding at `{path}` produced invalid Any object")).into()),
+        },
+    }
+}
+
+#[track_caller]
+fn create_any_catch_errors(create_any: impl FnOnce(&Context) -> Result<Any, EncodingErrorKind>) -> Any {
+    Context::try_with(call_info!(), |ctx| match create_any(ctx) {
+        Ok(any) => any,
+        Err(e) => {
+            ctx.push_error(e);
+            Any::new_invalid(InvalidReason::ErrorThatWasPushed)
+        }
+    })
+    .unwrap_or(Any::new_invalid(InvalidReason::CreatedWithNoActiveEncoding))
 }
 
 impl Any {
+    /// Creates a storage buffer binding at the specified bind path.
+    #[track_caller]
+    pub fn storage_buffer_binding(
+        bind_path: BindPath,
+        visibility: StageMask,
+        layout: TypeLayoutCompatibleWith<compatible_with::Storage>,
+        access: AccessModeReadable,
+        buffer_binding_as_ref: bool,
+        has_dynamic_offset: bool,
+    ) -> Any {
+        let create_any = |ctx: &Context| -> Result<Any, EncodingErrorKind> {
+            let binding_type = BindingType::Buffer {
+                ty: BufferBindingType::Storage(access),
+                has_dynamic_offset,
+            };
+            let store_type = layout_to_store_type(layout.recipe(), &binding_type)?;
+
+            let ty = match (buffer_binding_as_ref, access) {
+                (true, _) => Type::Ref(
+                    MemoryRegion::new(
+                        ctx.latest_user_caller(),
+                        store_type.clone(),
+                        None,
+                        None,
+                        access.into(),
+                        AddressSpace::Storage,
+                    )?,
+                    store_type.clone(),
+                    access.into(),
+                ),
+                (false, AccessModeReadable::ReadWrite) => {
+                    return Err(BindingError::NonRefBufferRequiresReadOnlyAndConstructible.into());
+                }
+                (false, AccessModeReadable::Read) => {
+                    if !store_type.is_constructible() {
+                        return Err(BindingError::NonRefBufferRequiresReadOnlyAndConstructible.into());
+                    }
+                    Type::Store(store_type.clone())
+                }
+            };
+
+            record_and_register_binding(ctx, bind_path, visibility, binding_type, store_type, ty)
+        };
+
+        create_any_catch_errors(create_any)
+    }
+
+    /// Creates a uniform buffer binding at the specified bind path.
+    #[track_caller]
+    pub fn uniform_buffer_binding(
+        bind_path: BindPath,
+        visibility: StageMask,
+        layout: TypeLayoutCompatibleWith<compatible_with::Uniform>,
+        has_dynamic_offset: bool,
+    ) -> Any {
+        let create_any = |ctx: &Context| -> Result<Any, EncodingErrorKind> {
+            let binding_type = BindingType::Buffer {
+                ty: BufferBindingType::Uniform,
+                has_dynamic_offset,
+            };
+            let store_type = layout_to_store_type(layout.recipe(), &binding_type)?;
+            if !store_type.is_constructible() {
+                return Err(BindingError::NonRefBufferRequiresReadOnlyAndConstructible.into());
+            }
+
+            let ty = Type::Store(store_type.clone());
+
+            record_and_register_binding(ctx, bind_path, visibility, binding_type, store_type, ty)
+        };
+
+        create_any_catch_errors(create_any)
+    }
+
+    /// Creates a handle binding at the specified bind path.
+    #[track_caller]
+    pub fn handle_binding(bind_path: BindPath, visibility: StageMask, handle_type: HandleType) -> Any {
+        let create_any = |ctx: &Context| -> Result<Any, EncodingErrorKind> {
+            let binding_type = match &handle_type {
+                HandleType::Sampler(s) => BindingType::Sampler(*s),
+                HandleType::SampledTexture(s, t, p) => BindingType::SampledTexture {
+                    shape: *s,
+                    sample_type: *t,
+                    samples_per_pixel: *p,
+                },
+                HandleType::StorageTexture(s, f, a) => BindingType::StorageTexture {
+                    shape: *s,
+                    format: f.clone(),
+                    access: *a,
+                },
+            };
+
+            let store_type = StoreType::Handle(handle_type);
+            let ty = Type::Store(store_type.clone());
+
+            record_and_register_binding(ctx, bind_path, visibility, binding_type, store_type, ty)
+        };
+
+        create_any_catch_errors(create_any)
+    }
+
     /// import the resource bound at `path` of kind `binding_ty`.
     /// the shader type `ty` must correspond to the `binding_ty` according to https://www.w3.org/TR/WGSL/#var-decls
     /// (paragraphs on uniform buffer, storage buffer etc.)

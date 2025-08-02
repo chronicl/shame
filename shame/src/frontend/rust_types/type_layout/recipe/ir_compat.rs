@@ -5,7 +5,7 @@ use super::*;
 //     Conversions to ir types     //
 
 /// Errors that can occur when converting IR types to recipe types.
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Clone)]
 pub enum IRConversionError {
     /// Packed vectors do not exist in the shader type system.
     #[error("Type is or contains a packed vector, which does not exist in the shader type system.")]
@@ -15,7 +15,7 @@ pub enum IRConversionError {
     DuplicateFieldName(#[from] DuplicateFieldNameError),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DuplicateFieldNameError {
     pub struct_type: StructKind,
     pub first_occurence: usize,
@@ -216,7 +216,6 @@ impl TryFrom<RuntimeSizedArrayField> for ir::ir_type::RuntimeSizedArrayField {
     }
 }
 
-
 //     Conversions from ir types     //
 
 /// Type contains bools, which doesn't have a known layout.
@@ -295,7 +294,9 @@ impl TryFrom<ir::ir_type::SizedStruct> for SizedStruct {
 }
 
 impl From<ContainsBoolsError> for RecipeConversionError {
-    fn from(_: ContainsBoolsError) -> Self { Self::ContainsBool }
+    fn from(_: ContainsBoolsError) -> Self {
+        Self::ContainsBool
+    }
 }
 
 impl TryFrom<ir::StoreType> for TypeLayoutRecipe {
@@ -366,10 +367,14 @@ pub enum StructKind {
 }
 
 impl From<SizedStruct> for StructKind {
-    fn from(value: SizedStruct) -> Self { StructKind::Sized(value) }
+    fn from(value: SizedStruct) -> Self {
+        StructKind::Sized(value)
+    }
 }
 impl From<UnsizedStruct> for StructKind {
-    fn from(value: UnsizedStruct) -> Self { StructKind::Unsized(value) }
+    fn from(value: UnsizedStruct) -> Self {
+        StructKind::Unsized(value)
+    }
 }
 
 #[test]

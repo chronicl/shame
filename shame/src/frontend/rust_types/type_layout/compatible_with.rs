@@ -54,6 +54,12 @@ pub struct TypeLayoutCompatibleWith<AddressSpace> {
     _phantom: std::marker::PhantomData<AddressSpace>,
 }
 
+impl<AS> TypeLayoutCompatibleWith<AS> {
+    pub fn recipe(&self) -> &TypeLayoutRecipe {
+        &self.recipe
+    }
+}
+
 impl<AS: BufferAddressSpace> TypeLayoutCompatibleWith<AS> {
     pub fn try_from(language: Language, recipe: TypeLayoutRecipe) -> Result<Self, AddressSpaceError> {
         let address_space = AS::BUFFER_ADDRESS_SPACE;
