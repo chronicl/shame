@@ -88,7 +88,6 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     let xforms_uni: sm::Buffer<Transforms, sm::mem::Uniform> = group0.next();
 
     let new_buf: Ref<Transforms, sm::mem::Storage> = group0.next2().buffer(false);
-    let new_buf: u32x1 = group0.next2().buffer::<Ref<_, sm::mem::Storage>>(false).get();
 
     // conditional code generation based on pipeline parameter
     if some_param > 0 {

@@ -99,7 +99,7 @@ impl<T: GpuStore, AS: AddressSpace> WritableRef for Ref<T, AS, Write> {}
 
 // TODO(docs) Docs: mention that this has broadly same interface as `Cell`
 /// (no documentation yet)
-pub struct Ref<T, AS = mem::Fn, AM = ReadWrite>
+pub struct Ref<T, AS = mem::Storage, AM = Read>
 where
     T: GpuStore,
     AS: AddressSpace,
@@ -108,6 +108,9 @@ where
     any: Any,
     fields_as_refs: T::RefFields<AS, AM>,
 }
+
+/// Ref, but with `mem::Fn` as address space and `ReadWrite` as access mode.
+pub type RefFn<T> = Ref<T, mem::Fn, ReadWrite>;
 
 impl<T: GpuStore, AS: AddressSpace, AM: AccessMode> Copy for Ref<T, AS, AM> {}
 

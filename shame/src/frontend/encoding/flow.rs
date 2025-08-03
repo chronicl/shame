@@ -1,6 +1,7 @@
 use crate::frontend::rust_types::len::x1;
 use crate::frontend::rust_types::mem::Cell;
 use crate::frontend::rust_types::reference::ReadWrite;
+use crate::frontend::rust_types::reference::RefFn;
 use crate::frontend::rust_types::vec::ToInteger;
 use crate::frontend::rust_types::vec::ToVec;
 use crate::frontend::rust_types::vec_range::Inclusivity;
@@ -26,7 +27,6 @@ use crate::{
 };
 
 use super::EncodingErrorKind;
-
 
 #[cfg(not(feature = "relaxed_control_flow"))]
 pub trait FlowFn: 'static {}
@@ -168,7 +168,9 @@ pub fn while_(condition: impl FnOnce() -> boolx1 + FlowFn, body: impl FnOnce() +
 /// })
 /// ```
 #[track_caller]
-pub fn for_range(range: impl VecRange<i32, x1>, body: impl FnOnce(i32x1) + FlowFn) { for_range_impl(range, body); }
+pub fn for_range(range: impl VecRange<i32, x1>, body: impl FnOnce(i32x1) + FlowFn) {
+    for_range_impl(range, body);
+}
 
 #[track_caller]
 pub(crate) fn for_range_impl<T: ScalarTypeInteger>(
@@ -183,7 +185,7 @@ pub(crate) fn for_range_impl<T: ScalarTypeInteger>(
     };
 
     let r = ForRecorder::new();
-    let mut i: Ref<vec<T, x1>> = Cell::new(start);
+    let mut i: RefFn<vec<T, x1>> = Cell::new(start);
     let r = r.next();
     let cond = match end_bound {
         Inclusivity::Incl => i.get().less_eq(end),
@@ -266,7 +268,9 @@ pub fn loop_(body: impl FnOnce() + FlowFn) {
 ///
 /// [`EncodingError`]: crate::EncodingError
 #[track_caller]
-pub fn break_() { record_jump_stmt(Jump::Break) }
+pub fn break_() {
+    record_jump_stmt(Jump::Break)
+}
 
 /// record a `continue` statement in a loop
 ///
@@ -277,7 +281,9 @@ pub fn break_() { record_jump_stmt(Jump::Break) }
 ///
 /// [`EncodingError`]: crate::EncodingError
 #[track_caller]
-pub fn continue_() { record_jump_stmt(Jump::Continue) }
+pub fn continue_() {
+    record_jump_stmt(Jump::Continue)
+}
 
 /// record a `if (cond) { break; }` statement in a loop
 ///

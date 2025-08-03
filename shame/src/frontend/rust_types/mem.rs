@@ -169,7 +169,7 @@ impl AddressSpaceAtomic for WorkGroup {}
 //[old-doc] - `WGSL`: "function" address space/variable declared in function
 /// (no documentation yet)
 #[track_caller]
-pub(crate) fn alloc<T: ToGpuType>(init: T) -> Ref<T::Gpu, Fn>
+pub(crate) fn alloc<T: ToGpuType>(init: T) -> RefFn<T::Gpu>
 where
     T::Gpu: GpuStore + GpuSized,
 {
@@ -193,7 +193,7 @@ where
 ///
 /// [`Settings`]: crate::Settings
 #[track_caller]
-pub fn workgroup_local<T: GpuType + GpuStore + GpuSized>() -> Ref<T, mem::WorkGroup> {
+pub fn workgroup_local<T: GpuType + GpuStore + GpuSized>() -> Ref<T, mem::WorkGroup, ReadWrite> {
     // workgroup allocations are default initialized (or uninitialized), since they cannot take
     // an inintializer value if `T` contains atomics. Atomics are not values but
     // memory cells, so we would require some sort of mapping from composit types
@@ -222,7 +222,7 @@ impl Cell {
     //       so passing it outside of a `shame::boolx1::then` closure for example makes it invalid
     /// (no documentation yet)
     #[track_caller]
-    pub fn new<T: ToGpuType>(init: T) -> Ref<T::Gpu, Fn>
+    pub fn new<T: ToGpuType>(init: T) -> RefFn<T::Gpu>
     where
         T::Gpu: GpuStore + GpuSized,
     {

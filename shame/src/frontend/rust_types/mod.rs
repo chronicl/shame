@@ -5,7 +5,7 @@ use type_traits::{GpuSized, GpuStore};
 
 use self::error::FrontendError;
 use super::any::{Any, InvalidReason};
-use crate::frontend::rust_types::reference::Ref;
+use crate::frontend::rust_types::reference::{Ref, RefFn};
 use crate::{
     call_info,
     ir::{self, recording::Context, Type},
@@ -143,7 +143,7 @@ pub trait ToGpuType {
     ///
     /// [`shame::Cell::new(...)`]: crate::Cell::new
     #[track_caller]
-    fn cell(self) -> Ref<Self::Gpu, mem::Fn>
+    fn cell(self) -> RefFn<Self::Gpu>
     where
         Self::Gpu: GpuStore + GpuSized,
         Self: std::marker::Sized,
