@@ -1,4 +1,5 @@
 #![allow(unused, clippy::no_effect)]
+use shame::Ref;
 use shame as sm;
 use shame::prelude::*;
 use shame::aliases::*;
@@ -85,6 +86,9 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     // (once rusts const-generics are more powerful this may be moved to compile-time)
     let xforms_sto: sm::Buffer<Transforms, sm::mem::Storage> = group0.next();
     let xforms_uni: sm::Buffer<Transforms, sm::mem::Uniform> = group0.next();
+
+    let new_buf: Ref<Transforms, sm::mem::Storage> = group0.next2().buffer(false);
+    let new_buf: u32x1 = group0.next2().buffer::<Ref<_, sm::mem::Storage>>(false).get();
 
     // conditional code generation based on pipeline parameter
     if some_param > 0 {
@@ -486,13 +490,17 @@ struct Mat2([[f32; 2]; 2]);
 // tell `shame` about the layout semantics of your cpu types
 // Mat2::layout() == sm::f32x2x2::layout()
 impl sm::CpuLayout for Mat2 {
-    fn cpu_layout() -> sm::TypeLayout { sm::gpu_layout::<sm::f32x2x2>() }
+    fn cpu_layout() -> sm::TypeLayout {
+        sm::gpu_layout::<sm::f32x2x2>()
+    }
 }
 
 #[repr(C, align(16))]
 struct Mat4([[f32; 4]; 4]);
 impl sm::CpuLayout for Mat4 {
-    fn cpu_layout() -> sm::TypeLayout { sm::gpu_layout::<sm::f32x4x4>() }
+    fn cpu_layout() -> sm::TypeLayout {
+        sm::gpu_layout::<sm::f32x4x4>()
+    }
 }
 
 // using "duck-traiting" allows you to define layouts for foreign cpu-types,

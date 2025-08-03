@@ -31,7 +31,9 @@ use crate::{
 pub struct EmptyRefFields;
 
 impl FromAnys for EmptyRefFields {
-    fn expected_num_anys() -> usize { 0 }
+    fn expected_num_anys() -> usize {
+        0
+    }
 
     #[track_caller]
     fn from_anys(anys: impl Iterator<Item = Any>) -> Self {
@@ -244,5 +246,7 @@ pub trait GpuLayoutField {
 }
 
 impl<T: From<Any>> GpuLayoutField for T {
-    fn from_any(any: Any) -> Self { T::from(any) }
+    fn from_any(any: Any) -> Self {
+        T::from(any)
+    }
 }

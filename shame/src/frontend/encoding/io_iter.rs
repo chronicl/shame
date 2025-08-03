@@ -38,6 +38,7 @@ use crate::{
         recording::Context,
         TextureFormatWrapper,
     },
+    mem, Ref,
 };
 
 use super::{binding::Binding, rasterizer::VertexIndex};
@@ -168,7 +169,9 @@ impl LocationCounter {
 }
 
 impl From<u32> for LocationCounter {
-    fn from(value: u32) -> Self { Self(Cell::new(value)) }
+    fn from(value: u32) -> Self {
+        Self(Cell::new(value))
+    }
 }
 
 impl<T: VertexLayout> VertexBuffer<'_, T> {
@@ -313,7 +316,9 @@ impl<'a> BindGroupIter<'a> {
     /// returns a binding iterator that allows iteration over/ or random access
     /// to the bindings of that bind group.
     #[track_caller]
-    pub fn index(&mut self, i: u32) -> BindingIter { self.at(i) }
+    pub fn index(&mut self, i: u32) -> BindingIter {
+        self.at(i)
+    }
 
     /// access the next bind group that is bound during the drawcall/compute dispatch.
     ///
@@ -391,7 +396,9 @@ impl BindingIter<'_> {
     ///
     /// [`BindingIter::next`]: crate::BindingIter::next
     #[track_caller]
-    pub fn index<T: Binding>(&mut self, index: u32) -> T { self.at(index) }
+    pub fn index<T: Binding>(&mut self, index: u32) -> T {
+        self.at(index)
+    }
 
     /// access the next binding of the bind group. (last index + 1)
     ///
@@ -506,6 +513,52 @@ impl BindingIter<'_> {
         *binding += 1;
         temp
     }
+
+    /// TODO(chronicl)
+    #[track_caller]
+    #[allow(clippy::should_implement_trait)]
+    pub fn next2(&mut self) -> BindingAny {
+        BindingAny {
+            bind_path: self.post_inc_path(),
+        }
+    }
+}
+
+pub struct BindingAny {
+    bind_path: BindPath,
+}
+
+impl BindingAny {
+    /// TODO(chronicl)
+    pub fn buffer<T: BufferBinding>(&self, dynamic_offset: bool) -> T {
+        Context::try_with(call_info!(), |ctx| {
+            let vert_write_storage = ctx.settings().vertex_writable_storage_by_default;
+            let max_visibility = T::binding_type().max_supported_stage_visibility(vert_write_storage);
+            BufferBinding::new_binding(
+                Ok(BindingArgs {
+                    path: self.bind_path,
+                    visibility: max_visibility,
+                }),
+                dynamic_offset,
+            )
+        })
+        .unwrap_or_else(|| BufferBinding::new_binding(Err(InvalidReason::CreatedWithNoActiveEncoding), dynamic_offset))
+    }
+}
+
+pub trait BufferBinding {
+    fn binding_type() -> BindingType;
+    fn new_binding(args: Result<BindingArgs, InvalidReason>, dynamic_offset: bool) -> Self;
+}
+
+impl<T: GpuStore, AS: mem::AddressSpace, AM: AccessMode> BufferBinding for Ref<T, AS, AM> {
+    fn binding_type() -> BindingType {
+        todo!()
+    }
+
+    fn new_binding(args: Result<BindingArgs, InvalidReason>, dynamic_offset: bool) -> Self {
+        todo!()
+    }
 }
 
 /// push-constant values that were set before the current draw command/dispatch.
@@ -516,8 +569,9 @@ pub struct PushConstants<'a> {
 }
 
 impl PushConstants<'_> {
-    pub(crate) fn new() -> Self { Self { phantom: PhantomData } }
-
+    pub(crate) fn new() -> Self {
+        Self { phantom: PhantomData }
+    }
 
     /// interpret the push constants as an instance of `T`.
     ///
