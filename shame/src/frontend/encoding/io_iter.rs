@@ -2,6 +2,7 @@
 use std::{cell::Cell, iter, marker::PhantomData, rc::Rc};
 
 use crate::{
+    any::BufferBindingType,
     call_info,
     common::integer::post_inc_u32,
     frontend::{
@@ -10,6 +11,7 @@ use crate::{
             shared_io::{BindPath, BindingType},
             Any, InvalidReason,
         },
+        encoding::buffer::BufferAddressSpaceEnum,
         error::InternalError,
         rust_types::{
             error::FrontendError,
@@ -19,6 +21,7 @@ use crate::{
             },
             reference::AccessMode,
             struct_::SizedFields,
+            type_layout::compatible_with::{AddressSpaceError, TypeLayoutCompatibleWith},
             type_traits::{BindingArgs, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools},
             GpuType,
         },
@@ -38,7 +41,8 @@ use crate::{
         recording::Context,
         TextureFormatWrapper,
     },
-    mem, Ref,
+    mem::{self, AddressSpace},
+    AccessModeReadable, BufferAddressSpace, Read, ReadWrite, Ref,
 };
 
 use super::{binding::Binding, rasterizer::VertexIndex};
@@ -530,36 +534,68 @@ pub struct BindingAny {
 
 impl BindingAny {
     /// TODO(chronicl)
-    pub fn buffer<T: BufferBinding>(&self, dynamic_offset: bool) -> T {
+    pub fn buffer<T, AS, AM>(&self, dynamic_offset: bool) -> Ref<T, AS, AM>
+    where
+        T: GpuStore + GpuLayout + GpuType,
+        AS: BufferAddressSpace,
+        AM: AccessModeReadable,
+        (AS, AM): UniformIsRead,
+        (AS, T): AtomicInStorageOnly,
+    {
         Context::try_with(call_info!(), |ctx| {
+            let access = AM::ACCESS_MODE_READABLE;
+            let bind_ty = BindingType::Buffer {
+                ty: match AS::BUFFER_ADDRESS_SPACE {
+                    BufferAddressSpaceEnum::Storage => BufferBindingType::Storage(access),
+                    BufferAddressSpaceEnum::Uniform => BufferBindingType::Uniform,
+                },
+                has_dynamic_offset: dynamic_offset,
+            };
+
             let vert_write_storage = ctx.settings().vertex_writable_storage_by_default;
-            let max_visibility = T::binding_type().max_supported_stage_visibility(vert_write_storage);
-            BufferBinding::new_binding(
-                Ok(BindingArgs {
-                    path: self.bind_path,
-                    visibility: max_visibility,
-                }),
-                dynamic_offset,
-            )
+            let vis = bind_ty.max_supported_stage_visibility(vert_write_storage);
+
+            // Check that the layout of `T` is compatible with the address space
+            // and if it is, create the binding.
+            let push_err_get_invalid_ref = |e: AddressSpaceError| {
+                ctx.push_error(e.into());
+                Ref::new_invalid(InvalidReason::ErrorThatWasPushed)
+            };
+            let recipe = T::layout_recipe();
+            let any = match AS::BUFFER_ADDRESS_SPACE {
+                BufferAddressSpaceEnum::Uniform => {
+                    match TypeLayoutCompatibleWith::<mem::Uniform>::try_from(crate::Language::Wgsl, recipe) {
+                        Ok(l) => Any::buffer_binding(self.bind_path, vis, l, access, dynamic_offset),
+                        Err(e) => return push_err_get_invalid_ref(e),
+                    }
+                }
+                BufferAddressSpaceEnum::Storage => {
+                    match TypeLayoutCompatibleWith::<mem::Storage>::try_from(crate::Language::Wgsl, recipe) {
+                        Ok(layout) => Any::buffer_binding(self.bind_path, vis, layout, access, dynamic_offset),
+                        Err(e) => return push_err_get_invalid_ref(e),
+                    }
+                }
+            };
+
+            Ref::from(any)
         })
-        .unwrap_or_else(|| BufferBinding::new_binding(Err(InvalidReason::CreatedWithNoActiveEncoding), dynamic_offset))
+        .unwrap_or_else(|| Ref::new_invalid(InvalidReason::CreatedWithNoActiveEncoding))
     }
 }
 
-pub trait BufferBinding {
-    fn binding_type() -> BindingType;
-    fn new_binding(args: Result<BindingArgs, InvalidReason>, dynamic_offset: bool) -> Self;
-}
+#[diagnostic::on_unimplemented(message = "The uniform address space is read only. Change `ReadWrite` to `Read`.")]
+/// TODO(chronicl)
+#[allow(missing_docs)]
+pub trait UniformIsRead {}
+impl<AM: AccessModeReadable> UniformIsRead for (mem::Storage, AM) {}
+impl UniformIsRead for (mem::Uniform, Read) {}
 
-impl<T: GpuStore, AS: mem::AddressSpace, AM: AccessMode> BufferBinding for Ref<T, AS, AM> {
-    fn binding_type() -> BindingType {
-        todo!()
-    }
-
-    fn new_binding(args: Result<BindingArgs, InvalidReason>, dynamic_offset: bool) -> Self {
-        todo!()
-    }
-}
+// Diagnostics carry over from `NoAtomics`.
+/// TODO(chronicl)
+#[allow(missing_docs)]
+pub trait AtomicInStorageOnly {}
+impl<T> AtomicInStorageOnly for (mem::Storage, T) {}
+impl<T: NoAtomics> AtomicInStorageOnly for (mem::Uniform, T) {}
 
 /// push-constant values that were set before the current draw command/dispatch.
 ///

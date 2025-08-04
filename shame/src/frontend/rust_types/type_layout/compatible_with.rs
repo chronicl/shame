@@ -13,7 +13,10 @@ use crate::{
             ArrayLayout,
         },
     },
-    ir::{ir_type::max_u64_po2_dividing, recording::Context},
+    ir::{
+        ir_type::{self, max_u64_po2_dividing},
+        recording::Context,
+    },
     mem, BufferAddressSpace, Language, TypeLayout,
 };
 

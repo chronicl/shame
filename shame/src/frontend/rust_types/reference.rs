@@ -13,7 +13,7 @@ use super::{
     vec::ToInteger,
     AsAny, GpuType, To,
 };
-use crate::frontend::any::Any;
+use crate::{frontend::any::Any, ToGpuType};
 use crate::frontend::rust_types::len::x1;
 use crate::frontend::rust_types::vec::vec;
 use crate::{
@@ -204,7 +204,7 @@ where
         };
         Context::with(call_info!(), |ctx| {
             let invalid = |e| from_any_unchecked(ctx.push_error_get_invalid_any(e));
-            let expected_store_ty = T::store_ty();
+            let expected_store_ty = T::Gpu::store_ty();
 
             match any.ty() {
                 Some(Type::Ref(alloc, store_ty, access)) => match alloc.address_space == AS::ADDRESS_SPACE {
@@ -229,6 +229,18 @@ where
                 None => from_any_unchecked(any), // already invalid.
             }
         })
+    }
+}
+
+impl<T: GpuStore, AS: AddressSpace, AM: AccessMode> Ref<T, AS, AM> {
+    #[track_caller]
+    pub(crate) fn new_invalid(reason: InvalidReason) -> Self {
+        let any = Any::new_invalid(reason);
+        let expected_fields = T::RefFields::<AS, AM>::expected_num_anys();
+        Self {
+            any,
+            fields_as_refs: FromAnys::from_anys(std::iter::repeat_n(any, expected_fields)),
+        }
     }
 }
 

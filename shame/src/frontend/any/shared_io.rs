@@ -3,13 +3,16 @@ use std::num::NonZeroU64;
 
 use crate::any::layout::TypeLayoutRecipe;
 use crate::backend::language::Language;
-use crate::call_info;
+use crate::frontend::encoding::buffer::BufferAddressSpaceEnum;
+use crate::{call_info, BufferAddressSpace};
 use crate::common::po2::U32PowerOf2;
 use crate::frontend::any::Any;
 use crate::frontend::any::{record_node, InvalidReason};
 use crate::frontend::encoding::{EncodingErrorKind, EncodingGuard};
 use crate::frontend::error::InternalError;
-use crate::frontend::rust_types::type_layout::compatible_with::{self, TypeLayoutCompatibleWith};
+use crate::frontend::rust_types::type_layout::compatible_with::{
+    self, AddressSpaceError, RequirementsNotSatisfied, TypeLayoutCompatibleWith,
+};
 use crate::frontend::rust_types::type_layout::recipe::ir_compat::IRConversionError;
 use crate::ir::expr::Binding;
 use crate::ir::expr::Expr;
@@ -224,72 +227,49 @@ fn create_any_catch_errors(create_any: impl FnOnce(&Context) -> Result<Any, Enco
 }
 
 impl Any {
-    /// Creates a storage buffer binding at the specified bind path.
+    /// Creates a uniform or storage buffer binding at the specified bind path.
     #[track_caller]
-    pub fn storage_buffer_binding(
+    pub fn buffer_binding<AS: BufferAddressSpace>(
         bind_path: BindPath,
         visibility: StageMask,
-        layout: TypeLayoutCompatibleWith<compatible_with::Storage>,
+        layout: TypeLayoutCompatibleWith<AS>,
         access: AccessModeReadable,
-        buffer_binding_as_ref: bool,
         has_dynamic_offset: bool,
     ) -> Any {
         let create_any = |ctx: &Context| -> Result<Any, EncodingErrorKind> {
-            let binding_type = BindingType::Buffer {
-                ty: BufferBindingType::Storage(access),
-                has_dynamic_offset,
-            };
-            let store_type = layout_to_store_type(layout.recipe(), &binding_type)?;
-
-            let ty = match (buffer_binding_as_ref, access) {
-                (true, _) => Type::Ref(
-                    MemoryRegion::new(
-                        ctx.latest_user_caller(),
-                        store_type.clone(),
-                        None,
-                        None,
-                        access.into(),
-                        AddressSpace::Storage,
-                    )?,
-                    store_type.clone(),
-                    access.into(),
-                ),
-                (false, AccessModeReadable::ReadWrite) => {
-                    return Err(BindingError::NonRefBufferRequiresReadOnlyAndConstructible.into());
+            let space = AS::BUFFER_ADDRESS_SPACE;
+            // Ensure that uniform buffers are read only
+            match (space, access) {
+                (BufferAddressSpaceEnum::Uniform, AccessModeReadable::ReadWrite) => {
+                    let err: AddressSpaceError =
+                        RequirementsNotSatisfied::MustBeSized(layout.recipe().clone(), Language::Wgsl, space).into();
+                    return Err(err.into());
                 }
-                (false, AccessModeReadable::Read) => {
-                    if !store_type.is_constructible() {
-                        return Err(BindingError::NonRefBufferRequiresReadOnlyAndConstructible.into());
-                    }
-                    Type::Store(store_type.clone())
-                }
-            };
-
-            record_and_register_binding(ctx, bind_path, visibility, binding_type, store_type, ty)
-        };
-
-        create_any_catch_errors(create_any)
-    }
-
-    /// Creates a uniform buffer binding at the specified bind path.
-    #[track_caller]
-    pub fn uniform_buffer_binding(
-        bind_path: BindPath,
-        visibility: StageMask,
-        layout: TypeLayoutCompatibleWith<compatible_with::Uniform>,
-        has_dynamic_offset: bool,
-    ) -> Any {
-        let create_any = |ctx: &Context| -> Result<Any, EncodingErrorKind> {
-            let binding_type = BindingType::Buffer {
-                ty: BufferBindingType::Uniform,
-                has_dynamic_offset,
-            };
-            let store_type = layout_to_store_type(layout.recipe(), &binding_type)?;
-            if !store_type.is_constructible() {
-                return Err(BindingError::NonRefBufferRequiresReadOnlyAndConstructible.into());
+                (BufferAddressSpaceEnum::Uniform, AccessModeReadable::Read)
+                | (BufferAddressSpaceEnum::Storage, AccessModeReadable::Read | AccessModeReadable::ReadWrite) => {}
             }
 
-            let ty = Type::Store(store_type.clone());
+            let binding_type = BindingType::Buffer {
+                ty: match space {
+                    BufferAddressSpaceEnum::Uniform => BufferBindingType::Uniform,
+                    BufferAddressSpaceEnum::Storage => BufferBindingType::Storage(access),
+                },
+                has_dynamic_offset,
+            };
+            let store_type = layout_to_store_type(layout.recipe(), &binding_type)?;
+
+            let ty = Type::Ref(
+                MemoryRegion::new(
+                    ctx.latest_user_caller(),
+                    store_type.clone(),
+                    None,
+                    None,
+                    access.into(),
+                    AS::ADDRESS_SPACE,
+                )?,
+                store_type.clone(),
+                access.into(),
+            );
 
             record_and_register_binding(ctx, bind_path, visibility, binding_type, store_type, ty)
         };

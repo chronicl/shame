@@ -10,9 +10,12 @@ use crate::{
     backend::{language::Language, shader_code::ShaderCode, wgsl::WgslErrorKind},
     call_info,
     common::marker::{Unsend, Unsync},
-    frontend::encoding::{
-        io_iter::{BindGroupIter, VertexBufferIter},
-        rasterizer::{PrimitiveAssembly, VertexStage},
+    frontend::{
+        encoding::{
+            io_iter::{BindGroupIter, VertexBufferIter},
+            rasterizer::{PrimitiveAssembly, VertexStage},
+        },
+        rust_types::type_layout::compatible_with::AddressSpaceError,
     },
     ir::{
         ir_type::LayoutError,
@@ -73,7 +76,6 @@ pub mod pipeline_kind {
 }
 use crate as shame;
 
-
 /// start a pipeline encoding on the current thread. The encoding is in progress
 /// for as long as the returned [`EncodingGuard`] object is alive. The encoding
 /// is concluded by calling `encoding_guard.finish()`, which gives access to the
@@ -95,7 +97,7 @@ use crate as shame;
 ///         // `enc` is generic over the pipeline kind, which decided by calling
 ///         // either `enc.new_render_pipeline` or `enc.new_compute_pipeline`.
 ///         // Without this additional call, there will be a compiler error.
-///        
+///
 ///         let mut drawcall = enc.new_render_pipeline(sm::Indexing::Incremental);
 ///
 ///         // ... use `drawcall` to build your pipeline
@@ -156,7 +158,9 @@ pub struct EncodingError {
 }
 
 impl std::fmt::Debug for EncodingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self) }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
 }
 
 impl std::error::Error for EncodingError {}
@@ -211,7 +215,9 @@ pub struct EncodingErrors {
 }
 
 impl std::fmt::Debug for EncodingErrors {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self) }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
 }
 
 impl std::error::Error for EncodingErrors {}
@@ -237,7 +243,9 @@ impl IntoIterator for EncodingErrors {
 
     type IntoIter = std::iter::Chain<std::iter::Once<EncodingError>, std::vec::IntoIter<EncodingError>>;
 
-    fn into_iter(self) -> Self::IntoIter { std::iter::once(self.first).chain(self.rest.into_vec()) }
+    fn into_iter(self) -> Self::IntoIter {
+        std::iter::once(self.first).chain(self.rest.into_vec())
+    }
 }
 
 impl From<EncodingError> for EncodingErrors {
@@ -292,6 +300,8 @@ pub enum EncodingErrorKind {
     PipelineError(#[from] PipelineError),
     #[error("{0}")]
     LayoutError(#[from] LayoutError),
+    #[error("{0}")]
+    AddressSpaceError(#[from] AddressSpaceError),
     #[error("{0}")]
     BindingError(#[from] BindingError),
     #[error("{0}")]
@@ -436,9 +446,9 @@ impl EncodingGuard<Render> {
     ///     &drawcall.vertices; // access to vertex-shader related functionality
     ///     &drawcall.bind_groups; // access to bind groups (descriptor-sets)
     ///     &drawcall.push_constants; // access to push constant data
-    ///     
+    ///
     ///     let fragments = drawcall.vertices.assemble(...).rasterize(...);
-    ///     
+    ///
     ///     // use fragments object for per-fragment computation and io
     ///
     ///     enc.finish()?
@@ -487,7 +497,7 @@ impl EncodingGuard<Compute> {
     ///     The compute grid is 3D and all thread positions are 3D vectors
     ///     even though the workgroup is only a flat 2D 8x4 slice.
     ///     Thread indices are still 1D scalars.
-    ///     
+    ///
     ///   The amount of workgroups dispatched is controlled at runtime by the
     ///   dispatch command.
     ///
@@ -641,7 +651,9 @@ impl Default for Settings {
 ///
 /// If no encoding is active on this thread, output is unspecified.
 #[track_caller]
-pub fn language() -> Language { Context::try_with(call_info!(), |ctx| ctx.settings().lang).unwrap_or(Language::Wgsl) }
+pub fn language() -> Language {
+    Context::try_with(call_info!(), |ctx| ctx.settings().lang).unwrap_or(Language::Wgsl)
+}
 
 impl Settings {
     pub(crate) fn assemble_error_fn(&self) -> impl Fn(CallInfo, EncodingErrorKind) -> EncodingError {

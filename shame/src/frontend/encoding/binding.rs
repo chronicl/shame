@@ -1,8 +1,10 @@
 use crate::frontend::any::Any;
 use crate::frontend::any::{shared_io::BufferBindingType, InvalidReason};
 use crate::frontend::rust_types::layout_traits::GpuLayout;
+use crate::frontend::rust_types::len::Len2;
 use crate::frontend::rust_types::reference::Ref;
 use crate::frontend::rust_types::reference::{AccessMode, AccessModeReadable, Read};
+use crate::frontend::rust_types::type_layout::compatible_with::TypeLayoutCompatibleWith;
 use crate::frontend::rust_types::type_traits::BindingArgs;
 use crate::frontend::rust_types::{reference::ReadWrite, struct_::SizedFields, type_traits::NoBools};
 use crate::frontend::texture::storage_texture::StorageTexture;
@@ -10,7 +12,12 @@ use crate::frontend::texture::texture_array::{StorageTextureArray, TextureArray}
 use crate::frontend::texture::texture_traits::{SamplingFormat, Spp, StorageTextureFormat};
 use crate::frontend::texture::{Sampler, Texture};
 use crate::ir::pipeline::StageMask;
+use crate::ir::recording::Context;
 use crate::ir::HandleType;
+use crate::{
+    call_info, mat, vec, Array, ArrayLen, Atomic, GpuSized, GpuStore, GpuType, Len, ScalarType, ScalarTypeFp,
+    ScalarTypeInteger, Struct, ToGpuType,
+};
 use crate::{
     frontend::any::{shared_io::BindPath, shared_io::BindingType},
     frontend::{
