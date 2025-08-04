@@ -41,7 +41,7 @@ use crate::{
         recording::Context,
         TextureFormatWrapper,
     },
-    mem::{self, AddressSpace},
+    mem::{self, AddressSpace, SupportsAccess},
     AccessModeReadable, BufferAddressSpace, Read, ReadWrite, Ref,
 };
 
@@ -536,10 +536,9 @@ impl BindingAny {
     /// TODO(chronicl)
     pub fn buffer<T, AS, AM>(&self, dynamic_offset: bool) -> Ref<T, AS, AM>
     where
-        T: GpuStore + GpuLayout + GpuType,
-        AS: BufferAddressSpace,
+        T: GpuStore + GpuLayout + GpuType + NoBools,
+        AS: BufferAddressSpace + SupportsAccess<AM>,
         AM: AccessModeReadable,
-        (AS, AM): UniformIsRead,
         (AS, T): AtomicsInStorageOnly,
         (AM, T): AtomicsRequireWriteable,
     {
@@ -583,11 +582,6 @@ impl BindingAny {
         .unwrap_or_else(|| Ref::new_invalid(InvalidReason::CreatedWithNoActiveEncoding))
     }
 }
-
-#[diagnostic::on_unimplemented(message = "The uniform address space is read only. Change `ReadWrite` to `Read`.")]
-pub trait UniformIsRead {}
-impl<AM: AccessModeReadable> UniformIsRead for (mem::Storage, AM) {}
-impl UniformIsRead for (mem::Uniform, Read) {}
 
 #[diagnostic::on_unimplemented(message = "atomics can only be used in read-write storage buffers`.")]
 pub trait AtomicsInStorageOnly {}
