@@ -540,7 +540,8 @@ impl BindingAny {
         AS: BufferAddressSpace,
         AM: AccessModeReadable,
         (AS, AM): UniformIsRead,
-        (AS, T): AtomicInStorageOnly,
+        (AS, T): AtomicsInStorageOnly,
+        (AM, T): AtomicsRequireWriteable,
     {
         Context::try_with(call_info!(), |ctx| {
             let access = AM::ACCESS_MODE_READABLE;
@@ -584,18 +585,21 @@ impl BindingAny {
 }
 
 #[diagnostic::on_unimplemented(message = "The uniform address space is read only. Change `ReadWrite` to `Read`.")]
-/// TODO(chronicl)
-#[allow(missing_docs)]
 pub trait UniformIsRead {}
 impl<AM: AccessModeReadable> UniformIsRead for (mem::Storage, AM) {}
 impl UniformIsRead for (mem::Uniform, Read) {}
 
-// Diagnostics carry over from `NoAtomics`.
-/// TODO(chronicl)
-#[allow(missing_docs)]
-pub trait AtomicInStorageOnly {}
-impl<T> AtomicInStorageOnly for (mem::Storage, T) {}
-impl<T: NoAtomics> AtomicInStorageOnly for (mem::Uniform, T) {}
+#[diagnostic::on_unimplemented(message = "atomics can only be used in read-write storage buffers`.")]
+pub trait AtomicsInStorageOnly {}
+impl<T> AtomicsInStorageOnly for (mem::Storage, T) {}
+impl<T: NoAtomics> AtomicsInStorageOnly for (mem::Uniform, T) {}
+
+#[diagnostic::on_unimplemented(
+    message = "atomics can only be used in read-write storage buffers. Use `ReadWrite` instead of `Read`."
+)]
+pub trait AtomicsRequireWriteable {}
+impl<T> AtomicsRequireWriteable for (ReadWrite, T) {}
+impl<T: NoAtomics> AtomicsRequireWriteable for (Read, T) {}
 
 /// push-constant values that were set before the current draw command/dispatch.
 ///
