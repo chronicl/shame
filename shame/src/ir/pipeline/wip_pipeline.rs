@@ -47,27 +47,22 @@ use crate::{
     BindingIter, DepthLhs, StencilMasking, Test, TypeLayout,
 };
 
-
 /// like `std::stringify!(x)` but it won't compile if `x` is not a valid expression or type
 #[doc(hidden)]
 #[macro_export]
 macro_rules! stringify_checked {
-    (ty: $t: ty) => {
-        {
-            if false {
-                let _: $t = unreachable!(); // make sure the type is valid
-            }
-            std::stringify!($t)
+    (ty: $t: ty) => {{
+        if false {
+            let _: $t = unreachable!(); // make sure the type is valid
         }
-    };
-    (expr: $ex: expr) => {
-        {
-            if false {
-                let _ = $ex; // make sure the expression is valid
-            }
-            std::stringify!($ex)
+        std::stringify!($t)
+    }};
+    (expr: $ex: expr) => {{
+        if false {
+            let _ = $ex; // make sure the expression is valid
         }
-    };
+        std::stringify!($ex)
+    }};
 }
 
 #[derive(Error, Debug, Clone)]
@@ -172,11 +167,10 @@ impl Display for InsufficientVisibilityError {
                 stringify_checked!(expr: vertex_writable_storage_by_default)
             )?;
         }
-        type T = crate::Buffer<crate::f32x1>; // dummy type for error message
         write!(
             f,
             "For custom visibility per binding, use the `{}` function",
-            stringify_checked!(expr: BindingIter::next_with_visibility::<T>)
+            stringify_checked!(expr: BindingIter::next_with_visibility)
         )?;
         Ok(())
     }
@@ -192,8 +186,8 @@ impl WipPipeline {
         };
 
         for binding in self.layout.borrow().bindings.values() {
-            if binding.binding_ty.can_produce_side_effects() &&
-                binding.user_defined_visibility.contains_stage(ShaderStage::Frag)
+            if binding.binding_ty.can_produce_side_effects()
+                && binding.user_defined_visibility.contains_stage(ShaderStage::Frag)
             {
                 return true;
             }
@@ -544,9 +538,13 @@ impl<T: Debug> LateRecorded<T> {
         });
     }
 
-    pub(crate) fn get_value(self) -> Option<T> { self.value.map(|t| t.0) }
+    pub(crate) fn get_value(self) -> Option<T> {
+        self.value.map(|t| t.0)
+    }
 
-    pub(crate) fn get(&self) -> Option<&(T, CallInfo)> { self.value.as_ref() }
+    pub(crate) fn get(&self) -> Option<&(T, CallInfo)> {
+        self.value.as_ref()
+    }
 
     #[track_caller]
     pub(crate) fn try_get(
@@ -653,7 +651,9 @@ pub struct RecordedWithIndex<T> {
 }
 
 impl<T> RecordedWithIndex<T> {
-    pub fn into_inner(self) -> T { self.t }
+    pub fn into_inner(self) -> T {
+        self.t
+    }
 }
 
 impl<T> RecordedWithIndex<T> {
@@ -669,11 +669,15 @@ impl<T> RecordedWithIndex<T> {
 impl<T> std::ops::Deref for RecordedWithIndex<T> {
     type Target = T;
 
-    fn deref(&self) -> &Self::Target { &self.t }
+    fn deref(&self) -> &Self::Target {
+        &self.t
+    }
 }
 
 impl<T> std::ops::DerefMut for RecordedWithIndex<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.t }
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.t
+    }
 }
 
 impl WipRenderPipelineDescriptor {

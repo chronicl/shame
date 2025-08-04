@@ -16,7 +16,6 @@ use crate::common::small_vec::SmallVec;
 use crate::frontend::any::shared_io::{BindPath, BindingType};
 use crate::frontend::any::Any;
 use crate::frontend::any::InvalidReason;
-use crate::frontend::encoding::buffer::{Buffer, BufferAddressSpace, BufferInner, BufferRef, BufferRefInner};
 use crate::frontend::encoding::flow::{for_range_impl, FlowFn};
 use crate::frontend::error::InternalError;
 use crate::frontend::rust_types::reference::Ref;
@@ -87,7 +86,9 @@ pub struct Array<T: GpuType + GpuSized, N: ArrayLen = RuntimeSize> {
 }
 
 impl<T: GpuType + GpuStore + GpuSized, N: ArrayLen> GpuType for Array<T, N> {
-    fn ty() -> ir::Type { ir::Type::Store(Self::store_ty()) }
+    fn ty() -> ir::Type {
+        ir::Type::Store(Self::store_ty())
+    }
 
     fn from_any_unchecked(any: Any) -> Self {
         Self {
@@ -98,7 +99,9 @@ impl<T: GpuType + GpuStore + GpuSized, N: ArrayLen> GpuType for Array<T, N> {
 }
 
 impl<T: GpuType + GpuSized, N: ArrayLen> AsAny for Array<T, N> {
-    fn as_any(&self) -> Any { self.any }
+    fn as_any(&self) -> Any {
+        self.any
+    }
 }
 
 impl<const N: usize> Size<N> {
@@ -109,29 +112,13 @@ impl<const N: usize> Size<N> {
 
 impl<T: GpuType + GpuSized + GpuStore, N: ArrayLen> GpuStore for Array<T, N> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
-    fn store_ty() -> ir::StoreType { Self::array_store_ty() }
-
-    fn instantiate_buffer_inner<AS: BufferAddressSpace>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BindingType,
-    ) -> BufferInner<Self, AS>
-    where
-        Self: NoAtomics + NoBools,
-    {
-        BufferInner::new_array(args, bind_ty)
+    fn store_ty() -> ir::StoreType {
+        Self::array_store_ty()
     }
 
-    fn instantiate_buffer_ref_inner<AS: BufferAddressSpace, AM: AccessModeReadable>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BindingType,
-    ) -> BufferRefInner<Self, AS, AM>
-    where
-        Self: NoBools,
-    {
-        BufferRefInner::new_plain(args, bind_ty)
+    fn impl_category() -> GpuStoreImplCategory {
+        GpuStoreImplCategory::GpuType(Self::store_ty())
     }
-
-    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
 }
 
 impl<T: GpuType + GpuSized, N: ArrayLen> GpuAligned for Array<T, N> {
@@ -159,9 +146,13 @@ impl<T: GpuType + GpuSized, const N: usize> GpuSized for Array<T, Size<N>> {
 impl<T: GpuType + GpuStore + GpuSized, N: ArrayLen> ToGpuType for Array<T, N> {
     type Gpu = Self;
 
-    fn to_gpu(&self) -> Self::Gpu { self.clone() }
+    fn to_gpu(&self) -> Self::Gpu {
+        self.clone()
+    }
 
-    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> { Some(self) }
+    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> {
+        Some(self)
+    }
 }
 
 impl<T: GpuType + GpuSized + GpuLayout, N: ArrayLen> GpuLayout for Array<T, N> {
@@ -217,10 +208,14 @@ impl<T: GpuType + GpuSized + GpuLayout, N: ArrayLen> GpuLayout for Array<T, N> {
 }
 
 impl<T: GpuType + GpuSized, N: ArrayLen> FromAnys for Array<T, N> {
-    fn expected_num_anys() -> usize { 1 }
+    fn expected_num_anys() -> usize {
+        1
+    }
 
     #[track_caller]
-    fn from_anys(mut anys: impl Iterator<Item = Any>) -> Self { super::layout_traits::from_single_any(anys).into() }
+    fn from_anys(mut anys: impl Iterator<Item = Any>) -> Self {
+        super::layout_traits::from_single_any(anys).into()
+    }
 }
 
 impl<T: GpuType + GpuSized, N: ArrayLen> Array<T, N> {
@@ -245,7 +240,9 @@ impl<T: GpuType + GpuSized, N: ArrayLen> From<Any> for Array<T, N> {
 impl<T: GpuSized + GpuType + NoAtomics, N: ArrayLen> Array<T, N> {
     /// (no documentation yet)
     #[track_caller]
-    pub fn at(&self, index: impl ToInteger) -> T { self.any.array_index(index.to_any()).into() }
+    pub fn at(&self, index: impl ToInteger) -> T {
+        self.any.array_index(index.to_any()).into()
+    }
 
     /// (no documentation yet)
     #[track_caller]
@@ -260,7 +257,9 @@ impl<T: GpuSized + GpuType + NoAtomics, N: ArrayLen> Array<T, N> {
 impl<Idx: ToInteger, T: GpuType + GpuSized + NoAtomics, N: ArrayLen> GpuIndex<Idx> for Array<T, N> {
     type Output = T;
 
-    fn index(&self, index: Idx) -> T { self.any.array_index(index.to_any()).into() }
+    fn index(&self, index: Idx) -> T {
+        self.any.array_index(index.to_any()).into()
+    }
 }
 
 impl<Idx, T, AS, AM, N> GpuIndex<Idx> for Ref<Array<T, N>, AS, AM>
@@ -274,7 +273,9 @@ where
     type Output = Ref<T, AS, AM>;
 
     #[track_caller]
-    fn index(&self, index: Idx) -> Ref<T, AS, AM> { self.at(index) }
+    fn index(&self, index: Idx) -> Ref<T, AS, AM> {
+        self.at(index)
+    }
 }
 
 impl<T: ToGpuType, const N: usize> ToGpuType for [T; N]
@@ -288,17 +289,23 @@ where
         Any::new_array(Rc::new(T::Gpu::sized_ty()), &anys).into()
     }
 
-    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> { None }
+    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> {
+        None
+    }
 }
 
 impl<T: GpuType + GpuStore + GpuSized + NoAtomics, const N: usize> Array<T, Size<N>> {
     /// (no documentation yet)
     #[track_caller]
-    pub fn new(fields: [impl To<T>; N]) -> Self { fields.to_gpu() }
+    pub fn new(fields: [impl To<T>; N]) -> Self {
+        fields.to_gpu()
+    }
 
     /// zero initialize, see https://www.w3.org/TR/WGSL/#zero-value-builtin-function
     #[track_caller]
-    pub fn zero() -> Self { Any::new_default(Self::sized_ty()).into() }
+    pub fn zero() -> Self {
+        Any::new_default(Self::sized_ty()).into()
+    }
 
     /// create a new array by transforming the elements of `self`
     ///
@@ -318,7 +325,9 @@ impl<T: GpuType + GpuStore + GpuSized + NoAtomics, const N: usize> Array<T, Size
 }
 
 impl<T: GpuType + GpuSized, N: ArrayLen> GetAllFields for Array<T, N> {
-    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
+    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> {
+        []
+    }
 }
 
 #[track_caller]
@@ -338,99 +347,6 @@ fn push_buffer_of_array_has_wrong_variant_error(is_ref: bool, expected_variant: 
     .unwrap_or(Any::new_invalid(
         crate::frontend::any::InvalidReason::CreatedWithNoActiveEncoding,
     ))
-}
-
-impl<Idx, T, AS, const DYN_OFFSET: bool> GpuIndex<Idx> for Buffer<Array<T>, AS, DYN_OFFSET>
-where
-    Idx: ToInteger,
-    T: GpuType + GpuSized + NoAtomics + NoHandles + GpuStore + 'static,
-    Array<T>: GpuStore + NoAtomics + NoBools + NoHandles,
-    AS: BufferAddressSpace + 'static,
-{
-    type Output = T;
-
-    #[track_caller]
-    fn index(&self, index: Idx) -> T {
-        if let BufferInner::RuntimeSizedArray(arr) = &self.inner {
-            arr.at(index).get()
-        } else {
-            push_buffer_of_array_has_wrong_variant_error(false, std::stringify!(BufferInner::RuntimeSizedArray)).into()
-        }
-    }
-}
-
-impl<Idx, T, AS, AM, const DYN_OFFSET: bool> GpuIndex<Idx> for BufferRef<Array<T>, AS, AM, DYN_OFFSET>
-where
-    Idx: ToInteger,
-    T: GpuType + GpuSized + GpuStore + 'static,
-    Array<T>: GpuStore + NoBools + NoHandles,
-    AS: BufferAddressSpace + 'static,
-    AM: AccessModeReadable + 'static,
-{
-    type Output = Ref<T, AS, AM>;
-
-    #[track_caller]
-    fn index(&self, index: Idx) -> Ref<T, AS, AM> {
-        if let BufferRefInner::Plain(arr) = &self.inner {
-            arr.at(index)
-        } else {
-            push_buffer_of_array_has_wrong_variant_error(true, std::stringify!(BufferRefInner::Plain)).into()
-        }
-    }
-}
-
-impl<T: GpuType + GpuSized, AS: BufferAddressSpace + 'static, const DYN_OFFSET: bool> Buffer<Array<T>, AS, DYN_OFFSET>
-where
-    Array<T>: GpuStore + NoAtomics + NoBools + NoHandles,
-    T: GpuType + GpuSized + NoAtomics + NoHandles + GpuStore + 'static,
-{
-    /// (no documentation yet)
-    #[track_caller]
-    pub fn len(&self) -> vec<u32, x1> {
-        if let BufferInner::RuntimeSizedArray(arr) = &self.inner {
-            arr.as_any().address().array_length().into()
-        } else {
-            push_buffer_of_array_has_wrong_variant_error(false, std::stringify!(BufferInner::RuntimeSizedArray)).into()
-        }
-    }
-
-    /// (no documentation yet)
-    #[track_caller]
-    pub fn at(&self, index: impl ToInteger) -> T {
-        if let BufferInner::RuntimeSizedArray(arr) = &self.inner {
-            arr.at(index).get()
-        } else {
-            push_buffer_of_array_has_wrong_variant_error(false, std::stringify!(BufferInner::RuntimeSizedArray)).into()
-        }
-    }
-}
-
-impl<T, AS, AM, const DYN_OFFSET: bool> BufferRef<Array<T>, AS, AM, DYN_OFFSET>
-where
-    Array<T>: GpuStore + NoBools + NoHandles,
-    T: GpuStore + GpuType + GpuSized + 'static,
-    AS: BufferAddressSpace + 'static,
-    AM: AccessModeReadable + 'static,
-{
-    /// (no documentation yet)
-    #[track_caller]
-    pub fn len(&self) -> vec<u32, x1> {
-        if let BufferRefInner::Plain(arr) = &self.inner {
-            arr.as_any().address().array_length().into()
-        } else {
-            push_buffer_of_array_has_wrong_variant_error(false, std::stringify!(BufferRefInner::Plain)).into()
-        }
-    }
-
-    /// (no documentation yet)
-    #[track_caller]
-    pub fn at(&self, index: impl ToInteger) -> Ref<T, AS, AM> {
-        if let BufferRefInner::Plain(arr) = &self.inner {
-            arr.at(index)
-        } else {
-            push_buffer_of_array_has_wrong_variant_error(true, std::stringify!(BufferRefInner::Plain)).into()
-        }
-    }
 }
 
 #[diagnostic::on_unimplemented(message = "array size <= 8 is required")]

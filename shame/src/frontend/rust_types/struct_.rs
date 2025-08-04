@@ -1,14 +1,10 @@
 use crate::common::small_vec::SmallVec;
 use crate::frontend::any::shared_io::{BindPath, BindingType};
 use crate::frontend::any::{Any, InvalidReason};
-use crate::frontend::encoding::buffer::BufferRefInner;
 use crate::{
     call_info,
     frontend::{
-        encoding::{
-            buffer::{BufferAddressSpace, BufferInner},
-            EncodingErrorKind,
-        },
+        encoding::{EncodingErrorKind},
         error::InternalError,
     },
     ir::{self, pipeline::StageMask, recording::Context, SizedStruct, StructureDefinitionError},
@@ -78,7 +74,9 @@ pub struct Struct<Layout: SizedFields + GpuStore> {
 impl<T: SizedFields + GpuStore + NoAtomics> Struct<T> {
     /// (no documentation yet)
     #[track_caller]
-    pub fn new(fields: T) -> Self { fields.to_gpu() }
+    pub fn new(fields: T) -> Self {
+        fields.to_gpu()
+    }
 }
 
 impl<T: SizedFields + GpuStore> Clone for Struct<T> {
@@ -92,36 +90,25 @@ impl<T: SizedFields + GpuStore> Clone for Struct<T> {
 
 impl<T: SizedFields + GpuStore> GpuStore for Struct<T> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = T::RefFields<AS, AM>;
-    fn store_ty() -> ir::StoreType { ir::StoreType::Sized(<Self as GpuSized>::sized_ty()) }
-    fn instantiate_buffer_inner<AS: BufferAddressSpace>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BindingType,
-    ) -> BufferInner<Self, AS>
-    where
-        Self: NoAtomics + NoBools,
-    {
-        BufferInner::new_plain(args, bind_ty)
+    fn store_ty() -> ir::StoreType {
+        ir::StoreType::Sized(<Self as GpuSized>::sized_ty())
     }
 
-    fn instantiate_buffer_ref_inner<AS: BufferAddressSpace, AM: AccessModeReadable>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BindingType,
-    ) -> BufferRefInner<Self, AS, AM>
-    where
-        Self: NoBools,
-    {
-        BufferRefInner::new_plain(args, bind_ty)
+    fn impl_category() -> GpuStoreImplCategory {
+        GpuStoreImplCategory::GpuType(Self::store_ty())
     }
-
-    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
 }
 
 impl<T: SizedFields + GpuStore> GpuAligned for Struct<T> {
-    fn aligned_ty() -> ir::AlignedType { ir::AlignedType::Sized(<Self as GpuSized>::sized_ty()) }
+    fn aligned_ty() -> ir::AlignedType {
+        ir::AlignedType::Sized(<Self as GpuSized>::sized_ty())
+    }
 }
 
 impl<T: SizedFields + GpuStore> GpuSized for Struct<T> {
-    fn sized_ty() -> ir::SizedType { ir::SizedType::Structure(T::get_sizedstruct_type()) }
+    fn sized_ty() -> ir::SizedType {
+        ir::SizedType::Structure(T::get_sizedstruct_type())
+    }
 }
 
 impl<T: SizedFields + GpuStore + NoBools> NoBools for Struct<T> {}
@@ -130,11 +117,15 @@ impl<T: SizedFields + GpuStore + NoHandles> NoHandles for Struct<T> {}
 
 impl<T: SizedFields + GpuStore> Deref for Struct<T> {
     type Target = T;
-    fn deref(&self) -> &Self::Target { &self.fields }
+    fn deref(&self) -> &Self::Target {
+        &self.fields
+    }
 }
 
 impl<T: SizedFields + GpuStore + NoBools + GpuLayout> GpuLayout for Struct<T> {
-    fn layout_recipe() -> recipe::TypeLayoutRecipe { T::layout_recipe() }
+    fn layout_recipe() -> recipe::TypeLayoutRecipe {
+        T::layout_recipe()
+    }
 
     fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
         T::cpu_type_name_and_layout().map(|x| x.map(|(name, l)| (format!("Struct<{name}>").into(), l)))
@@ -142,16 +133,22 @@ impl<T: SizedFields + GpuStore + NoBools + GpuLayout> GpuLayout for Struct<T> {
 }
 
 impl<T: SizedFields + GpuStore> FromAnys for Struct<T> {
-    fn expected_num_anys() -> usize { 1 }
+    fn expected_num_anys() -> usize {
+        1
+    }
 
-    fn from_anys(anys: impl Iterator<Item = Any>) -> Self { super::layout_traits::from_single_any(anys).into() }
+    fn from_anys(anys: impl Iterator<Item = Any>) -> Self {
+        super::layout_traits::from_single_any(anys).into()
+    }
 }
 
 impl<T: SizedFields + GpuStore> GpuType for Struct<T>
 where
     Struct<T>: Sized,
 {
-    fn ty() -> ir::Type { <Self as GpuSized>::sized_ty().into() }
+    fn ty() -> ir::Type {
+        <Self as GpuSized>::sized_ty().into()
+    }
 
     #[track_caller]
     fn from_any_unchecked(any: Any) -> Self {
@@ -171,13 +168,21 @@ where
 
 impl<T: SizedFields + GpuStore> ToGpuType for Struct<T> {
     type Gpu = Self;
-    fn to_gpu(&self) -> Self::Gpu { self.clone() }
-    fn to_any(&self) -> Any { self.any }
-    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> { Some(self) }
+    fn to_gpu(&self) -> Self::Gpu {
+        self.clone()
+    }
+    fn to_any(&self) -> Any {
+        self.any
+    }
+    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> {
+        Some(self)
+    }
 }
 
 impl<T: SizedFields + GpuStore> AsAny for Struct<T> {
-    fn as_any(&self) -> Any { self.any }
+    fn as_any(&self) -> Any {
+        self.any
+    }
 }
 
 impl<T: SizedFields + GpuStore> From<Any> for Struct<T> {
@@ -193,5 +198,7 @@ impl<T: SizedFields + GpuStore> From<Any> for Struct<T> {
 }
 
 impl<T: SizedFields + GpuStore> GetAllFields for Struct<T> {
-    fn fields_as_anys_unchecked(self_as_any: Any) -> impl Borrow<[Any]> { T::fields_as_anys_unchecked(self_as_any) }
+    fn fields_as_anys_unchecked(self_as_any: Any) -> impl Borrow<[Any]> {
+        T::fields_as_anys_unchecked(self_as_any)
+    }
 }

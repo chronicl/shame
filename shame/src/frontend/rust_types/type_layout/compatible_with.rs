@@ -5,7 +5,7 @@ use crate::{
     call_info,
     common::prettify::{set_color, UnwrapOrStr},
     frontend::{
-        encoding::buffer::BufferAddressSpaceEnum,
+        encoding::binding::BufferAddressSpaceEnum,
         rust_types::type_layout::{
             display::LayoutInfo,
             eq::{try_find_mismatch, LayoutMismatch, StructMismatch, TopLevelMismatch},

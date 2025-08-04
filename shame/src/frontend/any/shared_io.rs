@@ -3,7 +3,7 @@ use std::num::NonZeroU64;
 
 use crate::any::layout::TypeLayoutRecipe;
 use crate::backend::language::Language;
-use crate::frontend::encoding::buffer::BufferAddressSpaceEnum;
+use crate::frontend::encoding::binding::BufferAddressSpaceEnum;
 use crate::{call_info, BufferAddressSpace};
 use crate::common::po2::U32PowerOf2;
 use crate::frontend::any::Any;

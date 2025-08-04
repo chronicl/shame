@@ -84,16 +84,17 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     // The check happens at shader-generation time, so that a nice error
     // message can be generated, pointing to the field that doesn't match.
     // (once rusts const-generics are more powerful this may be moved to compile-time)
-    let xforms_sto: sm::Buffer<Transforms, sm::mem::Storage> = group0.next();
-    let xforms_uni: sm::Buffer<Transforms, sm::mem::Uniform> = group0.next();
+    let xforms_sto: Ref<sm::Struct<Transforms>, sm::mem::Storage> = group0.next2().buffer(false);
+    let xforms_uni: Ref<sm::Struct<Transforms>, sm::mem::Uniform> = group0.next2().buffer(false);
 
+    // TODO(chronicl)
     let buf: Ref<u32x1> = group0.next2().buffer(false);
     // let bufs: BindingArray<Transforms> = group0.next2().buffers(false);
 
     // conditional code generation based on pipeline parameter
     if some_param > 0 {
         // if not further specified, defaults to `sm::mem::Storage`
-        let xforms_sto2: sm::Buffer<Transforms> = group0.next();
+        let xforms_sto2: sm::Ref<sm::Struct<Transforms>> = group0.next2().buffer(false);
     }
 
     // result types of matrix multiplications are inferred

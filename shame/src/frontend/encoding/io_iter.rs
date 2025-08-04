@@ -11,7 +11,7 @@ use crate::{
             shared_io::{BindPath, BindingType},
             Any, InvalidReason,
         },
-        encoding::buffer::BufferAddressSpaceEnum,
+        encoding::binding::BufferAddressSpaceEnum,
         error::InternalError,
         rust_types::{
             error::FrontendError,
@@ -504,11 +504,11 @@ impl BindingIter<'_> {
     ///
     /// see [`BindingIter::next`] for more info on the `T` parameter
     #[track_caller]
-    pub fn next_with_visibility<T: Binding>(&mut self, stages: StageMask) -> T {
-        Binding::new_binding(Ok(BindingArgs {
-            path: self.post_inc_path(),
-            visibility: stages,
-        }))
+    pub fn next_with_visibility(&mut self, stages: StageMask) -> BindingAny {
+        BindingAny {
+            bind_path: self.post_inc_path(),
+            visibility: Some(stages),
+        }
     }
 
     fn post_inc_path(&mut self) -> BindPath {
@@ -524,12 +524,14 @@ impl BindingIter<'_> {
     pub fn next2(&mut self) -> BindingAny {
         BindingAny {
             bind_path: self.post_inc_path(),
+            visibility: None,
         }
     }
 }
 
 pub struct BindingAny {
     bind_path: BindPath,
+    visibility: Option<StageMask>,
 }
 
 impl BindingAny {

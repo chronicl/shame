@@ -1,9 +1,10 @@
+// TODO(chronicl) make this convenience for Ref instead Buffer
 // convenience implementations of `std::ops` (+ - * ...) for
 // `Buffer<vec>` and `Buffer<mat>`
 
 use std::ops::{Add, BitAnd, BitOr, BitXor, Deref, Div, Mul, Rem, Shl, Shr, Sub};
 
-use super::buffer::Buffer;
+use crate::Ref;
 use crate::frontend::rust_types::vec::vec;
 use crate::frontend::rust_types::{
     len::{x1, Len, Len2},
@@ -24,67 +25,62 @@ use crate::frontend::rust_types::{
 // }
 
 // // vec * Buf<mat>
-// impl<T: ScalarTypeFp, C: Len2, R: Len2, L: Len> Mul<Buffer<mat<T, C, R>>> for vec<T, L>
+// impl<T: ScalarTypeFp, C: Len2, R: Len2, L: Len> Mul<Ref<mat<T, C, R>>> for vec<T, L>
 // where
 //     vec<T, L>: Mul<mat<T, C, R>>,
-//     Buffer<mat<T, C, R>>: Deref<Target = mat<T, C, R>>,
+//     Ref<mat<T, C, R>>: Deref<Target = mat<T, C, R>>,
 // {
 //     type Output = <Self as Mul<mat<T, C, R>>>::Output;
 
-//     fn mul(self, rhs: Buffer<mat<T, C, R>>) -> Self::Output { self * *rhs.deref() }
+//     fn mul(self, rhs: Ref<mat<T, C, R>>) -> Self::Output { self * *rhs.deref() }
 // }
 
-
-macro_rules! impl_binops_for_buffer {
+macro_rules! impl_binops_for_ref {
     (
         $(
             impl<$($gen: ident: $bound: ident),*>
             $Lhs: ty, $Mul: ident :: $mul: ident, $Rhs: ty;
         )*
     ) => {
-        // Buffer<A> x B
+        // Ref<A> x B
         $(
-        impl<$($gen: $bound),*> $Mul<$Rhs> for Buffer<$Lhs>
+        impl<$($gen: $bound),*> $Mul<$Rhs> for Ref<$Lhs>
         where
             $Lhs: NoBools,
-            Buffer<$Lhs>: Deref<Target = $Lhs>,
             $Lhs: Mul<$Rhs>,
         {
             type Output = <$Lhs as $Mul<$Rhs>>::Output;
 
-            fn $mul(self, rhs: $Rhs) -> Self::Output { (*self).$mul(rhs) }
+            fn $mul(self, rhs: $Rhs) -> Self::Output { (self.get()).$mul(rhs) }
         }
 
-        // A x Buffer<B>
-        impl<$($gen: $bound),*> $Mul<Buffer<$Rhs>> for $Lhs
+        // A x Ref<B>
+        impl<$($gen: $bound),*> $Mul<Ref<$Rhs>> for $Lhs
         where
             $Rhs: NoBools,
-            Buffer<$Rhs>: Deref<Target = $Rhs>,
             $Lhs: Mul<$Rhs>,
         {
             type Output = <$Lhs as $Mul<$Rhs>>::Output;
 
-            fn $mul(self, rhs: Buffer<$Rhs>) -> Self::Output { self.$mul(*rhs) }
+            fn $mul(self, rhs: Ref<$Rhs>) -> Self::Output { self.$mul(rhs.get()) }
         }
 
-        // Buffer<A> x Buffer<B>
-        impl<$($gen: $bound),*> $Mul<Buffer<$Rhs>> for Buffer<$Lhs>
+        // Ref<A> x Buffer<B>
+        impl<$($gen: $bound),*> $Mul<Ref<$Rhs>> for Ref<$Lhs>
         where
             $Lhs: NoBools,
             $Rhs: NoBools,
-            Buffer<$Lhs>: Deref<Target = $Lhs>,
-            Buffer<$Rhs>: Deref<Target = $Rhs>,
             $Lhs: Mul<$Rhs>,
         {
             type Output = <$Lhs as $Mul<$Rhs>>::Output;
 
-            fn $mul(self, rhs: Buffer<$Rhs>) -> Self::Output { (*self).$mul(*rhs) }
+            fn $mul(self, rhs: Ref<$Rhs>) -> Self::Output { (self.get()).$mul(rhs.get()) }
         }
         )*
     };
 }
 
-impl_binops_for_buffer! {
+impl_binops_for_ref! {
     // scalar * mat
     impl<T: ScalarTypeFp, C: Len2, R: Len2> vec<T, x1>  , Mul::mul, mat<T, C, R>;
     impl<T: ScalarTypeFp, C: Len2, R: Len2> mat<T, C, R>, Mul::mul, vec<T, x1>;

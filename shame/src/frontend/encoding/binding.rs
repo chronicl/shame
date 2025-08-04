@@ -224,3 +224,35 @@ impl<M: SamplingMethod> Binding for Sampler<M> {
         Self::from_inner(any)
     }
 }
+
+/// Address spaces used for [`Buffer`] and [`BufferRef`] bindings.
+///
+/// Implemented by the marker types
+/// - [`mem::Uniform`]
+/// - [`mem::Storage`]
+pub trait BufferAddressSpace: AddressSpace + SupportsAccess<Read> {
+    /// Either Storage or Uniform address space.
+    const BUFFER_ADDRESS_SPACE: BufferAddressSpaceEnum;
+}
+/// Either Storage or Uniform address space.
+#[derive(Debug, Clone, Copy)]
+pub enum BufferAddressSpaceEnum {
+    /// Storage address space
+    Storage,
+    /// Uniform address space
+    Uniform,
+}
+impl BufferAddressSpace for mem::Uniform {
+    const BUFFER_ADDRESS_SPACE: BufferAddressSpaceEnum = BufferAddressSpaceEnum::Uniform;
+}
+impl BufferAddressSpace for mem::Storage {
+    const BUFFER_ADDRESS_SPACE: BufferAddressSpaceEnum = BufferAddressSpaceEnum::Storage;
+}
+impl std::fmt::Display for BufferAddressSpaceEnum {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BufferAddressSpaceEnum::Storage => write!(f, "storage address space"),
+            BufferAddressSpaceEnum::Uniform => write!(f, "uniform address space"),
+        }
+    }
+}

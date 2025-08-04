@@ -23,7 +23,6 @@ use crate::{
             shared_io::{BindPath, BindingType},
             Any, InvalidReason,
         },
-        encoding::buffer::{BufferAddressSpace, BufferInner, BufferRefInner},
     },
     ir::{self, pipeline::StageMask, recording::Context, Comp4, VectorAccess},
 };
@@ -60,22 +59,32 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuLayout for mat<T, C, R> {
         .into()
     }
 
-    fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> { None }
+    fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
+        None
+    }
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> FromAnys for mat<T, C, R> {
-    fn expected_num_anys() -> usize { 1 }
+    fn expected_num_anys() -> usize {
+        1
+    }
 
     #[track_caller]
-    fn from_anys(mut anys: impl Iterator<Item = Any>) -> Self { super::layout_traits::from_single_any(anys).into() }
+    fn from_anys(mut anys: impl Iterator<Item = Any>) -> Self {
+        super::layout_traits::from_single_any(anys).into()
+    }
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuSized for mat<T, C, R> {
-    fn sized_ty() -> ir::SizedType { ir::SizedType::Matrix(C::LEN2, R::LEN2, T::SCALAR_TYPE_FP) }
+    fn sized_ty() -> ir::SizedType {
+        ir::SizedType::Matrix(C::LEN2, R::LEN2, T::SCALAR_TYPE_FP)
+    }
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuType for mat<T, C, R> {
-    fn ty() -> ir::Type { ir::Type::Store(Self::store_ty()) }
+    fn ty() -> ir::Type {
+        ir::Type::Store(Self::store_ty())
+    }
 
     fn from_any_unchecked(any: Any) -> Self {
         Self {
@@ -90,51 +99,45 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> NoAtomics for mat<T, C, R> {}
 impl<T: ScalarTypeFp, C: Len2, R: Len2> NoBools for mat<T, C, R> {}
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> AsAny for mat<T, C, R> {
-    fn as_any(&self) -> Any { self.any }
+    fn as_any(&self) -> Any {
+        self.any
+    }
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuStore for mat<T, C, R> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
-    fn store_ty() -> ir::StoreType { ir::StoreType::Sized(<Self as GpuSized>::sized_ty()) }
-
-    fn instantiate_buffer_inner<AS: BufferAddressSpace>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BindingType,
-    ) -> BufferInner<Self, AS>
-    where
-        Self: NoAtomics + NoBools,
-    {
-        BufferInner::new_plain(args, bind_ty)
+    fn store_ty() -> ir::StoreType {
+        ir::StoreType::Sized(<Self as GpuSized>::sized_ty())
     }
 
-    fn instantiate_buffer_ref_inner<AS: BufferAddressSpace, AM: AccessModeReadable>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BindingType,
-    ) -> BufferRefInner<Self, AS, AM>
-    where
-        Self: NoBools,
-    {
-        BufferRefInner::new_plain(args, bind_ty)
+    fn impl_category() -> GpuStoreImplCategory {
+        GpuStoreImplCategory::GpuType(Self::store_ty())
     }
-
-    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuAligned for mat<T, C, R> {
-    fn aligned_ty() -> ir::AlignedType { ir::AlignedType::Sized(<Self as GpuSized>::sized_ty()) }
+    fn aligned_ty() -> ir::AlignedType {
+        ir::AlignedType::Sized(<Self as GpuSized>::sized_ty())
+    }
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> ToGpuType for mat<T, C, R> {
     type Gpu = Self;
 
-    fn to_gpu(&self) -> Self::Gpu { *self }
+    fn to_gpu(&self) -> Self::Gpu {
+        *self
+    }
 
-    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> { Some(self) }
+    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> {
+        Some(self)
+    }
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> From<Any> for mat<T, C, R> {
     #[track_caller]
-    fn from(any: Any) -> Self { GpuType::from_any(any) }
+    fn from(any: Any) -> Self {
+        GpuType::from_any(any)
+    }
 }
 
 impl<R: Len2, T: ScalarTypeFp> From<[vec<T, R>; 2]> for mat<T, x2, R> {
@@ -274,7 +277,9 @@ impl<Cols: Len2, Rows: Len2, T: ScalarTypeFp> mat<T, Cols, Rows> {
     /// (WGSL).
     ///
     /// see https://www.w3.org/TR/WGSL/#indeterminate-values
-    pub fn col(&self, i: impl ToInteger) -> vec<T, Rows> { self.any.matrix_index(i.to_any()).into() }
+    pub fn col(&self, i: impl ToInteger) -> vec<T, Rows> {
+        self.any.matrix_index(i.to_any()).into()
+    }
 
     /// construct a matrix filled with zeroes
     ///
@@ -284,7 +289,9 @@ impl<Cols: Len2, Rows: Len2, T: ScalarTypeFp> mat<T, Cols, Rows> {
     /// let x: mat<f32, x4, x4> = mat::zero();
     /// ```
     #[track_caller]
-    pub fn zero() -> Self { Default::default() }
+    pub fn zero() -> Self {
+        Default::default()
+    }
 
     /// resizes `self` to a different matrix size by either removing columns/rows
     /// or adding zero-filled columns/rows.
@@ -356,7 +363,9 @@ impl<Cols: Len2, Rows: Len2, T: ScalarTypeFp> mat<T, Cols, Rows> {
     /// generic conversion. Therefore the `From` implementation is split up into
     /// all the specific permutations.
     #[track_caller]
-    pub fn into_generic<T1: ScalarTypeFp>(self) -> mat<T1, Cols, Rows> { <mat<T1, Cols, Rows>>::from_generic(self) }
+    pub fn into_generic<T1: ScalarTypeFp>(self) -> mat<T1, Cols, Rows> {
+        <mat<T1, Cols, Rows>>::from_generic(self)
+    }
 
     /// identical to `From::from()` except that it is also usable in generic
     /// contexts. If unsure use `From::from()` instead of this.
@@ -377,7 +386,9 @@ impl<Cols: Len2, Rows: Len2, T: ScalarTypeFp> mat<T, Cols, Rows> {
     /// flips columns and rows
     ///
     #[track_caller]
-    pub fn transpose(self) -> mat<T, Rows, Cols> { self.any.transpose().into() }
+    pub fn transpose(self) -> mat<T, Rows, Cols> {
+        self.any.transpose().into()
+    }
 }
 
 impl<C: Len2, T: ScalarTypeFp> mat<T, C, C> {
@@ -385,7 +396,9 @@ impl<C: Len2, T: ScalarTypeFp> mat<T, C, C> {
     ///
     /// see <https://www.w3.org/TR/WGSL/#determinant-builtin>
     #[track_caller]
-    pub fn determinant(self) -> vec<T, x1> { self.as_any().determinant().into() }
+    pub fn determinant(self) -> vec<T, x1> {
+        self.as_any().determinant().into()
+    }
 }
 
 macro_rules! impl_from {
@@ -540,7 +553,9 @@ where
 {
     type Output = vec<T, Rows>;
 
-    fn index(&self, i: Idx) -> Self::Output { self.col(i) }
+    fn index(&self, i: Idx) -> Self::Output {
+        self.col(i)
+    }
 }
 
 impl<Cols: Len2, Rows: Len2, T: ScalarTypeFp, Idx, AM: AccessMode, AS: AddressSpace> GpuIndex<Idx>
@@ -550,7 +565,9 @@ where
 {
     type Output = Ref<vec<T, Rows>, AS, AM>;
 
-    fn index(&self, i: Idx) -> Self::Output { self.col(i) }
+    fn index(&self, i: Idx) -> Self::Output {
+        self.col(i)
+    }
 }
 
 impl<Cols: Len2, Rows: Len2, T: ScalarTypeFp, AM, AS> Ref<mat<T, Cols, Rows>, AS, AM>
@@ -564,9 +581,13 @@ where
     /// (WGSL).
     ///
     /// see https://www.w3.org/TR/WGSL/#indeterminate-values
-    pub fn col(&self, i: impl ToInteger) -> Ref<vec<T, Rows>, AS, AM> { self.as_any().matrix_index(i.to_any()).into() }
+    pub fn col(&self, i: impl ToInteger) -> Ref<vec<T, Rows>, AS, AM> {
+        self.as_any().matrix_index(i.to_any()).into()
+    }
 }
 
 impl<Cols: Len2, Rows: Len2, T: ScalarTypeFp> GetAllFields for mat<T, Cols, Rows> {
-    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
+    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> {
+        []
+    }
 }

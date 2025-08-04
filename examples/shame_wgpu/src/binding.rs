@@ -19,32 +19,33 @@ pub trait AsBindingResource: sm::Binding {
     }
 }
 
-impl<T, AS, const DYNAMIC_OFFSET: bool> AsBindingResource for sm::Buffer<T, AS, DYNAMIC_OFFSET>
-where
-    Self: sm::Binding,
-    T: sm::GpuStore + sm::NoHandles + sm::NoAtomics + sm::NoBools,
-    AS: sm::BufferAddressSpace,
-{
-    type BindingResource<'a> = wgpu::BufferBinding<'a>;
+// TODO(chronicl)
+// impl<T, AS, const DYNAMIC_OFFSET: bool> AsBindingResource for sm::Buffer<T, AS, DYNAMIC_OFFSET>
+// where
+//     Self: sm::Binding,
+//     T: sm::GpuStore + sm::NoHandles + sm::NoAtomics + sm::NoBools,
+//     AS: sm::BufferAddressSpace,
+// {
+//     type BindingResource<'a> = wgpu::BufferBinding<'a>;
 
-    fn binding_resource<'a>(resource: &'a Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
-        wgpu::BindingResource::Buffer(resource.clone())
-    }
-}
+//     fn binding_resource<'a>(resource: &'a Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
+//         wgpu::BindingResource::Buffer(resource.clone())
+//     }
+// }
 
-impl<T, AS, AM, const DYNAMIC_OFFSET: bool> AsBindingResource for sm::BufferRef<T, AS, AM, DYNAMIC_OFFSET>
-where
-    Self: sm::Binding,
-    T: sm::GpuStore + sm::NoHandles + sm::NoBools,
-    AS: sm::BufferAddressSpace,
-    AM: sm::AccessModeReadable,
-{
-    type BindingResource<'a> = wgpu::BufferBinding<'a>;
+// impl<T, AS, AM, const DYNAMIC_OFFSET: bool> AsBindingResource for sm::BufferRef<T, AS, AM, DYNAMIC_OFFSET>
+// where
+//     Self: sm::Binding,
+//     T: sm::GpuStore + sm::NoHandles + sm::NoBools,
+//     AS: sm::BufferAddressSpace,
+//     AM: sm::AccessModeReadable,
+// {
+//     type BindingResource<'a> = wgpu::BufferBinding<'a>;
 
-    fn binding_resource<'a>(resource: &'a Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
-        wgpu::BindingResource::Buffer(resource.clone())
-    }
-}
+//     fn binding_resource<'a>(resource: &'a Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
+//         wgpu::BindingResource::Buffer(resource.clone())
+//     }
+// }
 
 impl<M: sm::SamplingMethod> AsBindingResource for sm::Sampler<M> {
     type BindingResource<'a> = wgpu::Sampler;
