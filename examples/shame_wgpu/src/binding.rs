@@ -3,7 +3,7 @@ use crate::conversion::ShameToWgpuError;
 
 /// this trait connects the shame binding types `sm::Binding` to their
 /// `wgpu::BindingResource`, `wgpu::BindingType` types
-pub trait AsBindingResource: sm::Binding {
+pub trait AsBindingResource: sm::TextureBinding {
     type BindingResource<'a>: ?Sized;
 
     fn binding_resource<'a>(resource: &'a Self::BindingResource<'a>) -> wgpu::BindingResource<'a>;
@@ -19,6 +19,14 @@ pub trait AsBindingResource: sm::Binding {
     }
 }
 
+struct A<T: B, D = <T as B>::C> {
+    a: T,
+    b: D,
+}
+
+trait B {
+    type C;
+}
 // TODO(chronicl)
 // impl<T, AS, const DYNAMIC_OFFSET: bool> AsBindingResource for sm::Buffer<T, AS, DYNAMIC_OFFSET>
 // where

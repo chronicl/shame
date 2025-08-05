@@ -1,4 +1,6 @@
 #![allow(unused, clippy::no_effect)]
+use shame::Read;
+use shame::ReadWrite;
 use shame::Ref;
 use shame as sm;
 use shame::prelude::*;
@@ -84,17 +86,13 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     // The check happens at shader-generation time, so that a nice error
     // message can be generated, pointing to the field that doesn't match.
     // (once rusts const-generics are more powerful this may be moved to compile-time)
-    let xforms_sto: Ref<sm::Struct<Transforms>, sm::mem::Storage> = group0.next2().buffer(false);
-    let xforms_uni: Ref<sm::Struct<Transforms>, sm::mem::Uniform> = group0.next2().buffer(false);
-
-    // TODO(chronicl)
-    let buf: Ref<u32x1> = group0.next2().buffer(false);
-    // let bufs: BindingArray<Transforms> = group0.next2().buffers(false);
+    let xforms_sto: Transforms = group0.next().storage_buffer();
+    let xforms_uni: Transforms = group0.next().uniform_buffer();
 
     // conditional code generation based on pipeline parameter
     if some_param > 0 {
         // if not further specified, defaults to `sm::mem::Storage`
-        let xforms_sto2: sm::Ref<sm::Struct<Transforms>> = group0.next2().buffer(false);
+        let xforms_sto2: sm::Ref<sm::Struct<Transforms>> = group0.next().storage_buffer();
     }
 
     // result types of matrix multiplications are inferred
@@ -217,12 +215,12 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     let (pos, uv) = frag.fill((pos, uv));
 
     // samplers are generic over their capabilities (Nearest/Filtering/Comparison)
-    let sampler: sm::Sampler<sm::Filtering> = group0.next();
+    let sampler: sm::Sampler<sm::Filtering> = group0.next().texture();
 
     // textures are generic too:
     // Texture<Format, Coords = f32x2, SPP = Single>
     // (spp = samples per pixel is either `sm::Single` or `sm::Multi`)
-    let texture: sm::Texture<sm::tf::Rg8Unorm> = group0.next();
+    let texture: sm::Texture<sm::tf::Rg8Unorm> = group0.next().texture();
 
     // fragment-quad based derivative of `uv`
     let duv = frag.quad.grad(uv, sm::GradPrecision::Fine);

@@ -47,7 +47,7 @@ use std::num::NonZeroU32;
 /// [`Buffer`]: crate::Buffer
 /// [`BufferRef`]: crate::BufferRef
 #[diagnostic::on_unimplemented(message = "`{Self}` is not a valid type for a bind-group binding")]
-pub trait Binding {
+pub trait TextureBinding {
     /// runtime representation of `Self`
     fn binding_type() -> BindingType;
 
@@ -59,7 +59,7 @@ pub trait Binding {
     fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self;
 }
 
-impl<Format, Coords, SPP> Binding for Texture<Format, Coords, SPP>
+impl<Format, Coords, SPP> TextureBinding for Texture<Format, Coords, SPP>
 where
     Coords: TextureCoords + SupportsSpp<SPP>,
     Format: SamplingFormat + SupportsSpp<SPP> + SupportsCoords<Coords>,
@@ -99,7 +99,7 @@ where
 }
 
 impl<Access: AccessMode, Format: StorageTextureFormat<Access> + SupportsCoords<Coords>, Coords: StorageTextureCoords>
-    Binding for StorageTexture<Format, Coords, Access>
+    TextureBinding for StorageTexture<Format, Coords, Access>
 {
     fn binding_type() -> BindingType {
         BindingType::StorageTexture {
@@ -130,7 +130,7 @@ impl<Access: AccessMode, Format: StorageTextureFormat<Access> + SupportsCoords<C
     }
 }
 
-impl<Format, const N: u32, Coords> Binding for TextureArray<Format, N, Coords>
+impl<Format, const N: u32, Coords> TextureBinding for TextureArray<Format, N, Coords>
 where
     Format: SamplingFormat + SupportsCoords<Coords>,
     Coords: TextureCoords + LayerCoords,
@@ -174,7 +174,7 @@ impl<
     Format: StorageTextureFormat<Access> + SupportsCoords<Coords>,
     const N: u32,
     Coords: StorageTextureCoords + LayerCoords,
-> Binding for StorageTextureArray<Format, N, Coords, Access>
+> TextureBinding for StorageTextureArray<Format, N, Coords, Access>
 {
     fn binding_type() -> BindingType {
         BindingType::StorageTexture {
@@ -205,7 +205,7 @@ impl<
     }
 }
 
-impl<M: SamplingMethod> Binding for Sampler<M> {
+impl<M: SamplingMethod> TextureBinding for Sampler<M> {
     fn binding_type() -> BindingType {
         BindingType::Sampler(M::SAMPLING_METHOD)
     }

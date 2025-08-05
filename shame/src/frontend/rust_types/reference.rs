@@ -99,7 +99,7 @@ impl<T: GpuStore, AS: AddressSpace> WritableRef for Ref<T, AS, Write> {}
 
 // TODO(docs) Docs: mention that this has broadly same interface as `Cell`
 /// (no documentation yet)
-pub struct Ref<T, AS = mem::Storage, AM = Read>
+pub struct Ref<T, AS = mem::Storage, AM = ReadWrite>
 where
     T: GpuStore,
     AS: AddressSpace,
@@ -135,8 +135,7 @@ impl<T, AS, AM> Ref<T, AS, AM>
 where
     T: GpuType + GpuStore + NoAtomics,
     AS: AddressSpace,
-    AM: AccessMode,
-    Self: ReadableRef,
+    AM: AccessModeReadable,
 {
     /// (no documentation yet)
     #[track_caller]

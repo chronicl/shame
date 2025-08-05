@@ -46,7 +46,6 @@ pub mod io_iter;
 pub mod mask;
 pub mod pipeline_info;
 pub mod rasterizer;
-pub mod ref_op;
 
 pub mod pipeline_kind {
     use crate::ir::pipeline::PipelineKind;

@@ -261,7 +261,7 @@ pub mod mem {
 }
 
 // # Binding
-pub use frontend::encoding::binding::Binding;
+pub use frontend::encoding::binding::TextureBinding;
 pub use frontend::encoding::binding::BufferAddressSpace;
 
 // `Sampler`

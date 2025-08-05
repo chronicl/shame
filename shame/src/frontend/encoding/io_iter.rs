@@ -19,10 +19,12 @@ use crate::{
                 cpu_type_name_and_layout, get_layout_compare_with_cpu_push_error, ArrayElementsUnsizedError, FromAnys,
                 GpuLayout, VertexLayout,
             },
+            len::Len2,
             reference::AccessMode,
             struct_::SizedFields,
             type_layout::compatible_with::{AddressSpaceError, TypeLayoutCompatibleWith},
             type_traits::{BindingArgs, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools},
+            vec::vec,
             GpuType,
         },
         texture::{
@@ -41,11 +43,13 @@ use crate::{
         recording::Context,
         TextureFormatWrapper,
     },
+    mat,
     mem::{self, AddressSpace, SupportsAccess},
-    AccessModeReadable, BufferAddressSpace, Read, ReadWrite, Ref,
+    AccessModeReadable, Array, Atomic, BufferAddressSpace, BufferFields, Len, Read, ReadWrite, Ref, ScalarType,
+    ScalarTypeFp, ScalarTypeInteger, Struct,
 };
 
-use super::{binding::Binding, rasterizer::VertexIndex};
+use super::{binding::TextureBinding, rasterizer::VertexIndex};
 
 /// an iterator over the draw command's bound vertex buffers, which also
 /// allows random access
@@ -361,7 +365,7 @@ impl BindingIter<'_> {
     ///
     /// [`BindingIter::next`]: crate::BindingIter::next
     #[track_caller]
-    pub fn at<T: Binding>(&mut self, index: u32) -> T {
+    pub fn at<T: TextureBinding>(&mut self, index: u32) -> T {
         Context::try_with(call_info!(), |ctx| {
             let vert_write_storage = ctx.settings().vertex_writable_storage_by_default;
             let max_visibility = T::binding_type().max_supported_stage_visibility(vert_write_storage);
@@ -369,7 +373,7 @@ impl BindingIter<'_> {
         })
         .unwrap_or_else(|| {
             self.next = BindPath(self.next.0, index + 1);
-            Binding::new_binding(Err(InvalidReason::CreatedWithNoActiveEncoding))
+            TextureBinding::new_binding(Err(InvalidReason::CreatedWithNoActiveEncoding))
         })
     }
 
@@ -381,9 +385,9 @@ impl BindingIter<'_> {
     ///
     /// [`BindingIter::next_with_visibility`]: crate::BindingIter::next_with_visibility
     #[track_caller]
-    pub fn at_with_visibility<T: Binding>(&mut self, index: u32, stages: StageMask) -> T {
+    pub fn at_with_visibility<T: TextureBinding>(&mut self, index: u32, stages: StageMask) -> T {
         self.next = BindPath(self.next.0, index + 1);
-        Binding::new_binding(Ok(BindingArgs {
+        TextureBinding::new_binding(Ok(BindingArgs {
             path: BindPath(self.next.0, index),
             visibility: stages,
         }))
@@ -400,7 +404,7 @@ impl BindingIter<'_> {
     ///
     /// [`BindingIter::next`]: crate::BindingIter::next
     #[track_caller]
-    pub fn index<T: Binding>(&mut self, index: u32) -> T {
+    pub fn index<T: TextureBinding>(&mut self, index: u32) -> T {
         self.at(index)
     }
 
@@ -481,17 +485,11 @@ impl BindingIter<'_> {
     //TODO(release) mention/explain default visibility
     #[track_caller]
     #[allow(clippy::should_implement_trait)]
-    pub fn next<T: Binding>(&mut self) -> T {
-        let path = self.post_inc_path();
-        Context::try_with(call_info!(), |ctx| {
-            let vert_write_storage = ctx.settings().vertex_writable_storage_by_default;
-            let max_visibility = T::binding_type().max_supported_stage_visibility(vert_write_storage);
-            Binding::new_binding(Ok(BindingArgs {
-                path,
-                visibility: max_visibility,
-            }))
-        })
-        .unwrap_or_else(|| Binding::new_binding(Err(InvalidReason::CreatedWithNoActiveEncoding)))
+    pub fn next(&mut self) -> BindingAny {
+        BindingAny {
+            bind_path: self.post_inc_path(),
+            visibility: None,
+        }
     }
 
     /// access the next binding in the bind group with a custom shader stage
@@ -517,16 +515,6 @@ impl BindingIter<'_> {
         *binding += 1;
         temp
     }
-
-    /// TODO(chronicl)
-    #[track_caller]
-    #[allow(clippy::should_implement_trait)]
-    pub fn next2(&mut self) -> BindingAny {
-        BindingAny {
-            bind_path: self.post_inc_path(),
-            visibility: None,
-        }
-    }
 }
 
 pub struct BindingAny {
@@ -535,8 +523,64 @@ pub struct BindingAny {
 }
 
 impl BindingAny {
-    /// TODO(chronicl)
-    pub fn buffer<T, AS, AM>(&self, dynamic_offset: bool) -> Ref<T, AS, AM>
+    pub fn texture<T: TextureBinding>(self) -> T {
+        Context::try_with(call_info!(), |ctx| {
+            let vert_write_storage = ctx.settings().vertex_writable_storage_by_default;
+            T::new_binding(Ok(BindingArgs {
+                path: self.bind_path,
+                visibility: T::binding_type().max_supported_stage_visibility(vert_write_storage),
+            }))
+        })
+        .unwrap_or_else(|| T::new_binding(Err(InvalidReason::CreatedWithNoActiveEncoding)))
+    }
+
+    pub fn storage_buffer<AM, T>(self) -> T
+    where
+        T: MaybeRef<mem::Storage, AM>,
+        (T, AM): TypeSupportsAccess,
+        T::Inner: GpuStore + GpuLayout + GpuType + NoBools,
+        mem::Storage: BufferAddressSpace + SupportsAccess<AM>,
+        AM: AccessModeReadable,
+        (mem::Storage, T::Inner): AtomicsInStorageOnly,
+        (AM, T::Inner): AtomicsRequireWriteable,
+    {
+        self.buffer::<mem::Storage, AM, T>(false)
+    }
+
+    pub fn uniform_buffer<AM, T>(self) -> T
+    where
+        T: MaybeRef<mem::Uniform, AM>,
+        (T, AM): TypeSupportsAccess,
+        T::Inner: GpuStore + GpuLayout + GpuType + NoBools,
+        mem::Uniform: BufferAddressSpace + SupportsAccess<AM>,
+        AM: AccessModeReadable,
+        (mem::Uniform, T::Inner): AtomicsInStorageOnly,
+        (AM, T::Inner): AtomicsRequireWriteable,
+    {
+        self.buffer::<mem::Uniform, AM, T>(false)
+    }
+
+    pub fn buffer<AS, AM, T>(self, dynamic_offset: bool) -> T
+    where
+        T: MaybeRef<AS, AM>,
+        (T, AM): TypeSupportsAccess,
+        T::Inner: GpuStore + GpuLayout + GpuType + NoBools,
+        AS: BufferAddressSpace + SupportsAccess<AM>,
+        AM: AccessModeReadable,
+        (AS, T::Inner): AtomicsInStorageOnly,
+        (AM, T::Inner): AtomicsRequireWriteable,
+    {
+        T::ref_to_self(self.buffer_ref::<T::Inner, AS, AM>(dynamic_offset))
+    }
+
+    /// Buffers in wgsl and spirv are references/pointers to the types they contain.
+    /// We match this by forcing buffer creating to go through this method, which
+    /// returns a `Ref<T, AddressSpace, AccessMode>`.
+    ///
+    /// The convenience method `Self::buffer` can return references or values,
+    /// which is inferred by the it's return type, but internally it always first
+    /// obtains a `Ref` through this method and then dereferences if necessary.
+    pub fn buffer_ref<T, AS, AM>(self, dynamic_offset: bool) -> Ref<T, AS, AM>
     where
         T: GpuStore + GpuLayout + GpuType + NoBools,
         AS: BufferAddressSpace + SupportsAccess<AM>,
@@ -585,6 +629,79 @@ impl BindingAny {
     }
 }
 
+/// Trait used for `BindingAny::buffer` being able to return a value or a reference
+/// (instead of only returning references).
+///
+/// `MaybeRef::Inner` defines what the inner type of the `Ref` is and `MaybeRef::ref_to_self`
+/// defines how to obtain Self from a `Ref<Self::Inner, AS, AM>`.
+pub trait MaybeRef<AS: BufferAddressSpace, AM: AccessModeReadable> {
+    type Inner: GpuStore;
+    fn ref_to_self(outer: Ref<Self::Inner, AS, AM>) -> Self;
+}
+
+// impl for all `Ref`, simply returning the `Ref` itself
+impl<T, AS, AM> MaybeRef<AS, AM> for Ref<T, AS, AM>
+where
+    T: GpuStore,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+{
+    type Inner = T;
+    fn ref_to_self(outer: Ref<Self::Inner, AS, AM>) -> Self {
+        outer
+    }
+}
+// impl for types that can be dereferenced to their inner type by `Ref::get`
+macro_rules! impl_maybe_ref_simple_deref {
+    ($(
+        impl<$($t:ident : $bound:tt),*> MaybeRef for $type:ty;
+    )*) => {
+        $(
+        impl<$($t: $bound,)* AS, AM> MaybeRef<AS, AM> for $type
+        where
+            T: GpuStore + NoAtomics,
+            AS: BufferAddressSpace,
+            AM: AccessModeReadable,
+        {
+            type Inner = $type;
+
+            fn ref_to_self(outer: Ref<Self::Inner, AS, AM>) -> Self {
+                outer.get()
+            }
+        }
+        )*
+    };
+}
+impl_maybe_ref_simple_deref!(
+    impl<T: ScalarTypeFp, C: Len2, R: Len2> MaybeRef for mat<T, C, R>;
+    impl<T: SizedFields>                    MaybeRef for Struct<T>   ;
+    impl<T: ScalarType, L: Len>             MaybeRef for vec<T, L>   ;
+);
+// impl for structs not wrapped in `shame::Struct`
+impl<T, AS, AM> MaybeRef<AS, AM> for T
+where
+    T: GpuStore + SizedFields + BufferFields + NoAtomics,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+{
+    type Inner = crate::Struct<T>;
+    fn ref_to_self(outer: Ref<Self::Inner, AS, AM>) -> Self {
+        outer.get().clone_fields()
+    }
+}
+// impl for sized arrays (not included in impl_maybe_ref_simple_deref! because of const generic)
+impl<T, const N: usize, AS, AM> MaybeRef<AS, AM> for Array<T, crate::Size<N>>
+where
+    T: GpuStore + GpuType + GpuSized + NoAtomics,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+{
+    type Inner = Array<T, crate::Size<N>>;
+    fn ref_to_self(outer: Ref<Self::Inner, AS, AM>) -> Self {
+        outer.get()
+    }
+}
+
 #[diagnostic::on_unimplemented(message = "atomics can only be used in read-write storage buffers`.")]
 pub trait AtomicsInStorageOnly {}
 impl<T> AtomicsInStorageOnly for (mem::Storage, T) {}
@@ -596,6 +713,26 @@ impl<T: NoAtomics> AtomicsInStorageOnly for (mem::Uniform, T) {}
 pub trait AtomicsRequireWriteable {}
 impl<T> AtomicsRequireWriteable for (ReadWrite, T) {}
 impl<T: NoAtomics> AtomicsRequireWriteable for (Read, T) {}
+
+#[diagnostic::on_unimplemented(message = "For ReadWrite buffers wrap the type in `shame::Ref`.")]
+pub trait TypeSupportsAccess {}
+// only Read support for non-Ref types
+impl<T> TypeSupportsAccess for (T, Read) where T: GpuStore {}
+// both Read and ReadWrite support for Ref types
+impl<T, AS, AM> TypeSupportsAccess for (Ref<T, AS, AM>, Read)
+where
+    T: GpuStore,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+{
+}
+impl<T, AS, AM> TypeSupportsAccess for (Ref<T, AS, AM>, ReadWrite)
+where
+    T: GpuStore,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+{
+}
 
 /// push-constant values that were set before the current draw command/dispatch.
 ///

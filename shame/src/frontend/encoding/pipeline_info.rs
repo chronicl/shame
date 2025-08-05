@@ -316,7 +316,7 @@ pub struct BindingLayout {
 
 impl BindingLayout {
     /// returns a `BindingLayout` corresponding to `T` with the maximum shader stage visibility
-    pub fn from_ty_with_max_visibility<T: crate::Binding + ?Sized>(vertex_writable_storage_supported: bool) -> Self {
+    pub fn from_ty_with_max_visibility<T: crate::TextureBinding + ?Sized>(vertex_writable_storage_supported: bool) -> Self {
         let binding_ty = T::binding_type();
         BindingLayout {
             visibility: binding_ty.max_supported_stage_visibility(vertex_writable_storage_supported),
