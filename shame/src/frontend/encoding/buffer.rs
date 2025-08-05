@@ -25,6 +25,138 @@ use std::ops::{Deref, Mul};
 
 use super::binding::Binding;
 
+pub struct Buffer2<T, AS, AM>
+where
+    T: BufferContent<AS, AM>,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+{
+    content: T::DerefTarget,
+    _phantom: PhantomData<(T, AS, AM)>,
+}
+
+impl<T, AS, AM> Deref for Buffer2<T, AS, AM>
+where
+    T: BufferContent<AS, AM>,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+{
+    type Target = T::DerefTarget;
+    fn deref(&self) -> &Self::Target {
+        &self.content
+    }
+}
+
+impl<T, AS, AM> Buffer2<T, AS, AM>
+where
+    T: BufferContent<AS, AM>,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+{
+    /// any must be of type `Ref<T::RefInner, AS, AM>`
+    pub fn from_any(any: Any) -> Self {
+        let r: Ref<T::RefInner, AS, AM> = any.into();
+        let content = T::ref_to_deref_target(r);
+        Self {
+            content,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+pub trait BufferContent<AS: BufferAddressSpace, AM: AccessModeReadable>: GpuStore + Sized {
+    // Ref<RefInner, AS, AM> gets dereferenced by ref_to_deref_target to DerefTarget
+    type RefInner: GpuStore + GpuType;
+    type DerefTarget;
+    fn ref_to_deref_target(reference: Ref<Self::RefInner, AS, AM>) -> Self::DerefTarget;
+}
+
+// impl for structs not wrapped in `shame::Struct`
+impl<T, AS> BufferContent<AS, Read> for T
+where
+    T: GpuStore + SizedFields + NoAtomics,
+    AS: BufferAddressSpace,
+{
+    type RefInner = Struct<T>;
+    type DerefTarget = T;
+    fn ref_to_deref_target(r: Ref<Self::RefInner, AS, Read>) -> Self::DerefTarget {
+        r.get().clone_fields()
+    }
+}
+impl<T, AS> BufferContent<AS, ReadWrite> for T
+where
+    T: GpuStore + SizedFields + NoAtomics,
+    AS: BufferAddressSpace,
+{
+    type RefInner = Struct<T>;
+    type DerefTarget = Ref<Self::RefInner, AS, ReadWrite>;
+    fn ref_to_deref_target(r: Ref<Self::RefInner, AS, ReadWrite>) -> Ref<Self::RefInner, AS, ReadWrite> {
+        r
+    }
+}
+impl<T, AS, AM> BufferContent<AS, AM> for Ref<T>
+where
+    T: GpuStore + BufferFields + NoAtomics,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+{
+    type RefInner = T;
+    type DerefTarget = Ref<Self::RefInner, AS, AM>;
+    fn ref_to_deref_target(r: Ref<Self::RefInner, AS, Read>) -> Self::DerefTarget {
+        r
+    }
+}
+
+// impl for simple sized types that deref to Self for read buffers and
+// to `Ref<T, AS, ReadWrite>` for read-write buffers
+macro_rules! impl_buffer_content_simple {
+    ($(
+        impl<$($t:ident : $bound:tt),*> BufferContent<Read> for $type:ty;
+    )*) => {
+        $(
+            impl<$($t: $bound,)* AS> BufferContent<AS, Read> for $type
+            where
+                T: GpuStore + NoAtomics,
+                AS: BufferAddressSpace,
+            {
+                type RefInner = Self;
+                type DerefTarget = Self;
+                fn ref_to_deref_target(r: Ref<Self, AS, Read>) -> Self {
+                    r.get()
+                }
+            }
+        )*
+    };
+    ($(
+        impl<$($t:ident : $bound:tt),*> BufferContent<ReadWrite> for $type:ty;
+    )*) => {
+        $(
+            impl<$($t: $bound,)* AS> BufferContent<AS, ReadWrite> for $type
+            where
+                T: GpuStore + NoAtomics,
+                AS: BufferAddressSpace,
+            {
+                type RefInner = Self;
+                type DerefTarget = Ref<Self, AS, ReadWrite>;
+                fn ref_to_deref_target(r: Ref<Self, AS, ReadWrite>) -> Ref<Self, AS, ReadWrite> {
+                    r
+                }
+            }
+        )*
+    };
+}
+impl_buffer_content_simple!(
+    impl<T: ScalarTypeFp, C: Len2, R: Len2> BufferContent<Read> for mat<T, C, R>;
+    impl<T: SizedFields>                    BufferContent<Read> for Struct<T>   ;
+    impl<T: ScalarType, L: Len>             BufferContent<Read> for vec<T, L>   ;
+);
+impl_buffer_content_simple!(
+    impl<T: ScalarTypeFp, C: Len2, R: Len2> BufferContent<ReadWrite> for mat<T, C, R>;
+    impl<T: SizedFields>                    BufferContent<ReadWrite> for Struct<T>   ;
+    impl<T: ScalarType, L: Len>             BufferContent<ReadWrite> for vec<T, L>   ;
+    impl<T: ScalarTypeInteger>              BufferContent<ReadWrite> for Atomic<T>   ;
+);
+
 /// Address spaces used for [`Buffer`] and [`BufferRef`] bindings.
 ///
 /// Implemented by the marker types

@@ -54,6 +54,7 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
         world: f32x4x4,
         view: f32x4x4,
         proj: f32x4x4,
+        a: sm::Array<f32x1>
     }
 
     // this struct contains "packed" vectors (snorm, unorm etc.) which are
@@ -83,7 +84,7 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     // The check happens at shader-generation time, so that a nice error
     // message can be generated, pointing to the field that doesn't match.
     // (once rusts const-generics are more powerful this may be moved to compile-time)
-    let xforms_sto: sm::Buffer<Transforms, sm::mem::Storage> = group0.next();
+    let xforms_sto: sm::BufferRef<Transforms, sm::mem::Storage> = group0.next();
     let xforms_uni: sm::Buffer<Transforms, sm::mem::Uniform> = group0.next();
 
     // conditional code generation based on pipeline parameter
@@ -486,13 +487,17 @@ struct Mat2([[f32; 2]; 2]);
 // tell `shame` about the layout semantics of your cpu types
 // Mat2::layout() == sm::f32x2x2::layout()
 impl sm::CpuLayout for Mat2 {
-    fn cpu_layout() -> sm::TypeLayout { sm::gpu_layout::<sm::f32x2x2>() }
+    fn cpu_layout() -> sm::TypeLayout {
+        sm::gpu_layout::<sm::f32x2x2>()
+    }
 }
 
 #[repr(C, align(16))]
 struct Mat4([[f32; 4]; 4]);
 impl sm::CpuLayout for Mat4 {
-    fn cpu_layout() -> sm::TypeLayout { sm::gpu_layout::<sm::f32x4x4>() }
+    fn cpu_layout() -> sm::TypeLayout {
+        sm::gpu_layout::<sm::f32x4x4>()
+    }
 }
 
 // using "duck-traiting" allows you to define layouts for foreign cpu-types,

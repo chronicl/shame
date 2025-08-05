@@ -29,7 +29,6 @@ use crate::{
 };
 use std::borrow::Borrow;
 
-
 /// A memory operation can read, write, or both read and write.
 /// Memory locations may support only some of these accesses.
 ///
@@ -82,7 +81,6 @@ pub trait AccessModeWritable: AccessMode {} // TODO(release) seal this trait
 impl AccessModeWritable for ReadWrite {}
 impl AccessModeWritable for Write {}
 
-
 #[diagnostic::on_unimplemented(
     message = "cannot read from a `shame::Ref<_, _, Write>` which only provides `Write` access"
 )]
@@ -114,9 +112,10 @@ where
 impl<T: GpuStore, AS: AddressSpace, AM: AccessMode> Copy for Ref<T, AS, AM> {}
 
 impl<T: GpuStore, AS: AddressSpace, AM: AccessMode> Clone for Ref<T, AS, AM> {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
-
 
 impl<T, AS, AM> AsAny for Ref<T, AS, AM>
 where
@@ -124,15 +123,16 @@ where
     AS: AddressSpace,
     AM: AccessMode,
 {
-    fn as_any(&self) -> Any { self.any }
+    fn as_any(&self) -> Any {
+        self.any
+    }
 }
 
 impl<T, AS, AM> Ref<T, AS, AM>
 where
     T: GpuType + GpuStore + NoAtomics,
     AS: AddressSpace,
-    AM: AccessMode,
-    Self: ReadableRef,
+    AM: AccessModeReadable,
 {
     /// (no documentation yet)
     #[track_caller]
@@ -161,7 +161,9 @@ where
 {
     type Target = T::RefFields<AS, AM>;
 
-    fn deref(&self) -> &Self::Target { &self.fields_as_refs }
+    fn deref(&self) -> &Self::Target {
+        &self.fields_as_refs
+    }
 }
 
 impl<T, AS, AM> Ref<T, AS, AM>
@@ -235,7 +237,9 @@ where
 {
     /// (no documentation yet)
     #[track_caller]
-    pub fn at(&self, index: impl ToInteger) -> Ref<T, AS, AM> { self.as_any().array_index(index.to_any()).into() }
+    pub fn at(&self, index: impl ToInteger) -> Ref<T, AS, AM> {
+        self.as_any().array_index(index.to_any()).into()
+    }
 }
 
 impl<T, AM> Ref<T, mem::WorkGroup, AM>
@@ -246,5 +250,7 @@ where
 {
     // see WGSL https://www.w3.org/TR/WGSL/#workgroupUniformLoad-builtin
     /// (no documentation yet)
-    pub fn uniform_load(&self) -> T { self.as_any().address().workgroup_uniform_load().into() }
+    pub fn uniform_load(&self) -> T {
+        self.as_any().address().workgroup_uniform_load().into()
+    }
 }
