@@ -2,6 +2,7 @@
 use std::{cell::Cell, iter, marker::PhantomData, rc::Rc};
 
 use crate::{
+    any::layout::TypeLayoutRecipe,
     call_info,
     common::integer::post_inc_u32,
     frontend::{
@@ -19,6 +20,7 @@ use crate::{
             },
             reference::AccessMode,
             struct_::SizedFields,
+            type_layout::recipe,
             type_traits::{BindingArgs, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools},
             GpuType,
         },
@@ -33,10 +35,10 @@ use crate::{
     },
     ir::{
         self,
-        ir_type::{Field, LayoutError},
+        ir_type::{Field},
         pipeline::{PipelineError, StageMask},
         recording::Context,
-        TextureFormatWrapper,
+        SizedStruct, TextureFormatWrapper,
     },
 };
 
@@ -567,38 +569,26 @@ impl PushConstants<'_> {
         Context::try_with(call_info!(), |ctx| {
             let _ = get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check);
 
-            match T::impl_category() {
-                GpuStoreImplCategory::Fields(buffer_block) => match buffer_block.last_unsized_field() {
-                    None => {
-                        assert_eq!(buffer_block.sized_fields().len(), buffer_block.fields().count());
-                        let fields = buffer_block.sized_fields().iter().map(|f| {
-                            Any::next_push_constants_field(f.ty.clone(), f.custom_min_size, f.custom_min_align)
-                        });
-                        T::from_anys(fields)
-                    }
-                    Some(_) => {
-                        let msg = format!(
-                            "Push constant type `{}` contains unsized last field",
-                            buffer_block.name()
-                        );
-                        let any = ctx.push_error_get_invalid_any(InternalError::new(true, msg).into());
-                        T::from_anys(std::iter::repeat_n(any, T::expected_num_anys()))
-                    }
-                },
-                GpuStoreImplCategory::GpuType(ty) => {
-                    let any = match ty {
-                        ir::StoreType::Sized(sized_type) => Any::next_push_constants_field(sized_type, None, None),
-                        _ => {
-                            let err = InternalError::new(
-                                true,
-                                "Unable to obtain sized-type from push constant type, \
-                                    even though trait bound `GpuSized` should ensure that"
-                                    .into(),
-                            );
-                            ctx.push_error_get_invalid_any(err.into())
-                        }
-                    };
-                    T::from_anys(std::iter::once(any))
+            match T::layout_recipe() {
+                TypeLayoutRecipe::UnsizedStruct(s) => {
+                    let msg = format!("Push constant type `{}` contains unsized last field", s.name);
+                    let any = ctx.push_error_get_invalid_any(InternalError::new(true, msg).into());
+                    T::from_anys(std::iter::repeat_n(any, T::expected_num_anys()))
+                }
+                TypeLayoutRecipe::RuntimeSizedArray(a) => {
+                    let msg = format!("Push constant type `{}` is a runtime-sized array", a);
+                    let any = ctx.push_error_get_invalid_any(InternalError::new(true, msg).into());
+                    T::from_anys(std::iter::repeat_n(any, T::expected_num_anys()))
+                }
+                TypeLayoutRecipe::Sized(recipe::SizedType::Struct(s)) => {
+                    let fields = s
+                        .fields()
+                        .iter()
+                        .map(|f| Any::next_push_constants_field(f.ty.clone(), f.custom_min_size, f.custom_min_align));
+                    T::from_anys(fields)
+                }
+                TypeLayoutRecipe::Sized(sized_type) => {
+                    T::from_anys(std::iter::once(Any::next_push_constants_field(sized_type, None, None)))
                 }
             }
         })

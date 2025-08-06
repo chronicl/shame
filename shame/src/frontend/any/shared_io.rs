@@ -3,7 +3,8 @@ use std::num::NonZeroU64;
 
 use crate::any::layout::TypeLayoutRecipe;
 use crate::backend::language::Language;
-use crate::{call_info, BufferAddressSpace};
+use crate::frontend::rust_types::type_layout::recipe;
+use crate::{call_info, mem, BufferAddressSpace};
 use crate::common::po2::U32PowerOf2;
 use crate::frontend::any::Any;
 use crate::frontend::any::{record_node, InvalidReason};
@@ -16,10 +17,7 @@ use crate::frontend::rust_types::type_layout::compatible_with::{
 use crate::frontend::rust_types::type_layout::recipe::ir_compat::IRConversionError;
 use crate::ir::expr::Binding;
 use crate::ir::expr::Expr;
-use crate::ir::ir_type::{
-    check_layout, get_type_for_buffer_binding_type, AccessModeReadable, HandleType, LayoutConstraints, LayoutError,
-    LayoutErrorContext, SamplesPerPixel,
-};
+use crate::ir::ir_type::{AccessModeReadable, HandleType, SamplesPerPixel};
 use crate::ir::pipeline::{PipelineError, StageMask, WipBinding, WipPushConstantsField};
 use crate::ir::recording::{Context, MemoryRegion};
 use crate::ir::{self, AddressSpace, StoreType, TextureFormatWrapper, TextureSampleUsageType, Type};
@@ -321,7 +319,7 @@ impl Any {
     /// > struct being visible or invisible in a given shader stage.
     #[track_caller]
     pub fn next_push_constants_field(
-        ty: ir::SizedType,
+        recipe_ty: recipe::SizedType,
         custom_min_size: Option<u64>,
         custom_min_align: Option<U32PowerOf2>,
     ) -> Any {
@@ -329,16 +327,15 @@ impl Any {
             let mut push_constants = &mut ctx.pipeline_layout_mut().push_constants;
             let field_index = push_constants.len();
 
+            let ty = match ir::SizedType::try_from(recipe_ty.clone()) {
+                Ok(s) => s,
+                Err(e) => {
+                    ctx.push_error(e.into());
+                    return Any::new_invalid(InvalidReason::ErrorThatWasPushed);
+                }
+            };
             let store_ty = StoreType::Sized(ty.clone());
-            if let Err(e) = check_layout(
-                &LayoutErrorContext {
-                    binding_type: BufferBindingType::Storage(AccessModeReadable::Read),
-                    expected_constraints: LayoutConstraints::Wgsl(ir::ir_type::WgslBufferLayout::StorageAddressSpace),
-                    top_level_type: store_ty.clone(),
-                    use_color: ctx.settings().colored_error_messages,
-                },
-                &store_ty.clone(),
-            ) {
+            if let Err(e) = TypeLayoutCompatibleWith::<mem::Storage>::try_from(Language::Wgsl, recipe_ty.into()) {
                 ctx.push_error(e.into());
             }
 

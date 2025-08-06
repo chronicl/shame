@@ -61,27 +61,19 @@ pub enum HandleType {
 }
 
 impl From<SizedType> for StoreType {
-    fn from(value: SizedType) -> Self {
-        StoreType::Sized(value)
-    }
+    fn from(value: SizedType) -> Self { StoreType::Sized(value) }
 }
 
 impl From<SizedType> for Type {
-    fn from(value: SizedType) -> Self {
-        Type::Store(StoreType::Sized(value))
-    }
+    fn from(value: SizedType) -> Self { Type::Store(StoreType::Sized(value)) }
 }
 
 impl From<ScalarType> for Type {
-    fn from(value: ScalarType) -> Self {
-        Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, value)))
-    }
+    fn from(value: ScalarType) -> Self { Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, value))) }
 }
 
 impl Type {
-    pub fn is_ref(&self) -> bool {
-        matches!(self, Type::Ref { .. })
-    }
+    pub fn is_ref(&self) -> bool { matches!(self, Type::Ref { .. }) }
 }
 
 impl std::fmt::Debug for Type {

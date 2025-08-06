@@ -15,10 +15,12 @@ use crate::{
             io_iter::{BindGroupIter, VertexBufferIter},
             rasterizer::{PrimitiveAssembly, VertexStage},
         },
-        rust_types::type_layout::compatible_with::AddressSpaceError,
+        rust_types::{
+            layout_traits::CpuLayoutCompareError,
+            type_layout::{compatible_with::AddressSpaceError, recipe::ir_compat::IRConversionError},
+        },
     },
     ir::{
-        ir_type::LayoutError,
         pipeline::{PipelineError, PipelineKind, StageSolverErrorKind},
         recording::{
             next_thread_generation, AllocError, BlockError, CallInfo, Context, FnError, NodeRecordingError, StmtError,
@@ -159,9 +161,7 @@ pub struct EncodingError {
 }
 
 impl std::fmt::Debug for EncodingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self) }
 }
 
 impl std::error::Error for EncodingError {}
@@ -216,9 +216,7 @@ pub struct EncodingErrors {
 }
 
 impl std::fmt::Debug for EncodingErrors {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self) }
 }
 
 impl std::error::Error for EncodingErrors {}
@@ -244,9 +242,7 @@ impl IntoIterator for EncodingErrors {
 
     type IntoIter = std::iter::Chain<std::iter::Once<EncodingError>, std::vec::IntoIter<EncodingError>>;
 
-    fn into_iter(self) -> Self::IntoIter {
-        std::iter::once(self.first).chain(self.rest.into_vec())
-    }
+    fn into_iter(self) -> Self::IntoIter { std::iter::once(self.first).chain(self.rest.into_vec()) }
 }
 
 impl From<EncodingError> for EncodingErrors {
@@ -300,11 +296,13 @@ pub enum EncodingErrorKind {
     #[error("{0}")]
     PipelineError(#[from] PipelineError),
     #[error("{0}")]
-    LayoutError(#[from] LayoutError),
-    #[error("{0}")]
     AddressSpaceError(#[from] AddressSpaceError),
     #[error("{0}")]
     BindingError(#[from] BindingError),
+    #[error("{0}")]
+    IrConversionError(#[from] IRConversionError),
+    #[error("{0}")]
+    CpuLayoutCompareError(#[from] CpuLayoutCompareError),
     #[error("{0}")]
     StageSolverError(#[from] StageSolverErrorKind),
     #[error("{0}")]
@@ -652,9 +650,7 @@ impl Default for Settings {
 ///
 /// If no encoding is active on this thread, output is unspecified.
 #[track_caller]
-pub fn language() -> Language {
-    Context::try_with(call_info!(), |ctx| ctx.settings().lang).unwrap_or(Language::Wgsl)
-}
+pub fn language() -> Language { Context::try_with(call_info!(), |ctx| ctx.settings().lang).unwrap_or(Language::Wgsl) }
 
 impl Settings {
     pub(crate) fn assemble_error_fn(&self) -> impl Fn(CallInfo, EncodingErrorKind) -> EncodingError {

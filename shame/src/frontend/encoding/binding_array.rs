@@ -28,13 +28,9 @@ where
     T: GpuStore + NoHandles + NoAtomics + NoBools,
     Buffer<T, AS, AM>: Binding,
 {
-    fn binding_type() -> BindingType {
-        Buffer::<T, AS, AM>::binding_type()
-    }
+    fn binding_type() -> BindingType { Buffer::<T, AS, AM>::binding_type() }
 
-    fn store_ty() -> StoreType {
-        StoreType::BindingArray(Rc::new(<Buffer<T, Storage, false>>::store_ty()), L::LEN)
-    }
+    fn store_ty() -> StoreType { StoreType::BindingArray(Rc::new(<Buffer<T, AS, AM>>::store_ty()), L::LEN) }
 
     fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self {
         let skip_stride_check = true; // not a vertex buffer
@@ -58,7 +54,5 @@ where
 impl<Idx: ToInteger, T, L> GpuIndex<Idx> for BindingArray<T, L> {
     type Output = T;
 
-    fn index(&self, index: Idx) -> Self::Output {
-        todo!()
-    }
+    fn index(&self, index: Idx) -> Self::Output { todo!() }
 }
