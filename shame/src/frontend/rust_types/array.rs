@@ -331,21 +331,20 @@ impl<T: GpuType + GpuSized, N: ArrayLen> GetAllFields for Array<T, N> {
     }
 }
 
-/// Wraps Ref<Array<T, L>, AS, AM> to provide a more convenient indexing API:
-/// Indexing ArrayRef<T, L, AS, AM> returns a T, and not a Ref<T, AS, AM>
-/// like indexing Ref<Array<T, L>, AS, AM> does.
-pub struct ArrayRef<T: GpuStore + GpuType + GpuSized, L: ArrayLen, AS: AddressSpace, AM: AccessMode> {
-    inner: Ref<Array<T, L>, AS, AM>,
+/// Wraps Ref<Array<T>, AS, AM> to provide a more convenient indexing API:
+/// Indexing ArrayRef<T, AS, AM> returns a T, and not a Ref<T, AS, AM>
+/// like indexing Ref<Array<T>, AS, AM> does.
+pub struct ArrayRef<T: GpuStore + GpuType + GpuSized, AS: AddressSpace, AM: AccessMode> {
+    inner: Ref<Array<T>, AS, AM>,
 }
 
 impl<
     T: GpuStore + GpuType + GpuSized + NoAtomics + 'static,
-    L: ArrayLen,
     AS: AddressSpace + 'static,
     AM: AccessModeReadable + 'static,
-> ArrayRef<T, L, AS, AM>
+> ArrayRef<T, AS, AM>
 {
-    pub fn new(inner: Ref<Array<T, L>, AS, AM>) -> Self {
+    pub fn new(inner: Ref<Array<T>, AS, AM>) -> Self {
         Self { inner }
     }
 
@@ -354,13 +353,10 @@ impl<
     }
 
     pub fn len(&self) -> vec<u32, x1> {
-        match L::LEN {
-            Some(len) => len.get().to_gpu(),
-            None => self.inner.as_any().address().array_length().into(),
-        }
+        self.inner.as_any().address().array_length().into()
     }
 
-    pub fn to_ref(&self) -> Ref<Array<T, L>, AS, AM> {
+    pub fn to_ref(&self) -> Ref<Array<T>, AS, AM> {
         self.inner
     }
 }
@@ -368,10 +364,9 @@ impl<
 impl<
     Idx: ToInteger,
     T: GpuType + GpuSized + GpuStore + NoAtomics + 'static,
-    L: ArrayLen,
     AS: AddressSpace + 'static,
     AM: AccessModeReadable + 'static,
-> GpuIndex<Idx> for ArrayRef<T, L, AS, AM>
+> GpuIndex<Idx> for ArrayRef<T, AS, AM>
 {
     type Output = T;
 

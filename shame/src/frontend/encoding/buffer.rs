@@ -271,9 +271,9 @@ impl<T: GpuStore + GpuType + GpuSized + NoAtomics, const N: usize, AS: BufferAdd
 
 // Array<T> is not constructible, because it's unsized, so we can only deref to Ref<Array<T>>
 impl<T: GpuType + GpuSized + GpuStore + NoAtomics + 'static, AS: BufferAddressSpace + 'static> BufferContent<AS, Read>
-    for Array<T, RuntimeSize>
+    for Array<T>
 {
-    type DerefTarget = ArrayRef<T, RuntimeSize, AS, Read>;
+    type DerefTarget = ArrayRef<T, AS, Read>;
     fn ref_to_deref_target(r: Ref<Self, AS, Read>) -> Self::DerefTarget {
         ArrayRef::new(r)
     }
@@ -464,7 +464,7 @@ mod tests {
         let array: &Ref<Array<f32x1, sm::Size<4>>, Storage, ReadWrite> =
             &group.next::<Buffer<Array<f32x1, sm::Size<4>>, Storage, ReadWrite>>();
 
-        let unsized_array: &ArrayRef<f32x1, RuntimeSize, Storage, Read> = &group.next::<Buffer<Array<f32x1>>>();
+        let unsized_array: &ArrayRef<f32x1, Storage, Read> = &group.next::<Buffer<Array<f32x1>>>();
         let f32x1 = group.next::<Buffer<Array<f32x1>>>().at(0);
         let unsized_array: &Ref<Array<f32x1>, Storage, ReadWrite> =
             &group.next::<Buffer<Array<f32x1>, Storage, ReadWrite>>();
