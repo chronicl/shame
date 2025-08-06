@@ -331,23 +331,54 @@ impl<T: GpuType + GpuSized, N: ArrayLen> GetAllFields for Array<T, N> {
     }
 }
 
-#[track_caller]
-fn push_buffer_of_array_has_wrong_variant_error(is_ref: bool, expected_variant: &str) -> Any {
-    Context::try_with(call_info!(), |ctx| {
-        ctx.push_error_get_invalid_any(
-            InternalError::new(
-                true,
-                format!(
-                    "Buffer{} inner is not `{expected_variant}` during indexing.",
-                    if is_ref { "Ref" } else { "" }
-                ),
-            )
-            .into(),
-        )
-    })
-    .unwrap_or(Any::new_invalid(
-        crate::frontend::any::InvalidReason::CreatedWithNoActiveEncoding,
-    ))
+/// Wraps Ref<Array<T, L>, AS, AM> to provide a more convenient indexing API:
+/// Indexing ArrayRef<T, L, AS, AM> returns a T, and not a Ref<T, AS, AM>
+/// like indexing Ref<Array<T, L>, AS, AM> does.
+pub struct ArrayRef<T: GpuStore + GpuType + GpuSized, L: ArrayLen, AS: AddressSpace, AM: AccessMode> {
+    inner: Ref<Array<T, L>, AS, AM>,
+}
+
+impl<
+    T: GpuStore + GpuType + GpuSized + NoAtomics + 'static,
+    L: ArrayLen,
+    AS: AddressSpace + 'static,
+    AM: AccessModeReadable + 'static,
+> ArrayRef<T, L, AS, AM>
+{
+    pub fn new(inner: Ref<Array<T, L>, AS, AM>) -> Self {
+        Self { inner }
+    }
+
+    pub fn at(&self, index: impl ToInteger) -> T {
+        self.inner.at(index).get()
+    }
+
+    pub fn len(&self) -> vec<u32, x1> {
+        match L::LEN {
+            Some(len) => len.get().to_gpu(),
+            None => self.inner.as_any().address().array_length().into(),
+        }
+    }
+
+    pub fn to_ref(&self) -> Ref<Array<T, L>, AS, AM> {
+        self.inner
+    }
+}
+
+impl<
+    Idx: ToInteger,
+    T: GpuType + GpuSized + GpuStore + NoAtomics + 'static,
+    L: ArrayLen,
+    AS: AddressSpace + 'static,
+    AM: AccessModeReadable + 'static,
+> GpuIndex<Idx> for ArrayRef<T, L, AS, AM>
+{
+    type Output = T;
+
+    #[track_caller]
+    fn index(&self, index: Idx) -> T {
+        self.at(index)
+    }
 }
 
 #[diagnostic::on_unimplemented(message = "array size <= 8 is required")]

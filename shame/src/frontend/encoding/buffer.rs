@@ -1,7 +1,7 @@
 use crate::common::proc_macro_reexports::{GpuLayoutField, GpuStoreImplCategory};
 use crate::frontend::any::shared_io::{BindPath, BindingType, BufferBindingType};
 use crate::frontend::any::{Any, InvalidReason};
-use crate::frontend::rust_types::array::{Array, ArrayLen, RuntimeSize, Size};
+use crate::frontend::rust_types::array::{Array, ArrayLen, ArrayRef, RuntimeSize, Size};
 use crate::frontend::rust_types::atomic::Atomic;
 use crate::frontend::rust_types::layout_traits::{get_layout_compare_with_cpu_push_error, FromAnys, GetAllFields};
 use crate::frontend::rust_types::len::{Len, Len2, LenEven};
@@ -260,22 +260,22 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2, AS: BufferAddressSpace> BufferContent<AS
 impl<T: ScalarType, L: Len, AS: BufferAddressSpace> BufferContent<AS, Read> for vec<T, L> {
     default_buffer_content_read!();
 }
+impl<T: GpuType + SizedFields + NoAtomics, AS: BufferAddressSpace> BufferContent<AS, Read> for Struct<T> {
+    default_buffer_content_read!();
+}
 impl<T: GpuStore + GpuType + GpuSized + NoAtomics, const N: usize, AS: BufferAddressSpace> BufferContent<AS, Read>
     for Array<T, Size<N>>
 {
     default_buffer_content_read!();
 }
-impl<T: GpuType + SizedFields + NoAtomics, AS: BufferAddressSpace> BufferContent<AS, Read> for Struct<T> {
-    default_buffer_content_read!();
-}
 
 // Array<T> is not constructible, because it's unsized, so we can only deref to Ref<Array<T>>
-impl<T: GpuType + GpuSized + GpuStore + NoAtomics, AS: BufferAddressSpace> BufferContent<AS, Read>
+impl<T: GpuType + GpuSized + GpuStore + NoAtomics + 'static, AS: BufferAddressSpace + 'static> BufferContent<AS, Read>
     for Array<T, RuntimeSize>
 {
-    type DerefTarget = Ref<Self, AS, Read>;
+    type DerefTarget = ArrayRef<T, RuntimeSize, AS, Read>;
     fn ref_to_deref_target(r: Ref<Self, AS, Read>) -> Self::DerefTarget {
-        r
+        ArrayRef::new(r)
     }
 }
 
@@ -430,7 +430,10 @@ impl std::fmt::Display for BufferAddressSpaceEnum {
 
 #[cfg(test)]
 mod tests {
-    use crate::{self as shame, aliases::*, Array, Buffer, GpuLayout, Read, Ref};
+    use crate::{
+        self as shame, aliases::*, frontend::rust_types::array::ArrayRef, Array, Buffer, GpuLayout, Read, Ref,
+        RuntimeSize,
+    };
     use shame as sm;
     use sm::{mem::Storage, ReadWrite};
 
@@ -461,7 +464,8 @@ mod tests {
         let array: &Ref<Array<f32x1, sm::Size<4>>, Storage, ReadWrite> =
             &group.next::<Buffer<Array<f32x1, sm::Size<4>>, Storage, ReadWrite>>();
 
-        let unsized_array: &Ref<Array<f32x1>, Storage, Read> = &group.next::<Buffer<Array<f32x1>>>();
+        let unsized_array: &ArrayRef<f32x1, RuntimeSize, Storage, Read> = &group.next::<Buffer<Array<f32x1>>>();
+        let f32x1 = group.next::<Buffer<Array<f32x1>>>().at(0);
         let unsized_array: &Ref<Array<f32x1>, Storage, ReadWrite> =
             &group.next::<Buffer<Array<f32x1>, Storage, ReadWrite>>();
 
