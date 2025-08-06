@@ -47,6 +47,16 @@ where
     }
 }
 
+trait A {
+    type B<T, N>;
+    const F: &'static dyn Fn();
+}
+
+impl A for u32 {
+    type B<T, N> = T;
+    const F: &'static dyn Fn() = &|| {};
+}
+
 impl<T, AS, AM> Buffer2<T, AS, AM>
 where
     T: BufferContent<AS, AM>,
@@ -55,20 +65,28 @@ where
 {
     /// any must be of type `Ref<T::RefInner, AS, AM>`
     pub fn from_any(any: Any) -> Self {
-        let r: Ref<T::RefInner, AS, AM> = any.into();
-        let content = T::ref_to_deref_target(r);
         Self {
-            content,
+            content: T::ref_to_deref_target(T::any_to_ref(any)),
             _phantom: PhantomData,
         }
     }
 }
 
-pub trait BufferContent<AS: BufferAddressSpace, AM: AccessModeReadable>: GpuStore + Sized {
+pub trait BufferContent<AS: BufferAddressSpace, AM: AccessModeReadable>: Sized {
     // Ref<RefInner, AS, AM> gets dereferenced by ref_to_deref_target to DerefTarget
     type RefInner: GpuStore + GpuType;
     type DerefTarget;
+    fn any_to_ref(any: Any) -> Ref<Self::RefInner, AS, AM>;
     fn ref_to_deref_target(reference: Ref<Self::RefInner, AS, AM>) -> Self::DerefTarget;
+
+    // struct trick
+    type Struct<T: SizedFields>;
+}
+
+macro_rules! default_struct_trick {
+    () => {
+        type Struct<T_: SizedFields> = Struct<T_>;
+    };
 }
 
 // impl for structs not wrapped in `shame::Struct`
@@ -79,9 +97,14 @@ where
 {
     type RefInner = Struct<T>;
     type DerefTarget = T;
+    fn any_to_ref(any: Any) -> Ref<Self::RefInner, AS, Read> {
+        any.into()
+    }
     fn ref_to_deref_target(r: Ref<Self::RefInner, AS, Read>) -> Self::DerefTarget {
         r.get().clone_fields()
     }
+
+    default_struct_trick!();
 }
 impl<T, AS> BufferContent<AS, ReadWrite> for T
 where
@@ -90,22 +113,27 @@ where
 {
     type RefInner = Struct<T>;
     type DerefTarget = Ref<Self::RefInner, AS, ReadWrite>;
+    fn any_to_ref(any: Any) -> Ref<Self::RefInner, AS, ReadWrite> {
+        any.into()
+    }
     fn ref_to_deref_target(r: Ref<Self::RefInner, AS, ReadWrite>) -> Ref<Self::RefInner, AS, ReadWrite> {
         r
     }
+
+    default_struct_trick!();
 }
-impl<T, AS, AM> BufferContent<AS, AM> for Ref<T>
-where
-    T: GpuStore + BufferFields + NoAtomics,
-    AS: BufferAddressSpace,
-    AM: AccessModeReadable,
-{
-    type RefInner = T;
-    type DerefTarget = Ref<Self::RefInner, AS, AM>;
-    fn ref_to_deref_target(r: Ref<Self::RefInner, AS, Read>) -> Self::DerefTarget {
-        r
-    }
-}
+// impl<T, AS, AM> BufferContent<AS, AM> for Ref<T>
+// where
+//     T: GpuStore + BufferFields + NoAtomics,
+//     AS: BufferAddressSpace,
+//     AM: AccessModeReadable,
+// {
+//     type RefInner = T;
+//     type DerefTarget = Ref<Self::RefInner, AS, AM>;
+//     fn ref_to_deref_target(r: Ref<Self::RefInner, AS, Read>) -> Self::DerefTarget {
+//         r
+//     }
+// }
 
 // impl for simple sized types that deref to Self for read buffers and
 // to `Ref<T, AS, ReadWrite>` for read-write buffers
@@ -121,9 +149,14 @@ macro_rules! impl_buffer_content_simple {
             {
                 type RefInner = Self;
                 type DerefTarget = Self;
+                fn any_to_ref(any: Any) -> Ref<Self, AS, Read> {
+                    any.into()
+                }
                 fn ref_to_deref_target(r: Ref<Self, AS, Read>) -> Self {
                     r.get()
                 }
+
+                default_struct_trick!();
             }
         )*
     };
@@ -138,9 +171,14 @@ macro_rules! impl_buffer_content_simple {
             {
                 type RefInner = Self;
                 type DerefTarget = Ref<Self, AS, ReadWrite>;
+                fn any_to_ref(any: Any) -> Ref<Self, AS, ReadWrite> {
+                    any.into()
+                }
                 fn ref_to_deref_target(r: Ref<Self, AS, ReadWrite>) -> Ref<Self, AS, ReadWrite> {
                     r
                 }
+
+                default_struct_trick!();
             }
         )*
     };

@@ -54,7 +54,6 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
         world: f32x4x4,
         view: f32x4x4,
         proj: f32x4x4,
-        a: sm::Array<f32x1>
     }
 
     // this struct contains "packed" vectors (snorm, unorm etc.) which are
@@ -84,7 +83,7 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     // The check happens at shader-generation time, so that a nice error
     // message can be generated, pointing to the field that doesn't match.
     // (once rusts const-generics are more powerful this may be moved to compile-time)
-    let xforms_sto: sm::BufferRef<Transforms, sm::mem::Storage> = group0.next();
+    let xforms_sto: sm::Buffer<Transforms, sm::mem::Storage> = group0.next();
     let xforms_uni: sm::Buffer<Transforms, sm::mem::Uniform> = group0.next();
 
     // conditional code generation based on pipeline parameter
