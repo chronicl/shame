@@ -33,6 +33,7 @@ pub enum StoreType {
     Handle(HandleType),
     RuntimeSizedArray(SizedType),
     BufferBlock(BufferBlock),
+    BindingArray(Rc<StoreType>),
 }
 
 /// types that have a size which is known at shader creation time.
@@ -60,19 +61,27 @@ pub enum HandleType {
 }
 
 impl From<SizedType> for StoreType {
-    fn from(value: SizedType) -> Self { StoreType::Sized(value) }
+    fn from(value: SizedType) -> Self {
+        StoreType::Sized(value)
+    }
 }
 
 impl From<SizedType> for Type {
-    fn from(value: SizedType) -> Self { Type::Store(StoreType::Sized(value)) }
+    fn from(value: SizedType) -> Self {
+        Type::Store(StoreType::Sized(value))
+    }
 }
 
 impl From<ScalarType> for Type {
-    fn from(value: ScalarType) -> Self { Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, value))) }
+    fn from(value: ScalarType) -> Self {
+        Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, value)))
+    }
 }
 
 impl Type {
-    pub fn is_ref(&self) -> bool { matches!(self, Type::Ref { .. }) }
+    pub fn is_ref(&self) -> bool {
+        matches!(self, Type::Ref { .. })
+    }
 }
 
 impl std::fmt::Debug for Type {
@@ -111,6 +120,7 @@ impl Display for StoreType {
             StoreType::Handle(x) => write!(f, "{x}"),
             StoreType::RuntimeSizedArray(x) => write!(f, "Array<{x}>"),
             StoreType::BufferBlock(x) => write!(f, "{}", x.name()),
+            StoreType::BindingArray(x) => write!(f, "BindingArray<{}>", x),
         }
     }
 }
@@ -146,6 +156,8 @@ impl StoreType {
             StoreType::Handle(handle_type) => None,
             StoreType::RuntimeSizedArray(sized_type) => NonZeroU64::new(sized_type.byte_size()),
             StoreType::BufferBlock(buffer_block) => NonZeroU64::new(buffer_block.min_byte_size()),
+            // TODO(chronicl) check correct
+            StoreType::BindingArray(binding_type) => binding_type.min_byte_size(),
         }
     }
 }

@@ -37,6 +37,7 @@ use super::{
 };
 
 pub mod binding;
+pub mod binding_array;
 pub mod buffer;
 pub mod buffer_op;
 pub mod color_target;

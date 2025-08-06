@@ -262,6 +262,7 @@ pub mod mem {
 
 // # Binding
 pub use frontend::encoding::binding::Binding;
+pub use frontend::encoding::binding_array::BindingArray;
 
 // Buffer
 pub use frontend::encoding::buffer::Buffer;

@@ -113,12 +113,18 @@ impl SizedField {
     }
 
     /// the alignment of this field, respecting user defined custom minimum alignment.
-    pub fn align(&self) -> u64 { self.ty.align().max(self.custom_min_align.map(u64::from).unwrap_or(1)) }
+    pub fn align(&self) -> u64 {
+        self.ty.align().max(self.custom_min_align.map(u64::from).unwrap_or(1))
+    }
 
     /// the byte-size of this field, respecting user defined custom minimum size.
-    pub fn byte_size(&self) -> u64 { self.ty.byte_size().max(self.custom_min_size.unwrap_or(0)) }
+    pub fn byte_size(&self) -> u64 {
+        self.ty.byte_size().max(self.custom_min_size.unwrap_or(0))
+    }
 
-    pub fn ty(&self) -> &SizedType { &self.ty }
+    pub fn ty(&self) -> &SizedType {
+        &self.ty
+    }
 }
 
 impl RuntimeSizedArrayField {
@@ -139,7 +145,9 @@ impl RuntimeSizedArrayField {
     }
 
     #[allow(missing_docs)] // runtime api
-    pub fn element_ty(&self) -> &SizedType { &self.element_ty }
+    pub fn element_ty(&self) -> &SizedType {
+        &self.element_ty
+    }
 }
 
 #[doc(hidden)] // runtime api
@@ -295,9 +303,13 @@ impl Struct {
         curr_offset
     }
 
-    pub(crate) fn len(&self) -> usize { self.sized_fields.len() + self.last_unsized.iter().count() }
+    pub(crate) fn len(&self) -> usize {
+        self.sized_fields.len() + self.last_unsized.iter().count()
+    }
 
-    pub(crate) fn is_empty(&self) -> bool { self.sized_fields.is_empty() && self.last_unsized.is_none() }
+    pub(crate) fn is_empty(&self) -> bool {
+        self.sized_fields.is_empty() && self.last_unsized.is_none()
+    }
 
     pub(crate) fn fields(&self) -> impl Iterator<Item = &dyn Field> + Clone {
         let fields = self.sized_fields.iter().map(|f| f as &dyn Field);
@@ -309,28 +321,34 @@ impl Struct {
         self.fields().find(|f| f.name() == canonical_name)
     }
 
-    pub(crate) fn name(&self) -> &CanonName { &self.name }
+    pub(crate) fn name(&self) -> &CanonName {
+        &self.name
+    }
 
     pub(crate) fn is_creation_fixed_footprint(&self) -> bool {
         self.sized_fields
             .iter()
-            .all(|field| StoreType::is_creation_fixed_footprint(&StoreType::from(field.ty.clone()))) &&
-            self.last_unsized.is_none()
+            .all(|field| StoreType::is_creation_fixed_footprint(&StoreType::from(field.ty.clone())))
+            && self.last_unsized.is_none()
     }
 
     pub(crate) fn contains_atomics(&self) -> bool {
-        self.sized_fields.iter().any(|f| f.ty.contains_atomics()) &&
-            self.last_unsized.iter().any(|f| f.element_ty.contains_atomics())
+        self.sized_fields.iter().any(|f| f.ty.contains_atomics())
+            && self.last_unsized.iter().any(|f| f.element_ty.contains_atomics())
     }
 
     pub(crate) fn is_host_shareable(&self) -> bool {
-        self.sized_fields.iter().all(|f| f.ty.is_host_shareable()) &&
-            self.last_unsized.iter().all(|f| f.element_ty.is_host_shareable())
+        self.sized_fields.iter().all(|f| f.ty.is_host_shareable())
+            && self.last_unsized.iter().all(|f| f.element_ty.is_host_shareable())
     }
 
-    pub(crate) fn sized_fields(&self) -> &[SizedField] { &self.sized_fields }
+    pub(crate) fn sized_fields(&self) -> &[SizedField] {
+        &self.sized_fields
+    }
 
-    pub(crate) fn last_unsized_field(&self) -> &Option<RuntimeSizedArrayField> { &self.last_unsized }
+    pub(crate) fn last_unsized_field(&self) -> &Option<RuntimeSizedArrayField> {
+        &self.last_unsized
+    }
 }
 
 /// try register `struct_` if we're currently in a pipeline encoding,
@@ -487,7 +505,9 @@ impl SizedStruct {
         self.min_byte_size()
     }
 
-    pub fn fields(&self) -> impl Iterator<Item = &SizedField> { self.sized_fields.iter() }
+    pub fn fields(&self) -> impl Iterator<Item = &SizedField> {
+        self.sized_fields.iter()
+    }
 
     pub fn get_field_by_name(&self, canonical_name: &CanonName) -> Option<&SizedField> {
         self.fields().find(|f| &f.name == canonical_name)
@@ -532,7 +552,9 @@ impl BufferBlock {
         false
     }
 
-    pub fn is_fixed_footprint(&self) -> bool { self.last_unsized.is_none() }
+    pub fn is_fixed_footprint(&self) -> bool {
+        self.last_unsized.is_none()
+    }
 
     pub fn map_sized_field_types(mut self, mut f: impl FnMut(SizedType) -> SizedType) -> BufferBlock {
         self.0 = Rc::new(Struct::clone(&self.0).map_sized_field_types(f));
@@ -586,11 +608,17 @@ impl StructDef {
         }
     }
 
-    pub fn call_info(&self) -> CallInfo { self.call_info }
+    pub fn call_info(&self) -> CallInfo {
+        self.call_info
+    }
 
-    pub fn canonical_name(&self) -> &CanonName { &self.name }
+    pub fn canonical_name(&self) -> &CanonName {
+        &self.name
+    }
 
-    pub fn ident(&self) -> Key<Ident> { self.ident }
+    pub fn ident(&self) -> Key<Ident> {
+        self.ident
+    }
 
     pub fn fields(&self) -> impl Iterator<Item = (&Key<Ident>, &dyn Field)> {
         let fields = self.sized_fields.iter().map(|(i, f)| (i, f as &dyn Field));
@@ -622,8 +650,9 @@ impl StructRegistry {
     /// returns an iterator that goes through the structs in a "topologically sorted" way.
     /// this means if structure `b`'s fields reference a structure `a` in any way, `a` appears
     /// before `b` in this list.
-    pub fn iter_topo_sorted(&self) -> impl Iterator<Item = &StructDef> { self.defs.iter().map(|(_, def)| def) }
-
+    pub fn iter_topo_sorted(&self) -> impl Iterator<Item = &StructDef> {
+        self.defs.iter().map(|(_, def)| def)
+    }
 
     fn validate_custom_align_and_size(s: &Rc<Struct>) -> Result<(), LayoutError> {
         for field in s.sized_fields() {
@@ -727,6 +756,7 @@ impl StructRegistry {
                 self.find_and_register_new_structs_used_in_sized_type(s, idents, call_info)
             }
             StoreType::BufferBlock(s) => self.register_mentioned_structs_recursively(s, idents, call_info),
+            StoreType::BindingArray(s) => self.find_and_register_new_structs_used_in_store_type(s, idents, call_info),
         }
     }
 
@@ -743,7 +773,11 @@ impl StructRegistry {
         }
     }
 
-    pub fn contains(&mut self, s: &Rc<Struct>) -> bool { self.defs.iter().any(|(x, _)| x == s) }
+    pub fn contains(&mut self, s: &Rc<Struct>) -> bool {
+        self.defs.iter().any(|(x, _)| x == s)
+    }
 
-    pub fn definitions(&self) -> &[(Rc<Struct>, StructDef)] { &self.defs }
+    pub fn definitions(&self) -> &[(Rc<Struct>, StructDef)] {
+        &self.defs
+    }
 }

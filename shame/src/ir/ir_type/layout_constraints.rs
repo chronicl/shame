@@ -242,6 +242,7 @@ pub fn check_layout(ctx: &LayoutErrorContext, ty: &StoreType) -> Result<(), Layo
         StoreType::Handle(_) => Err(LayoutError::NotHostShareable(ty.clone())),
         StoreType::RuntimeSizedArray(e) => check_array_layout(ctx, e),
         StoreType::BufferBlock(s) => check_structure_layout(ctx, &LayoutStructureKind::BufferBlock(s.clone())),
+        StoreType::BindingArray(s) => check_layout(ctx, s),
     }
 }
 
@@ -589,8 +590,6 @@ impl Display for ArrayAlignmentError {
     }
 }
 
-
-
 #[derive(Debug, Clone)]
 pub struct LayoutErrorContext {
     pub binding_type: BufferBindingType,
@@ -711,7 +710,6 @@ impl Display for StructureLayoutError {
             self.field_name, self.expected_alignment
         );
         writeln!(f)?;
-
 
         if let Some(summary) = short_summary {
             writeln!(f, "{summary}");

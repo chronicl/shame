@@ -85,6 +85,7 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     // (once rusts const-generics are more powerful this may be moved to compile-time)
     let xforms_sto: sm::Buffer<Transforms, sm::mem::Storage> = group0.next();
     let xforms_uni: sm::Buffer<Transforms, sm::mem::Uniform> = group0.next();
+    let t: sm::BindingArray<sm::Buffer<Transforms>> = group0.next();
 
     // conditional code generation based on pipeline parameter
     if some_param > 0 {
