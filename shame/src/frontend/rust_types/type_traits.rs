@@ -187,7 +187,7 @@ pub trait NoBools {}
 
 /// (no documentation yet)
 #[diagnostic::on_unimplemented(
-    message = "`{Self}` may be or contain a `shame::Atomic` type. Atomics are usable via `shame::BufferRef<_, Storage, ReadWrite>` or via allocations in workgroup memory"
+    message = "`{Self}` may be or contain a `shame::Atomic` type. Atomics are usable via `shame::Buffer<_, Storage, ReadWrite>` or via allocations in workgroup memory"
 )]
 // implementor note:
 // NoXYZ traits must require GpuLayout or some other base trait, so that the

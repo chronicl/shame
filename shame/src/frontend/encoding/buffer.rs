@@ -427,3 +427,54 @@ impl std::fmt::Display for BufferAddressSpaceEnum {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{self as shame, aliases::*, Array, Buffer, GpuLayout, Read, Ref};
+    use shame as sm;
+    use sm::{mem::Storage, ReadWrite};
+
+    #[test]
+    fn test_buffer_deref() {
+        let mut encoder = sm::start_encoding(sm::Settings::default()).unwrap();
+        let mut drawcall = encoder.new_render_pipeline(sm::Indexing::BufferU16);
+        let mut group = drawcall.bind_groups.next();
+
+        let f: f32x1 = *group.next::<Buffer<f32x1>>();
+
+        #[derive(GpuLayout)]
+        struct A {
+            a: f32x4x4,
+        }
+        let a: &A = &group.next::<Buffer<A>>();
+        let a: &Ref<A, Storage, ReadWrite> = &group.next::<Buffer<A, Storage, ReadWrite>>();
+
+        #[derive(GpuLayout)]
+        struct AUnsized {
+            a: f32x4x4,
+            b: Array<f32x1>,
+        }
+        let a_unsized: &Ref<AUnsized, Storage, Read> = &group.next::<Buffer<AUnsized>>();
+        let a_unsized: &Ref<AUnsized, Storage, ReadWrite> = &group.next::<Buffer<AUnsized, Storage, ReadWrite>>();
+
+        let array: &Array<f32x1, sm::Size<4>> = &group.next::<Buffer<Array<f32x1, sm::Size<4>>>>();
+        let array: &Ref<Array<f32x1, sm::Size<4>>, Storage, ReadWrite> =
+            &group.next::<Buffer<Array<f32x1, sm::Size<4>>, Storage, ReadWrite>>();
+
+        let unsized_array: &Ref<Array<f32x1>, Storage, Read> = &group.next::<Buffer<Array<f32x1>>>();
+        let unsized_array: &Ref<Array<f32x1>, Storage, ReadWrite> =
+            &group.next::<Buffer<Array<f32x1>, Storage, ReadWrite>>();
+
+        // this commented line should compile fail
+        // let atomic: Buffer<sm::AtomicU32, Storage, Read> = group.next();
+        let atomic: Buffer<sm::AtomicU32, Storage, ReadWrite> = group.next();
+
+        #[derive(GpuLayout)]
+        struct AAtomic {
+            a: sm::AtomicU32,
+        }
+        // this commented line should compile fail
+        // let a_atomic: &AAtomic = &group.next::<Buffer<AAtomic>>();
+        let a_atomic: &Ref<AAtomic, Storage, ReadWrite> = &group.next::<Buffer<AAtomic, Storage, ReadWrite>>();
+    }
+}
