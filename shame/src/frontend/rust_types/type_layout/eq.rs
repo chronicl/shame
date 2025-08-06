@@ -219,7 +219,9 @@ pub struct CheckEqLayoutMismatch {
 }
 
 impl std::fmt::Debug for CheckEqLayoutMismatch {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{self}") }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self}")
+    }
 }
 
 impl Display for CheckEqLayoutMismatch {
@@ -251,7 +253,9 @@ pub(crate) enum DisplayMismatchError {
     FmtError(std::fmt::Error),
 }
 impl From<std::fmt::Error> for DisplayMismatchError {
-    fn from(err: std::fmt::Error) -> Self { DisplayMismatchError::FmtError(err) }
+    fn from(err: std::fmt::Error) -> Self {
+        DisplayMismatchError::FmtError(err)
+    }
 }
 
 impl CheckEqLayoutMismatch {
@@ -482,9 +486,9 @@ impl CheckEqLayoutMismatch {
                 }
 
                 match mismatch {
-                    StructMismatch::FieldName { field_index, .. } |
-                    StructMismatch::FieldLayout { field_index, .. } |
-                    StructMismatch::FieldOffset { field_index, .. } => {
+                    StructMismatch::FieldName { field_index, .. }
+                    | StructMismatch::FieldLayout { field_index, .. }
+                    | StructMismatch::FieldOffset { field_index, .. } => {
                         // Write mismatching field
                         enable_color(f, hex_left)?;
                         writer_left.write_field(f, field_index)?;

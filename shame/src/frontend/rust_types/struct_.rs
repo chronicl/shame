@@ -1,12 +1,12 @@
 use crate::common::small_vec::SmallVec;
 use crate::frontend::any::shared_io::{BindPath, BindingType};
 use crate::frontend::any::{Any, InvalidReason};
-use crate::frontend::encoding::buffer::BufferRefInner;
+use crate::frontend::encoding::buffer::{BufferContent, StructField};
 use crate::{
     call_info,
     frontend::{
         encoding::{
-            buffer::{BufferAddressSpace, BufferInner},
+            buffer::{BufferAddressSpace},
             EncodingErrorKind,
         },
         error::InternalError,
@@ -61,9 +61,11 @@ pub trait BufferFields: GpuStore + GpuAligned + GpuLayout + NoHandles + FromAnys
 
     #[doc(hidden)]
     fn get_bufferblock_type() -> ir::BufferBlock;
+
+    #[doc(hidden)]
+    type LastField: StructField;
 }
 
-#[derive(Copy)]
 // a [`GpuSized`] struct containing the fields of the rust struct `Layout`.
 // To create a struct within a shader, you first need to define its layout via
 // `derive(GpuLayout)`.
@@ -91,30 +93,12 @@ impl<T: SizedFields + GpuStore> Clone for Struct<T> {
         }
     }
 }
+impl<T: SizedFields + GpuStore + Copy> std::marker::Copy for Struct<T> {}
 
 impl<T: SizedFields + GpuStore> GpuStore for Struct<T> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = T::RefFields<AS, AM>;
     fn store_ty() -> ir::StoreType {
         ir::StoreType::Sized(<Self as GpuSized>::sized_ty())
-    }
-    fn instantiate_buffer_inner<AS: BufferAddressSpace>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BindingType,
-    ) -> BufferInner<Self, AS>
-    where
-        Self: NoAtomics + NoBools,
-    {
-        BufferInner::new_plain(args, bind_ty)
-    }
-
-    fn instantiate_buffer_ref_inner<AS: BufferAddressSpace, AM: AccessModeReadable>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BindingType,
-    ) -> BufferRefInner<Self, AS, AM>
-    where
-        Self: NoBools,
-    {
-        BufferRefInner::new_plain(args, bind_ty)
     }
 
     fn impl_category() -> GpuStoreImplCategory {

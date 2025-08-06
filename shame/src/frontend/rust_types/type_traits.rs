@@ -15,7 +15,7 @@ use crate::{
     common::proc_macro_utils::push_wrong_amount_of_args_error,
     frontend::{
         any::{render_io::VertexAttribFormat, Any, InvalidReason},
-        encoding::buffer::{BufferAddressSpace, BufferInner, BufferRefInner},
+        encoding::buffer::{BufferAddressSpace},
         error::InternalError,
     },
     ir::{
@@ -31,7 +31,9 @@ use crate::{
 pub struct EmptyRefFields;
 
 impl FromAnys for EmptyRefFields {
-    fn expected_num_anys() -> usize { 0 }
+    fn expected_num_anys() -> usize {
+        0
+    }
 
     #[track_caller]
     fn from_anys(anys: impl Iterator<Item = Any>) -> Self {
@@ -99,28 +101,6 @@ pub trait GpuStore: GpuAligned + GetAllFields + FromAnys {
     /// [`shame::Ref<Self>`]: crate::Ref
     type RefFields<AS: AddressSpace, AM: AccessMode>: FromAnys + Copy;
 
-    /// internal function that aids in the construction of `Buffer` as a `Binding`.
-    ///
-    /// constructs an object containing an invalid `Any` if args is `Err`
-    #[doc(hidden)]
-    fn instantiate_buffer_inner<AS: BufferAddressSpace>(
-        args: Result<BindingArgs, InvalidReason>,
-        ty: BindingType,
-    ) -> BufferInner<Self, AS>
-    where
-        Self: std::marker::Sized /*not GpuSized, this is deliberate*/ + NoAtomics + NoBools;
-
-    /// internal function that aids in the construction of `BufferRef` as a `Binding`
-    ///
-    /// constructs an object containing an invalid `Any` if args is `Err`
-    #[doc(hidden)]
-    fn instantiate_buffer_ref_inner<AS: BufferAddressSpace, AM: AccessModeReadable>(
-        args: Result<BindingArgs, InvalidReason>,
-        ty: BindingType,
-    ) -> BufferRefInner<Self, AS, AM>
-    where
-        Self: std::marker::Sized /*not GpuSized, this is deliberate*/ + NoBools;
-
     #[doc(hidden)] // runtime api
     fn store_ty() -> ir::StoreType
     where
@@ -145,6 +125,19 @@ pub trait GpuStore: GpuAligned + GetAllFields + FromAnys {
 pub enum GpuStoreImplCategory {
     GpuType(ir::StoreType),
     Fields(ir::BufferBlock),
+}
+
+impl GpuStoreImplCategory {
+    /// returns the [`ir::StoreType`] that this category corresponds to
+    pub fn to_store_ty(self) -> ir::StoreType {
+        match self {
+            GpuStoreImplCategory::GpuType(ty) => ty,
+            GpuStoreImplCategory::Fields(buffer_block) => match buffer_block.clone().try_into() {
+                Ok(sized) => ir::StoreType::Sized(ir::SizedType::Structure(sized)),
+                Err(_) => ir::StoreType::BufferBlock(buffer_block),
+            },
+        }
+    }
 }
 
 #[diagnostic::on_unimplemented(message = "the size of `{Self}` on the gpu is not known at rust compile-time")]
@@ -244,5 +237,7 @@ pub trait GpuLayoutField {
 }
 
 impl<T: From<Any>> GpuLayoutField for T {
-    fn from_any(any: Any) -> Self { T::from(any) }
+    fn from_any(any: Any) -> Self {
+        T::from(any)
+    }
 }

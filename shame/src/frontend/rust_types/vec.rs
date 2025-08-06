@@ -18,7 +18,7 @@ use crate::{
         small_vec::SmallVec,
     },
     frontend::encoding::{
-        buffer::{BufferAddressSpace, BufferInner, BufferRefInner},
+        buffer::{BufferAddressSpace},
         rasterizer::Gradient,
     },
     ir::{
@@ -230,10 +230,14 @@ impl<T: ScalarType, L: Len> vec<T, L> {
     }
     /// (no documentation yet)
     #[track_caller]
-    pub fn zero() -> Self { super::vec::zero() }
+    pub fn zero() -> Self {
+        super::vec::zero()
+    }
     /// (no documentation yet)
     #[track_caller]
-    pub fn one() -> Self { super::vec::one() }
+    pub fn one() -> Self {
+        super::vec::one()
+    }
 
     #[track_caller]
     fn standard_basis_column(column: Comp4) -> Self {
@@ -304,11 +308,15 @@ impl<T: ScalarType, L: Len> vec<T, L> {
     /// literals interact with type inference, otherwise doing basic indexing
     /// with constants would be much more verbose (e.g. require `as u32` `.to_gpu()` etc.)
     #[allow(clippy::len_without_is_empty)] // cannot be empty
-    pub const fn len(&self) -> i32 { L::USIZE as i32 }
+    pub const fn len(&self) -> i32 {
+        L::USIZE as i32
+    }
 
     /// (no documentation yet)
     #[track_caller]
-    pub fn at(&self, i: impl ToInteger) -> vec<T, x1> { self.any.vector_index(i.to_any()).into() }
+    pub fn at(&self, i: impl ToInteger) -> vec<T, x1> {
+        self.any.vector_index(i.to_any()).into()
+    }
 
     /// (no documentation yet)
     #[track_caller]
@@ -387,30 +395,44 @@ impl<T: ScalarType, L: Len> vec<T, L> {
 
 impl<T: ScalarType> vec<T, x2> {
     /// split vector into `[self.x, self.y]` (useful for pattern matching and `.map(_)`)
-    pub fn comps(&self) -> [vec<T, x1>; 2] { [self.x, self.y] }
+    pub fn comps(&self) -> [vec<T, x1>; 2] {
+        [self.x, self.y]
+    }
 
     /// split vector into `(self.x, self.y)` (useful for pattern matching)
-    pub fn tuple(&self) -> (vec<T, x1>, vec<T, x1>) { (self.x, self.y) }
+    pub fn tuple(&self) -> (vec<T, x1>, vec<T, x1>) {
+        (self.x, self.y)
+    }
 }
 
 impl<T: ScalarType> vec<T, x3> {
     /// split vector into `[self.x, self.y, self.z]` (useful for pattern matching and `.map(_)`)
-    pub fn array(&self) -> [vec<T, x1>; 3] { [self.x, self.y, self.z] }
+    pub fn array(&self) -> [vec<T, x1>; 3] {
+        [self.x, self.y, self.z]
+    }
 
     /// split vector into `(self.x, self.y, self.z)` (useful for pattern matching)
-    pub fn tuple(&self) -> (vec<T, x1>, vec<T, x1>, vec<T, x1>) { (self.x, self.y, self.z) }
+    pub fn tuple(&self) -> (vec<T, x1>, vec<T, x1>, vec<T, x1>) {
+        (self.x, self.y, self.z)
+    }
 }
 
 #[allow(clippy::type_complexity)]
 impl<T: ScalarType> vec<T, x4> {
     /// split vector into `[self.x, self.y, self.z, self.w]` (useful for pattern matching and `.map(_)`)
-    pub fn array(&self) -> [vec<T, x1>; 4] { [self.x, self.y, self.z, self.w] }
+    pub fn array(&self) -> [vec<T, x1>; 4] {
+        [self.x, self.y, self.z, self.w]
+    }
 
     /// split vector into `(self.x, self.y, self.z, self.w)` (useful for pattern matching)
-    pub fn tuple(&self) -> (vec<T, x1>, vec<T, x1>, vec<T, x1>, vec<T, x1>) { (self.x, self.y, self.z, self.w) }
+    pub fn tuple(&self) -> (vec<T, x1>, vec<T, x1>, vec<T, x1>, vec<T, x1>) {
+        (self.x, self.y, self.z, self.w)
+    }
 
     /// split a 4 component vector into the xyz and the w component
-    pub fn xyz_w(&self) -> (vec<T, x3>, vec<T, x1>) { (self.xyz(), self.w) }
+    pub fn xyz_w(&self) -> (vec<T, x3>, vec<T, x1>) {
+        (self.xyz(), self.w)
+    }
 
     /// A vector with all zeroes except the w component which is one.
     ///
@@ -418,7 +440,9 @@ impl<T: ScalarType> vec<T, x4> {
     ///
     /// returns (0, 0, 0, 1)
     #[track_caller]
-    pub fn w() -> Self { vec::standard_basis_column(Comp4::W) }
+    pub fn w() -> Self {
+        vec::standard_basis_column(Comp4::W)
+    }
 }
 
 /// implemented only for [`vec`]
@@ -534,42 +558,32 @@ impl ToInteger for crate::VertexIndex {
 impl<T: ScalarType, L: Len> Deref for vec<T, L> {
     type Target = L::VecComponents<T>;
 
-    fn deref(&self) -> &Self::Target { &self.components }
+    fn deref(&self) -> &Self::Target {
+        &self.components
+    }
 }
 
 impl<T: ScalarType, L: Len> GpuSized for vec<T, L> {
-    fn sized_ty() -> ir::SizedType { ir::SizedType::Vector(L::LEN, T::SCALAR_TYPE) }
+    fn sized_ty() -> ir::SizedType {
+        ir::SizedType::Vector(L::LEN, T::SCALAR_TYPE)
+    }
 }
 
 impl<T: ScalarType, L: Len> GpuAligned for vec<T, L> {
-    fn aligned_ty() -> ir::AlignedType { ir::AlignedType::Sized(<Self as GpuSized>::sized_ty()) }
+    fn aligned_ty() -> ir::AlignedType {
+        ir::AlignedType::Sized(<Self as GpuSized>::sized_ty())
+    }
 }
 
 impl<T: ScalarType, L: Len> GpuStore for vec<T, L> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = L::VecComponentsRef<T, AS, AM>;
-    fn store_ty() -> ir::StoreType { ir::StoreType::Sized(<Self as GpuSized>::sized_ty()) }
-
-    fn instantiate_buffer_inner<AS: BufferAddressSpace>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BindingType,
-    ) -> BufferInner<Self, AS>
-    where
-        Self: NoAtomics + NoBools,
-    {
-        BufferInner::new_plain(args, bind_ty)
+    fn store_ty() -> ir::StoreType {
+        ir::StoreType::Sized(<Self as GpuSized>::sized_ty())
     }
 
-    fn instantiate_buffer_ref_inner<AS: BufferAddressSpace, AM: AccessModeReadable>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BindingType,
-    ) -> BufferRefInner<Self, AS, AM>
-    where
-        Self: NoBools,
-    {
-        BufferRefInner::new_plain(args, bind_ty)
+    fn impl_category() -> GpuStoreImplCategory {
+        GpuStoreImplCategory::GpuType(Self::store_ty())
     }
-
-    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
 }
 
 impl<T: ScalarType, L: Len> GpuLayout for vec<T, L>
@@ -594,7 +608,9 @@ where
 }
 
 impl<T: ScalarType, L: Len> GpuType for vec<T, L> {
-    fn ty() -> ir::Type { ir::Type::Store(Self::store_ty()) }
+    fn ty() -> ir::Type {
+        ir::Type::Store(Self::store_ty())
+    }
 
     #[track_caller]
     fn from_any_unchecked(any: Any) -> Self {
@@ -606,22 +622,28 @@ impl<T: ScalarType, L: Len> GpuType for vec<T, L> {
 }
 
 impl<T: ScalarType, L: Len> AsAny for vec<T, L> {
-    fn as_any(&self) -> Any { self.any }
+    fn as_any(&self) -> Any {
+        self.any
+    }
 }
 
 impl<T: ScalarType, L: Len> ToGpuType for vec<T, L> {
     type Gpu = Self;
 
+    fn to_gpu(&self) -> Self::Gpu {
+        *self
+    }
 
-
-    fn to_gpu(&self) -> Self::Gpu { *self }
-
-    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> { Some(self) }
+    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> {
+        Some(self)
+    }
 }
 
 impl<T: ScalarType, L: Len> From<Any> for vec<T, L> {
     #[track_caller]
-    fn from(any: Any) -> Self { GpuType::from_any(any) }
+    fn from(any: Any) -> Self {
+        GpuType::from_any(any)
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -687,7 +709,9 @@ pub(crate) trait Components: Copy {
 }
 
 impl<T: ScalarType> Components for EmptyComponents<T> {
-    fn new(parent: Any) -> Self { EmptyComponents { phantom: PhantomData } }
+    fn new(parent: Any) -> Self {
+        EmptyComponents { phantom: PhantomData }
+    }
 }
 
 impl<T: ScalarType> Components for Xy<T> {
@@ -763,7 +787,9 @@ impl<T: ScalarType> Components for Xyzw<T> {
 
 const XY_LEN: usize = 2;
 impl<T: ScalarType, AS: AddressSpace, AM: AccessMode> FromAnys for RefXy<T, AS, AM> {
-    fn expected_num_anys() -> usize { XY_LEN }
+    fn expected_num_anys() -> usize {
+        XY_LEN
+    }
 
     #[track_caller]
     fn from_anys(anys: impl Iterator<Item = Any>) -> Self {
@@ -784,7 +810,9 @@ impl<T: ScalarType, AS: AddressSpace, AM: AccessMode> FromAnys for RefXy<T, AS, 
 
 const XYZ_LEN: usize = 3;
 impl<T: ScalarType, AS: AddressSpace, AM: AccessMode> FromAnys for RefXyz<T, AS, AM> {
-    fn expected_num_anys() -> usize { XYZ_LEN }
+    fn expected_num_anys() -> usize {
+        XYZ_LEN
+    }
     #[track_caller]
     fn from_anys(anys: impl Iterator<Item = Any>) -> Self {
         const EXPECTED_LEN: usize = XYZ_LEN;
@@ -805,7 +833,9 @@ impl<T: ScalarType, AS: AddressSpace, AM: AccessMode> FromAnys for RefXyz<T, AS,
 
 const XYZW_LEN: usize = 4;
 impl<T: ScalarType, AS: AddressSpace, AM: AccessMode> FromAnys for RefXyzw<T, AS, AM> {
-    fn expected_num_anys() -> usize { XYZW_LEN }
+    fn expected_num_anys() -> usize {
+        XYZW_LEN
+    }
 
     #[track_caller]
     fn from_anys(anys: impl Iterator<Item = Any>) -> Self {
@@ -828,17 +858,29 @@ impl<T: ScalarType, AS: AddressSpace, AM: AccessMode> FromAnys for RefXyzw<T, AS
 
 impl<T: ScalarType, L: Len> vec<T, L> {
     /// (no documentation yet)
-    pub fn to_f16(self) -> vec<f16, L> { self.into_generic() }
+    pub fn to_f16(self) -> vec<f16, L> {
+        self.into_generic()
+    }
     /// (no documentation yet)
-    pub fn to_f32(self) -> vec<f32, L> { self.into_generic() }
+    pub fn to_f32(self) -> vec<f32, L> {
+        self.into_generic()
+    }
     /// (no documentation yet)
-    pub fn to_f64(self) -> vec<f64, L> { self.into_generic() }
+    pub fn to_f64(self) -> vec<f64, L> {
+        self.into_generic()
+    }
     /// (no documentation yet)
-    pub fn to_u32(self) -> vec<u32, L> { self.into_generic() }
+    pub fn to_u32(self) -> vec<u32, L> {
+        self.into_generic()
+    }
     /// (no documentation yet)
-    pub fn to_i32(self) -> vec<i32, L> { self.into_generic() }
+    pub fn to_i32(self) -> vec<i32, L> {
+        self.into_generic()
+    }
     /// (no documentation yet)
-    pub fn to_bool(self) -> vec<bool, L> { self.into_generic() }
+    pub fn to_bool(self) -> vec<bool, L> {
+        self.into_generic()
+    }
 
     /// identical to `Into::into(_)` except that it is also usable in generic
     /// contexts. If unsure use `Into::into()` instead of this.
@@ -850,7 +892,9 @@ impl<T: ScalarType, L: Len> vec<T, L> {
     /// generic conversion. Therefore the `From` implementation is split up into
     /// all the specific permutations.
     #[track_caller]
-    pub fn into_generic<T1: ScalarType>(self) -> vec<T1, L> { vec::<T1, L>::from_generic(self) }
+    pub fn into_generic<T1: ScalarType>(self) -> vec<T1, L> {
+        vec::<T1, L>::from_generic(self)
+    }
 
     /// identical to `From::from()` except that it is also usable in generic
     /// contexts. If unsure use `From::from()` instead of this.
@@ -878,7 +922,6 @@ macro_rules! impl_from {
         }
     )*)*};
 }
-
 
 #[rustfmt::skip]
 impl_from! {
@@ -916,7 +959,9 @@ impl<T: ScalarType> Iterator for ComponentIter<T> {
     type Item = vec<T, x1>;
 
     #[track_caller]
-    fn next(&mut self) -> Option<Self::Item> { Some(self.any.get_component(*self.components.next()?).into()) }
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.any.get_component(*self.components.next()?).into())
+    }
 }
 
 impl<T: ScalarType, L: Len> IntoIterator for vec<T, L> {
@@ -936,17 +981,23 @@ impl<T: ScalarType, L: Len> IntoIterator for vec<T, L> {
 }
 
 impl<T: ScalarTypeNumber, L: Len> std::iter::Sum for vec<T, L> {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self { iter.reduce(|l, r| l + r).unwrap_or_else(|| vec::zero()) }
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|l, r| l + r).unwrap_or_else(|| vec::zero())
+    }
 }
 
 impl<T: ScalarTypeNumber> std::iter::Product for vec<T, x1> {
-    fn product<I: Iterator<Item = Self>>(iter: I) -> Self { iter.reduce(|l, r| l * r).unwrap_or_else(|| vec::zero()) }
+    fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|l, r| l * r).unwrap_or_else(|| vec::zero())
+    }
 }
 
 impl<T: ScalarType, L: Len, Idx: ToInteger> GpuIndex<Idx> for vec<T, L> {
     type Output = vec<T, x1>;
 
-    fn index(&self, index: Idx) -> Self::Output { self.any.vector_index(index.to_any()).into() }
+    fn index(&self, index: Idx) -> Self::Output {
+        self.any.vector_index(index.to_any()).into()
+    }
 }
 
 impl<T: ScalarType, L: Len> Default for vec<T, L> {
@@ -970,7 +1021,9 @@ impl<L: Len> NoBools for vec<i32, L> {}
 impl<T: ScalarType, L: Len, AS: AddressSpace, AM: AccessMode, Idx: ToInteger> GpuIndex<Idx> for Ref<vec<T, L>, AS, AM> {
     type Output = Ref<vec<T, x1>, AS, AM>;
 
-    fn index(&self, i: Idx) -> Ref<vec<T, x1>, AS, AM> { self.as_any().vector_index(i.to_any()).into() }
+    fn index(&self, i: Idx) -> Ref<vec<T, x1>, AS, AM> {
+        self.as_any().vector_index(i.to_any()).into()
+    }
 }
 
 impl<T: ScalarType, L: Len, AS: AddressSpace, AM: AccessMode> Ref<vec<T, L>, AS, AM> {
@@ -1005,7 +1058,9 @@ impl<T: ScalarType, L: Len, AS: AddressSpace, AM: AccessMode> Ref<vec<T, L>, AS,
 
     /// (no documentation yet)
     #[track_caller]
-    pub fn zw(&self) -> Ref<vec<T, x2>, AS, AM> { self.as_any().swizzle(Swizzle2([Z, W])).into() }
+    pub fn zw(&self) -> Ref<vec<T, x2>, AS, AM> {
+        self.as_any().swizzle(Swizzle2([Z, W])).into()
+    }
 
     // 3 component swizzle
 
@@ -1069,19 +1124,27 @@ pub trait Swizzle<const N: usize> {
 
 impl Swizzle<1> for () {
     type Len = x1;
-    fn to_vector_access(comps: [Comp4; 1]) -> VectorAccess { VectorAccess::Swizzle1(comps) }
+    fn to_vector_access(comps: [Comp4; 1]) -> VectorAccess {
+        VectorAccess::Swizzle1(comps)
+    }
 }
 impl Swizzle<2> for () {
     type Len = x2;
-    fn to_vector_access(comps: [Comp4; 2]) -> VectorAccess { VectorAccess::Swizzle2(comps) }
+    fn to_vector_access(comps: [Comp4; 2]) -> VectorAccess {
+        VectorAccess::Swizzle2(comps)
+    }
 }
 impl Swizzle<3> for () {
     type Len = x3;
-    fn to_vector_access(comps: [Comp4; 3]) -> VectorAccess { VectorAccess::Swizzle3(comps) }
+    fn to_vector_access(comps: [Comp4; 3]) -> VectorAccess {
+        VectorAccess::Swizzle3(comps)
+    }
 }
 impl Swizzle<4> for () {
     type Len = x4;
-    fn to_vector_access(comps: [Comp4; 4]) -> VectorAccess { VectorAccess::Swizzle4(comps) }
+    fn to_vector_access(comps: [Comp4; 4]) -> VectorAccess {
+        VectorAccess::Swizzle4(comps)
+    }
 }
 
 impl<T: ScalarType, L: Len> GetAllFields for vec<T, L> {
@@ -1118,7 +1181,11 @@ where
 
 impl<T: ScalarType, L: Len> FromAnys for vec<T, L> {
     #[track_caller]
-    fn from_anys(anys: impl Iterator<Item = Any>) -> Self { from_single_any(anys).into() }
+    fn from_anys(anys: impl Iterator<Item = Any>) -> Self {
+        from_single_any(anys).into()
+    }
 
-    fn expected_num_anys() -> usize { 1 }
+    fn expected_num_anys() -> usize {
+        1
+    }
 }

@@ -1,4 +1,10 @@
 #![allow(unused, clippy::no_effect)]
+use std::ops::Deref;
+
+use shame::mem::Storage;
+use shame::Array;
+use shame::Read;
+use shame::Ref;
 use shame as sm;
 use shame::prelude::*;
 use shame::aliases::*;
@@ -48,12 +54,20 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     //      `NoBools` - if there are no bools (see WGSL "HostShareable")
     //    `NoAtomics` - if there are no atomics (for instantiable structs)
     // etc...
-    #[derive(sm::GpuLayout)]
+    #[derive(sm::GpuLayout, Clone, Copy)]
     #[cpu(TransformsOnCpu)] // (optional) specify a corresponding CPU type for layout checks
     struct Transforms {
         world: f32x4x4,
         view: f32x4x4,
         proj: f32x4x4,
+    }
+    #[derive(sm::GpuLayout, Clone, Copy)]
+    #[cpu(TransformsOnCpu)] // (optional) specify a corresponding CPU type for layout checks
+    struct TransformsUnsized {
+        world: f32x4x4,
+        view: f32x4x4,
+        proj: f32x4x4,
+        a: sm::Array<f32x4>, // runtime sized array, must be the last field
     }
 
     // this struct contains "packed" vectors (snorm, unorm etc.) which are

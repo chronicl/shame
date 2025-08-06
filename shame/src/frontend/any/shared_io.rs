@@ -3,13 +3,16 @@ use std::num::NonZeroU64;
 
 use crate::any::layout::TypeLayoutRecipe;
 use crate::backend::language::Language;
-use crate::call_info;
+use crate::{call_info, BufferAddressSpace};
 use crate::common::po2::U32PowerOf2;
 use crate::frontend::any::Any;
 use crate::frontend::any::{record_node, InvalidReason};
+use crate::frontend::encoding::buffer::BufferAddressSpaceEnum;
 use crate::frontend::encoding::{EncodingErrorKind, EncodingGuard};
 use crate::frontend::error::InternalError;
-use crate::frontend::rust_types::type_layout::compatible_with::{self, TypeLayoutCompatibleWith};
+use crate::frontend::rust_types::type_layout::compatible_with::{
+    self, AddressSpaceError, RequirementsNotSatisfied, TypeLayoutCompatibleWith,
+};
 use crate::frontend::rust_types::type_layout::recipe::ir_compat::IRConversionError;
 use crate::ir::expr::Binding;
 use crate::ir::expr::Expr;
@@ -224,72 +227,49 @@ fn create_any_catch_errors(create_any: impl FnOnce(&Context) -> Result<Any, Enco
 }
 
 impl Any {
-    /// Creates a storage buffer binding at the specified bind path.
+    /// Creates a uniform or storage buffer binding at the specified bind path.
     #[track_caller]
-    pub fn storage_buffer_binding(
+    pub fn buffer_binding<AS: BufferAddressSpace>(
         bind_path: BindPath,
         visibility: StageMask,
-        layout: TypeLayoutCompatibleWith<compatible_with::Storage>,
+        layout: TypeLayoutCompatibleWith<AS>,
         access: AccessModeReadable,
-        buffer_binding_as_ref: bool,
         has_dynamic_offset: bool,
     ) -> Any {
         let create_any = |ctx: &Context| -> Result<Any, EncodingErrorKind> {
-            let binding_type = BindingType::Buffer {
-                ty: BufferBindingType::Storage(access),
-                has_dynamic_offset,
-            };
-            let store_type = layout_to_store_type(layout.recipe(), &binding_type)?;
-
-            let ty = match (buffer_binding_as_ref, access) {
-                (true, _) => Type::Ref(
-                    MemoryRegion::new(
-                        ctx.latest_user_caller(),
-                        store_type.clone(),
-                        None,
-                        None,
-                        access.into(),
-                        AddressSpace::Storage,
-                    )?,
-                    store_type.clone(),
-                    access.into(),
-                ),
-                (false, AccessModeReadable::ReadWrite) => {
-                    return Err(BindingError::NonRefBufferRequiresReadOnlyAndConstructible.into());
+            let space = AS::BUFFER_ADDRESS_SPACE;
+            // Ensure that uniform buffers are read only
+            match (space, access) {
+                (BufferAddressSpaceEnum::Uniform, AccessModeReadable::ReadWrite) => {
+                    let err: AddressSpaceError =
+                        RequirementsNotSatisfied::MustBeSized(layout.recipe().clone(), Language::Wgsl, space).into();
+                    return Err(err.into());
                 }
-                (false, AccessModeReadable::Read) => {
-                    if !store_type.is_constructible() {
-                        return Err(BindingError::NonRefBufferRequiresReadOnlyAndConstructible.into());
-                    }
-                    Type::Store(store_type.clone())
-                }
-            };
-
-            record_and_register_binding(ctx, bind_path, visibility, binding_type, store_type, ty)
-        };
-
-        create_any_catch_errors(create_any)
-    }
-
-    /// Creates a uniform buffer binding at the specified bind path.
-    #[track_caller]
-    pub fn uniform_buffer_binding(
-        bind_path: BindPath,
-        visibility: StageMask,
-        layout: TypeLayoutCompatibleWith<compatible_with::Uniform>,
-        has_dynamic_offset: bool,
-    ) -> Any {
-        let create_any = |ctx: &Context| -> Result<Any, EncodingErrorKind> {
-            let binding_type = BindingType::Buffer {
-                ty: BufferBindingType::Uniform,
-                has_dynamic_offset,
-            };
-            let store_type = layout_to_store_type(layout.recipe(), &binding_type)?;
-            if !store_type.is_constructible() {
-                return Err(BindingError::NonRefBufferRequiresReadOnlyAndConstructible.into());
+                (BufferAddressSpaceEnum::Uniform, AccessModeReadable::Read)
+                | (BufferAddressSpaceEnum::Storage, AccessModeReadable::Read | AccessModeReadable::ReadWrite) => {}
             }
 
-            let ty = Type::Store(store_type.clone());
+            let binding_type = BindingType::Buffer {
+                ty: match space {
+                    BufferAddressSpaceEnum::Uniform => BufferBindingType::Uniform,
+                    BufferAddressSpaceEnum::Storage => BufferBindingType::Storage(access),
+                },
+                has_dynamic_offset,
+            };
+            let store_type = layout_to_store_type(layout.recipe(), &binding_type)?;
+
+            let ty = Type::Ref(
+                MemoryRegion::new(
+                    ctx.latest_user_caller(),
+                    store_type.clone(),
+                    None,
+                    None,
+                    access.into(),
+                    AS::ADDRESS_SPACE,
+                )?,
+                store_type.clone(),
+                access.into(),
+            );
 
             record_and_register_binding(ctx, bind_path, visibility, binding_type, store_type, ty)
         };
@@ -299,7 +279,7 @@ impl Any {
 
     /// Creates a handle binding at the specified bind path.
     #[track_caller]
-    pub fn handle_binding(bind_path: BindPath, visibility: StageMask, handle_type: HandleType) -> Any {
+    pub fn texture_binding(bind_path: BindPath, visibility: StageMask, handle_type: HandleType) -> Any {
         let create_any = |ctx: &Context| -> Result<Any, EncodingErrorKind> {
             let binding_type = match &handle_type {
                 HandleType::Sampler(s) => BindingType::Sampler(*s),
@@ -322,120 +302,6 @@ impl Any {
         };
 
         create_any_catch_errors(create_any)
-    }
-
-    /// import the resource bound at `path` of kind `binding_ty`.
-    /// the shader type `ty` must correspond to the `binding_ty` according to https://www.w3.org/TR/WGSL/#var-decls
-    /// (paragraphs on uniform buffer, storage buffer etc.)
-    ///
-    /// -----
-    ///
-    /// `buffer_binding_as_ref`: how the resulting `Any` is returned.
-    /// - `true`: returns `Ref<ty, ...>` (`binding_ty` must be `BindingType::Buffer`)
-    /// - `false`: returns `ty` (`binding_ty` must be a uniform or read-only storage buffer, `ty` must be constructible)
-    ///
-    /// if the conditions mentioned above are not met, an `EncodingError` is pushed and an invalid `Any` is returned.
-    #[track_caller]
-    pub fn binding(
-        path: BindPath,
-        visibility: StageMask,
-        ty: ir::StoreType,
-        binding_ty: BindingType,
-        buffer_binding_as_ref: bool,
-    ) -> Any {
-        let record_handle_node = |ty, call_info| {
-            record_node(
-                call_info,
-                Expr::PipelineIo(PipelineIo::Binding(Binding { bind_path: path, ty })),
-                &[],
-            )
-        };
-        // this closure checks whether `binding_ty` and `ty` are compatible
-        let create_any = |ctx: &Context| -> Result<Any, EncodingErrorKind> {
-            ctx.push_error_if_outside_encoding_scope("import of bindings");
-            let call_info = ctx.latest_user_caller();
-
-            if buffer_binding_as_ref && !matches!(binding_ty, BindingType::Buffer { .. }) {
-                return Err(LayoutError::NonRefBufferRequiresReadOnlyAndConstructible.into());
-            }
-
-            let any = match &binding_ty {
-                BindingType::Buffer {
-                    ty: buffer_ty,
-                    has_dynamic_offset,
-                } => {
-                    let ref_or_value_ty =
-                        get_type_for_buffer_binding_type(&ty, *buffer_ty, buffer_binding_as_ref, ctx)?;
-                    Ok(record_handle_node(ref_or_value_ty, ctx.latest_user_caller()))
-                }
-                BindingType::Sampler(s1) => match &ty {
-                    StoreType::Handle(HandleType::Sampler(s2)) if s1 == s2 => {
-                        Ok(record_handle_node(Type::Store(ty.clone()), call_info))
-                    }
-                    _ => Err(BindingError::InvalidTypeForBinding(ty.clone(), binding_ty.clone())),
-                },
-                BindingType::SampledTexture {
-                    shape: s0,
-                    sample_type: t0,
-                    samples_per_pixel: spp0,
-                } => match &ty {
-                    StoreType::Handle(HandleType::SampledTexture(s1, t1, spp1))
-                        if (t0 == t1) && (s0 == s1) && (spp0 == spp1) =>
-                    {
-                        Ok(record_handle_node(Type::Store(ty.clone()), call_info))
-                    }
-
-                    _ => Err(BindingError::InvalidTypeForBinding(ty.clone(), binding_ty.clone())),
-                },
-                BindingType::StorageTexture {
-                    shape: s0,
-                    format: f0,
-                    access: a0,
-                } => match &ty {
-                    StoreType::Handle(HandleType::StorageTexture(s1, f1, a1))
-                        if (a0 == a1) && (f0 == f1) && (s0 == s1) =>
-                    {
-                        Ok(record_handle_node(Type::Store(ty.clone()), call_info))
-                    }
-
-                    _ => Err(BindingError::InvalidTypeForBinding(ty.clone(), binding_ty.clone())),
-                },
-            };
-
-            match ctx.pipeline_layout_mut().bindings.entry(path) {
-                Entry::Occupied(entry) => {
-                    Err(PipelineError::DuplicateBindPath(path, entry.get().shader_ty.clone()).into())
-                }
-                Entry::Vacant(entry) => match any {
-                    Ok(any) => match any.node() {
-                        Some(node) => {
-                            entry.insert(WipBinding {
-                                call_info,
-                                user_defined_visibility: visibility,
-                                binding_ty,
-                                shader_ty: ty,
-                                node,
-                            });
-                            Ok(any)
-                        }
-                        None => Err(InternalError::new(
-                            true,
-                            format!("binding at `{path}` produced invalid Any object"),
-                        )
-                        .into()),
-                    },
-                    Err(err) => Err(err.into()),
-                },
-            }
-        };
-        Context::try_with(call_info!(), |ctx| match create_any(ctx) {
-            Ok(any) => any,
-            Err(e) => {
-                ctx.push_error(e);
-                Any::new_invalid(InvalidReason::ErrorThatWasPushed)
-            }
-        })
-        .unwrap_or(Any::new_invalid(InvalidReason::CreatedWithNoActiveEncoding))
     }
 
     /// get the next field of type `ty` in the push-constants struct.

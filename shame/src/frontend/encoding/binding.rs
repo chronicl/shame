@@ -85,7 +85,7 @@ where
         let handle_type = HandleType::SampledTexture(shape, sample_type.restrict_with_spp(spp), spp);
         let any = match args {
             Err(reason) => Any::new_invalid(reason),
-            Ok(BindingArgs { path, visibility }) => Any::handle_binding(path, visibility, handle_type),
+            Ok(BindingArgs { path, visibility }) => Any::texture_binding(path, visibility, handle_type),
         };
         Texture::from_inner(TextureKind::Standalone(any))
     }
@@ -117,7 +117,7 @@ impl<Access: AccessMode, Format: StorageTextureFormat<Access> + SupportsCoords<C
         let handle_type = HandleType::StorageTexture(shape, format, access);
         let any = match args {
             Err(reason) => Any::new_invalid(reason),
-            Ok(BindingArgs { path, visibility }) => Any::handle_binding(path, visibility, handle_type),
+            Ok(BindingArgs { path, visibility }) => Any::texture_binding(path, visibility, handle_type),
         };
         StorageTexture::from_inner(TextureKind::Standalone(any))
     }
@@ -156,7 +156,7 @@ where
         let handle_type = HandleType::SampledTexture(shape, sample_type.restrict_with_spp(spp), spp);
         let any = match args {
             Err(reason) => Any::new_invalid(reason),
-            Ok(BindingArgs { path, visibility }) => Any::handle_binding(path, visibility, handle_type),
+            Ok(BindingArgs { path, visibility }) => Any::texture_binding(path, visibility, handle_type),
         };
         TextureArray::from_inner(any)
     }
@@ -192,7 +192,7 @@ impl<
         let handle_type = HandleType::StorageTexture(shape, format, access);
         let any = match args {
             Err(reason) => Any::new_invalid(reason),
-            Ok(BindingArgs { path, visibility }) => Any::handle_binding(path, visibility, handle_type),
+            Ok(BindingArgs { path, visibility }) => Any::texture_binding(path, visibility, handle_type),
         };
         StorageTextureArray::from_inner(any)
     }
@@ -212,7 +212,7 @@ impl<M: SamplingMethod> Binding for Sampler<M> {
         let handle_type = HandleType::Sampler(M::SAMPLING_METHOD);
         let any = match args {
             Err(reason) => Any::new_invalid(reason),
-            Ok(BindingArgs { path, visibility }) => Any::handle_binding(path, visibility, handle_type),
+            Ok(BindingArgs { path, visibility }) => Any::texture_binding(path, visibility, handle_type),
         };
         Self::from_inner(any)
     }

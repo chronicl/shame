@@ -11,7 +11,9 @@ use crate::util;
 use crate::util::Repr;
 
 macro_rules! bail {
-    ($span: expr, $display: expr) => {return Err(syn::Error::new($span, $display,))};
+    ($span: expr, $display: expr) => {
+        return Err(syn::Error::new($span, $display))
+    };
 }
 
 #[derive(Debug)]
@@ -61,8 +63,6 @@ pub fn impl_for_struct(
             format!("`derive({which_derive:?})` currently does not support where clauses")
         )
     }
-
-
 
     // we do lots of `Vec<_>` collection here, because `&Vec<_>` is copy and supports `quote` repetition,
     // if we find another way of getting this without requiring `collect` replace all the vecs in here.
@@ -268,8 +268,6 @@ pub fn impl_for_struct(
                 { }
             };
 
-
-
             let impl_from_anys = quote! {
                 impl<#generics_decl> #re::FromAnys for #derive_struct_ident<#(#idents_of_generics),*>
                 where #where_clause_predicates {
@@ -389,6 +387,8 @@ pub fn impl_for_struct(
                             #triv #last_field_type:     #re::GpuAligned,
                             #where_clause_predicates
                         {
+                            type LastField = #last_field_type;
+
                             fn as_anys(&self) -> impl std::borrow::Borrow<[#re::Any]> {
                                 use #re::AsAny;
                                 [
@@ -466,28 +466,6 @@ pub fn impl_for_struct(
                             fn store_ty() -> #re::ir::StoreType where
                             #triv Self: #re::GpuType {
                                 unreachable!("Self: !GpuType")
-                            }
-
-                            fn instantiate_buffer_inner<AS: #re::BufferAddressSpace>(
-                                args: Result<#re::BindingArgs, #re::InvalidReason>,
-                                bind_ty: #re::BindingType
-                            ) -> #re::BufferInner<Self, AS>
-                            where
-                                #triv Self:
-                                    #re::NoAtomics +
-                                    #re::NoBools
-                            {
-                                #re::BufferInner::new_fields(args, bind_ty)
-                            }
-
-                            fn instantiate_buffer_ref_inner<AS: #re::BufferAddressSpace, AM: #re::AccessModeReadable>(
-                                args: Result<#re::BindingArgs, #re::InvalidReason>,
-                                bind_ty: #re::BindingType
-                            ) -> #re::BufferRefInner<Self, AS, AM>
-                            where
-                                #triv Self: #re::NoBools,
-                            {
-                                #re::BufferRefInner::new_fields(args, bind_ty)
                             }
 
                             fn impl_category() -> #re::GpuStoreImplCategory {

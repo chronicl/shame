@@ -6,7 +6,7 @@ use crate::frontend::any::render_io::{
     Attrib, VertexBufferLookupIndex, Location, VertexAttribFormat, VertexBufferLayout, VertexLayoutError,
 };
 use crate::frontend::any::{Any, InvalidReason};
-use crate::frontend::encoding::buffer::{BufferAddressSpace, BufferInner, BufferRefInner};
+use crate::frontend::encoding::buffer::{BufferAddressSpace};
 use crate::frontend::encoding::{EncodingError, EncodingErrorKind};
 use crate::frontend::error::InternalError;
 use crate::frontend::rust_types::len::*;
@@ -185,13 +185,17 @@ pub trait GpuLayout {
 /// println!("OnGpu:\n{}\n", OnGpu::gpu_layout());
 /// println!("OnCpu:\n{}\n", OnCpu::cpu_layout());
 /// ```
-pub fn gpu_layout<T: GpuLayout + ?Sized>() -> TypeLayout { T::layout_recipe().layout() }
+pub fn gpu_layout<T: GpuLayout + ?Sized>() -> TypeLayout {
+    T::layout_recipe().layout()
+}
 
 /// (no documentation yet)
 // `CpuLayout::cpu_layout` exists, but this function exists for consistency with
 // the `gpu_layout` function. `GpuLayout::gpu_layout` does not exist, so that implementors
 // of `GpuLayout` can't overwrite it.
-pub fn cpu_layout<T: CpuLayout + ?Sized>() -> TypeLayout { T::cpu_layout() }
+pub fn cpu_layout<T: CpuLayout + ?Sized>() -> TypeLayout {
+    T::cpu_layout()
+}
 
 pub(crate) fn cpu_type_name_and_layout<T: GpuLayout>(ctx: &Context) -> Option<(Cow<'static, str>, TypeLayout)> {
     match T::cpu_type_name_and_layout().transpose() {
@@ -397,7 +401,9 @@ where
 }
 
 impl<AS: AddressSpace, AM: AccessMode> FromAnys for GpuTypeRef<AS, AM> {
-    fn expected_num_anys() -> usize { 3 }
+    fn expected_num_anys() -> usize {
+        3
+    }
 
     fn from_anys(anys: impl Iterator<Item = Any>) -> Self {
         use crate::__private::proc_macro_reexports::{collect_into_array_exact, push_wrong_amount_of_args_error};
@@ -447,7 +453,11 @@ where
 }
 
 impl BufferFields for GpuT {
-    fn as_anys(&self) -> impl Borrow<[Any]> { [self.a.as_any(), self.b.as_any(), self.c.as_any()] }
+    type LastField = Array<vec<i32, x1>, Size<4>>;
+
+    fn as_anys(&self) -> impl Borrow<[Any]> {
+        [self.a.as_any(), self.b.as_any(), self.c.as_any()]
+    }
 
     #[allow(clippy::clone_on_copy)]
     fn clone_fields(&self) -> Self {
@@ -559,7 +569,9 @@ where
 }
 
 impl GpuLayout for GpuT {
-    fn layout_recipe() -> recipe::TypeLayoutRecipe { todo!() }
+    fn layout_recipe() -> recipe::TypeLayoutRecipe {
+        todo!()
+    }
 
     fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
         Some(Ok((
@@ -570,7 +582,9 @@ impl GpuLayout for GpuT {
 }
 
 impl FromAnys for GpuT {
-    fn expected_num_anys() -> usize { 3 }
+    fn expected_num_anys() -> usize {
+        3
+    }
 
     #[track_caller]
     fn from_anys(mut anys: impl Iterator<Item = Any>) -> Self {
@@ -602,7 +616,9 @@ impl<T: SizedFields + NoAtomics> ToGpuType for T {
         Struct::<T>::from(Any::new_struct(T::get_sizedstruct_type(), self.as_anys().borrow()))
     }
 
-    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> { None }
+    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> {
+        None
+    }
 }
 
 impl GpuStore for GpuT {
@@ -615,27 +631,9 @@ impl GpuStore for GpuT {
         unreachable!()
     }
 
-    fn instantiate_buffer_inner<AS: BufferAddressSpace>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BindingType,
-    ) -> BufferInner<Self, AS>
-    where
-        Self: for<'trivial_bound> NoAtomics + for<'trivial_bound> NoBools,
-    {
-        BufferInner::new_fields(args, bind_ty)
+    fn impl_category() -> GpuStoreImplCategory {
+        GpuStoreImplCategory::Fields(Self::get_bufferblock_type())
     }
-
-    fn instantiate_buffer_ref_inner<AS: BufferAddressSpace, AM: AccessModeReadable>(
-        args: Result<BindingArgs, InvalidReason>,
-        bind_ty: BindingType,
-    ) -> BufferRefInner<Self, AS, AM>
-    where
-        Self: for<'trivial_bound> NoBools,
-    {
-        BufferRefInner::new_fields(args, bind_ty)
-    }
-
-    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::Fields(Self::get_bufferblock_type()) }
 }
 
 impl GpuAligned for GpuT {
@@ -662,7 +660,6 @@ pub struct RustType {
     a: f32,
     b: i32,
 }
-
 
 impl CpuLayout for RustType
 where
@@ -727,16 +724,24 @@ fn cpu_layout_of_scalar(scalar: ScalarType) -> TypeLayout {
 }
 
 impl CpuLayout for f32 {
-    fn cpu_layout() -> TypeLayout { cpu_layout_of_scalar(ScalarType::F32) }
+    fn cpu_layout() -> TypeLayout {
+        cpu_layout_of_scalar(ScalarType::F32)
+    }
 }
 impl CpuLayout for f64 {
-    fn cpu_layout() -> TypeLayout { cpu_layout_of_scalar(ScalarType::F64) }
+    fn cpu_layout() -> TypeLayout {
+        cpu_layout_of_scalar(ScalarType::F64)
+    }
 }
 impl CpuLayout for u32 {
-    fn cpu_layout() -> TypeLayout { cpu_layout_of_scalar(ScalarType::U32) }
+    fn cpu_layout() -> TypeLayout {
+        cpu_layout_of_scalar(ScalarType::U32)
+    }
 }
 impl CpuLayout for i32 {
-    fn cpu_layout() -> TypeLayout { cpu_layout_of_scalar(ScalarType::I32) }
+    fn cpu_layout() -> TypeLayout {
+        cpu_layout_of_scalar(ScalarType::I32)
+    }
 }
 
 /// (no documentation yet)
@@ -753,7 +758,9 @@ impl<T> CpuAligned for T {
     const CPU_ALIGNMENT: U32PowerOf2 =
         U32PowerOf2::try_from_usize(std::mem::align_of::<T>()).expect("alignment of types is always a power of 2");
     const CPU_SIZE: Option<usize> = Some(std::mem::size_of::<T>());
-    fn alignment() -> U32PowerOf2 { Self::CPU_ALIGNMENT }
+    fn alignment() -> U32PowerOf2 {
+        Self::CPU_ALIGNMENT
+    }
 }
 
 impl<T> CpuAligned for [T] {

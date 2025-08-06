@@ -13,7 +13,11 @@ use super::{
     vec::ToInteger,
     AsAny, GpuType, To,
 };
-use crate::{frontend::any::Any, ir::StoreType, BufferFields};
+use crate::{
+    common::proc_macro_reexports::GpuStoreImplCategory,
+    frontend::any::Any,
+    ir::{SizedStruct, SizedType, StoreType},
+};
 use crate::frontend::rust_types::len::x1;
 use crate::frontend::rust_types::vec::vec;
 use crate::{
@@ -185,29 +189,13 @@ where
 
 impl<T, AS, AM> From<Any> for Ref<T, AS, AM>
 where
-    T: GpuType + GpuStore,
+    T: GpuStore,
     AS: AddressSpace,
     AM: AccessMode,
 {
     #[track_caller]
     fn from(any: Any) -> Self {
-        ref_from_any_and_store_type(any, T::store_ty())
-    }
-}
-
-impl<T, AS, AM> Ref<T, AS, AM>
-where
-    T: BufferFields + GpuStore,
-    AS: AddressSpace,
-    AM: AccessMode,
-{
-    /// From<Any> for unsized structs.
-    ///
-    /// WARNING: using this function with a sized struct will result in an invalid Any.
-    #[track_caller]
-    fn from_unsized_struct_any(any: Any) -> Self {
-        // StoreType is not a BufferBlock for sized structs
-        ref_from_any_and_store_type::<T, AS, AM>(any, StoreType::BufferBlock(T::get_bufferblock_type()))
+        ref_from_any_and_store_type(any, T::impl_category().to_store_ty())
     }
 }
 
