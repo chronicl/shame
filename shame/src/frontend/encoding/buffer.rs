@@ -172,7 +172,7 @@ where
         Self::from_ref(Ref::from(Any::new_invalid(reason)))
     }
 
-    /// any must be of type `Ref<T, AS, AM>`
+    /// TODO(chronicl)
     pub fn from_ref(r: Ref<T, AS, AM>) -> Self {
         Self {
             content: T::ref_to_deref_target(r),
