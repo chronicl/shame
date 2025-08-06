@@ -294,9 +294,7 @@ impl TryFrom<ir::ir_type::SizedStruct> for SizedStruct {
 }
 
 impl From<ContainsBoolsError> for RecipeConversionError {
-    fn from(_: ContainsBoolsError) -> Self {
-        Self::ContainsBool
-    }
+    fn from(_: ContainsBoolsError) -> Self { Self::ContainsBool }
 }
 
 impl TryFrom<ir::StoreType> for TypeLayoutRecipe {
@@ -310,6 +308,7 @@ impl TryFrom<ir::StoreType> for TypeLayoutRecipe {
             }),
             ir::StoreType::BufferBlock(buffer_block) => buffer_block.try_into()?,
             ir::StoreType::Handle(_) => return Err(RecipeConversionError::IsHandle),
+            ir::StoreType::BindingArray(s, _) => (*s).clone().try_into()?,
         })
     }
 }
@@ -367,14 +366,10 @@ pub enum StructKind {
 }
 
 impl From<SizedStruct> for StructKind {
-    fn from(value: SizedStruct) -> Self {
-        StructKind::Sized(value)
-    }
+    fn from(value: SizedStruct) -> Self { StructKind::Sized(value) }
 }
 impl From<UnsizedStruct> for StructKind {
-    fn from(value: UnsizedStruct) -> Self {
-        StructKind::Unsized(value)
-    }
+    fn from(value: UnsizedStruct) -> Self { StructKind::Unsized(value) }
 }
 
 #[test]

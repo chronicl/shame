@@ -11,8 +11,8 @@ use crate::{
     },
     ir::{recording::Context, StoreType},
     mem::Storage,
-    AccessModeReadable, ArrayLen, Binding, Buffer, BufferAddressSpace, BufferContent, GpuIndex, GpuStore, NoAtomics,
-    NoBools, NoHandles, RuntimeSize,
+    AccessModeReadable, ArrayLen, Binding, Buffer, BufferAddressSpace, BufferContent, GpuIndex, GpuLayout, GpuStore,
+    NoAtomics, NoBools, NoHandles, RuntimeSize,
 };
 
 pub struct BindingArray<T, L = RuntimeSize> {
@@ -25,7 +25,7 @@ pub struct BindingArray<T, L = RuntimeSize> {
 impl<T, L: ArrayLen, AS: BufferAddressSpace, AM: AccessModeReadable> Binding for BindingArray<Buffer<T, AS, AM>, L>
 where
     T: BufferContent<AS, AM>,
-    T: GpuStore + NoHandles + NoAtomics + NoBools,
+    T: GpuStore + GpuLayout + NoHandles + NoAtomics + NoBools,
     Buffer<T, AS, AM>: Binding,
 {
     fn binding_type() -> BindingType { Buffer::<T, AS, AM>::binding_type() }
@@ -41,7 +41,8 @@ where
         let any = match args {
             Err(reason) => Any::new_invalid(reason),
             Ok(BindingArgs { path, visibility }) => {
-                Any::binding(path, visibility, Self::store_ty(), Self::binding_type(), as_ref)
+                // Any::binding(path, visibility, Self::store_ty(), Self::binding_type(), as_ref)
+                todo!()
             }
         };
         Self {

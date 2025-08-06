@@ -682,7 +682,9 @@ impl StructRegistry {
                 self.find_and_register_new_structs_used_in_sized_type(s, idents, call_info)
             }
             StoreType::BufferBlock(s) => self.register_mentioned_structs_recursively(s, idents, call_info),
-            StoreType::BindingArray(s) => self.find_and_register_new_structs_used_in_store_type(s, idents, call_info),
+            StoreType::BindingArray(s, _) => {
+                self.find_and_register_new_structs_used_in_store_type(s, idents, call_info)
+            }
         }
     }
 

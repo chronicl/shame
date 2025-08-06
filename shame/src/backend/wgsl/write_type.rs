@@ -237,6 +237,15 @@ pub(super) fn write_store_type(
             write!(code, "{}", &ctx.idents[ident])?;
             Ok(())
         }
+        StoreType::BindingArray(s, n) => {
+            write!(code, "binding_array<")?;
+            write_store_type(code, s, call_info, ctx)?;
+            if let Some(n) = n {
+                write!(code, ", {n}")?;
+            }
+            write!(code, ">")?;
+            Ok(())
+        }
     }
 }
 

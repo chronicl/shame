@@ -55,6 +55,8 @@ impl StoreType {
             T::Sized(s) | T::RuntimeSizedArray(s) => s.is_host_shareable(),
             T::BufferBlock(def) => def.is_host_shareable(),
             T::Handle(_) => false,
+            // TODO(chronicl) check if correct
+            T::BindingArray(s, _) => false,
         }
     }
 
@@ -65,6 +67,7 @@ impl StoreType {
             Sized(_) => true,
             RuntimeSizedArray(_) | Handle(_) => false,
             BufferBlock(block) => block.is_creation_fixed_footprint(),
+            BindingArray(_, _) => false, // TODO(chronicl) check if correct
         }
     }
 
@@ -75,6 +78,7 @@ impl StoreType {
             Sized(_) => true,
             RuntimeSizedArray(_) | Handle(_) => false,
             BufferBlock(blk) => blk.is_fixed_footprint(),
+            BindingArray(_, _) => false, // TODO(chronicl) check if correct
         }
     }
 
@@ -84,6 +88,7 @@ impl StoreType {
             StoreType::Sized(s) | StoreType::RuntimeSizedArray(s) => s.contains_atomics(),
             StoreType::Handle(_) => false,
             StoreType::BufferBlock(blk) => blk.contains_atomics(),
+            StoreType::BindingArray(s, _) => s.contains_atomics(),
         }
     }
 
@@ -94,6 +99,7 @@ impl StoreType {
             Sized(sized) => sized.is_constructible(),
             RuntimeSizedArray(_) | Handle(_) => false,
             BufferBlock(blk) => blk.is_constructible(),
+            BindingArray(binding, _) => false, // check if correct
         }
     }
 }
