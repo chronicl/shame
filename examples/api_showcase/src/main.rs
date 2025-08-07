@@ -87,7 +87,8 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     // (once rusts const-generics are more powerful this may be moved to compile-time)
     let xforms_sto: sm::Buffer<Transforms, sm::mem::Storage> = group0.next();
     let xforms_uni: sm::Buffer<Transforms, sm::mem::Uniform> = group0.next();
-    let ts: sm::BindingArray<sm::Buffer<Transforms>> = group0.next();
+    let ts: sm::BindingArray<sm::Buffer<f32x4x4>> = group0.next();
+    let ts: sm::BindingArray<sm::Buffer<f32x1>> = group0.next();
     let t = ts.at(0);
 
     let textures: sm::BindingArray<sm::Texture<sm::tf::Rgba8Unorm>> = group0.next();
@@ -101,7 +102,7 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     }
 
     // result types of matrix multiplications are inferred
-    let xform = t.proj * xforms_sto.view * xforms_sto.world;
+    let xform = t * xforms_sto.view * xforms_sto.world;
 
     // here are some examples of how vector and matrix types behave
     let my_vec3 = sm::vec!(1.0, 2.0, 3.0);
