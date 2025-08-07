@@ -28,6 +28,7 @@ use crate::{call_info, for_count, ir};
 use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
+use std::ops::Deref;
 use std::rc::Rc;
 
 /// Amount of elements in an [`Array`]
@@ -87,9 +88,7 @@ pub struct Array<T: GpuType + GpuSized, N: ArrayLen = RuntimeSize> {
 }
 
 impl<T: GpuType + GpuStore + GpuSized, N: ArrayLen> GpuType for Array<T, N> {
-    fn ty() -> ir::Type {
-        ir::Type::Store(Self::store_ty())
-    }
+    fn ty() -> ir::Type { ir::Type::Store(Self::store_ty()) }
 
     fn from_any_unchecked(any: Any) -> Self {
         Self {
@@ -100,9 +99,7 @@ impl<T: GpuType + GpuStore + GpuSized, N: ArrayLen> GpuType for Array<T, N> {
 }
 
 impl<T: GpuType + GpuSized, N: ArrayLen> AsAny for Array<T, N> {
-    fn as_any(&self) -> Any {
-        self.any
-    }
+    fn as_any(&self) -> Any { self.any }
 }
 
 impl<const N: usize> Size<N> {
@@ -113,13 +110,9 @@ impl<const N: usize> Size<N> {
 
 impl<T: GpuType + GpuSized + GpuStore, N: ArrayLen> GpuStore for Array<T, N> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
-    fn store_ty() -> ir::StoreType {
-        Self::array_store_ty()
-    }
+    fn store_ty() -> ir::StoreType { Self::array_store_ty() }
 
-    fn impl_category() -> GpuStoreImplCategory {
-        GpuStoreImplCategory::GpuType(Self::store_ty())
-    }
+    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
 }
 
 impl<T: GpuType + GpuSized, N: ArrayLen> GpuAligned for Array<T, N> {
@@ -147,13 +140,9 @@ impl<T: GpuType + GpuSized, const N: usize> GpuSized for Array<T, Size<N>> {
 impl<T: GpuType + GpuStore + GpuSized, N: ArrayLen> ToGpuType for Array<T, N> {
     type Gpu = Self;
 
-    fn to_gpu(&self) -> Self::Gpu {
-        self.clone()
-    }
+    fn to_gpu(&self) -> Self::Gpu { self.clone() }
 
-    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> {
-        Some(self)
-    }
+    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> { Some(self) }
 }
 
 impl<T: GpuType + GpuSized + GpuLayout, N: ArrayLen> GpuLayout for Array<T, N> {
@@ -209,14 +198,10 @@ impl<T: GpuType + GpuSized + GpuLayout, N: ArrayLen> GpuLayout for Array<T, N> {
 }
 
 impl<T: GpuType + GpuSized, N: ArrayLen> FromAnys for Array<T, N> {
-    fn expected_num_anys() -> usize {
-        1
-    }
+    fn expected_num_anys() -> usize { 1 }
 
     #[track_caller]
-    fn from_anys(mut anys: impl Iterator<Item = Any>) -> Self {
-        super::layout_traits::from_single_any(anys).into()
-    }
+    fn from_anys(mut anys: impl Iterator<Item = Any>) -> Self { super::layout_traits::from_single_any(anys).into() }
 }
 
 impl<T: GpuType + GpuSized, N: ArrayLen> Array<T, N> {
@@ -241,9 +226,7 @@ impl<T: GpuType + GpuSized, N: ArrayLen> From<Any> for Array<T, N> {
 impl<T: GpuSized + GpuType + NoAtomics, N: ArrayLen> Array<T, N> {
     /// (no documentation yet)
     #[track_caller]
-    pub fn at(&self, index: impl ToInteger) -> T {
-        self.any.array_index(index.to_any()).into()
-    }
+    pub fn at(&self, index: impl ToInteger) -> T { self.any.array_index(index.to_any()).into() }
 
     /// (no documentation yet)
     #[track_caller]
@@ -258,9 +241,7 @@ impl<T: GpuSized + GpuType + NoAtomics, N: ArrayLen> Array<T, N> {
 impl<Idx: ToInteger, T: GpuType + GpuSized + NoAtomics, N: ArrayLen> GpuIndex<Idx> for Array<T, N> {
     type Output = T;
 
-    fn index(&self, index: Idx) -> T {
-        self.any.array_index(index.to_any()).into()
-    }
+    fn index(&self, index: Idx) -> T { self.any.array_index(index.to_any()).into() }
 }
 
 impl<Idx, T, AS, AM, N> GpuIndex<Idx> for Ref<Array<T, N>, AS, AM>
@@ -274,9 +255,7 @@ where
     type Output = Ref<T, AS, AM>;
 
     #[track_caller]
-    fn index(&self, index: Idx) -> Ref<T, AS, AM> {
-        self.at(index)
-    }
+    fn index(&self, index: Idx) -> Ref<T, AS, AM> { self.at(index) }
 }
 
 impl<T: ToGpuType, const N: usize> ToGpuType for [T; N]
@@ -290,23 +269,17 @@ where
         Any::new_array(Rc::new(T::Gpu::sized_ty()), &anys).into()
     }
 
-    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> {
-        None
-    }
+    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> { None }
 }
 
 impl<T: GpuType + GpuStore + GpuSized + NoAtomics, const N: usize> Array<T, Size<N>> {
     /// (no documentation yet)
     #[track_caller]
-    pub fn new(fields: [impl To<T>; N]) -> Self {
-        fields.to_gpu()
-    }
+    pub fn new(fields: [impl To<T>; N]) -> Self { fields.to_gpu() }
 
     /// zero initialize, see https://www.w3.org/TR/WGSL/#zero-value-builtin-function
     #[track_caller]
-    pub fn zero() -> Self {
-        Any::new_default(Self::sized_ty()).into()
-    }
+    pub fn zero() -> Self { Any::new_default(Self::sized_ty()).into() }
 
     /// create a new array by transforming the elements of `self`
     ///
@@ -326,9 +299,7 @@ impl<T: GpuType + GpuStore + GpuSized + NoAtomics, const N: usize> Array<T, Size
 }
 
 impl<T: GpuType + GpuSized, N: ArrayLen> GetAllFields for Array<T, N> {
-    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> {
-        []
-    }
+    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
 }
 
 /// Wraps Ref<Array<T>, AS, AM> to provide a more convenient indexing API:
@@ -344,21 +315,10 @@ impl<
     AM: AccessModeReadable + 'static,
 > ArrayRef<T, AS, AM>
 {
-    pub fn new(inner: Ref<Array<T>, AS, AM>) -> Self {
-        Self { inner }
-    }
-
-    pub fn at(&self, index: impl ToInteger) -> T {
-        self.inner.at(index).get()
-    }
-
-    pub fn len(&self) -> vec<u32, x1> {
-        self.inner.as_any().address().array_length().into()
-    }
-
-    pub fn to_ref(&self) -> Ref<Array<T>, AS, AM> {
-        self.inner
-    }
+    pub fn new(inner: Ref<Array<T>, AS, AM>) -> Self { Self { inner } }
+    pub fn at(&self, index: impl ToInteger) -> T { self.inner.at(index).get() }
+    pub fn len(&self) -> vec<u32, x1> { self.inner.as_any().address().array_length().into() }
+    pub fn to_ref(&self) -> Ref<Array<T>, AS, AM> { self.inner }
 }
 
 impl<
@@ -369,11 +329,18 @@ impl<
 > GpuIndex<Idx> for ArrayRef<T, AS, AM>
 {
     type Output = T;
-
     #[track_caller]
-    fn index(&self, index: Idx) -> T {
-        self.at(index)
-    }
+    fn index(&self, index: Idx) -> T { self.at(index) }
+}
+
+impl<T, AS, AM> Deref for ArrayRef<T, AS, AM>
+where
+    T: GpuStore + GpuType + GpuSized + NoAtomics,
+    AS: AddressSpace,
+    AM: AccessModeReadable,
+{
+    type Target = Ref<Array<T>, AS, AM>;
+    fn deref(&self) -> &Self::Target { &self.inner }
 }
 
 #[diagnostic::on_unimplemented(message = "array size <= 8 is required")]

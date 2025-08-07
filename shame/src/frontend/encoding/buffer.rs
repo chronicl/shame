@@ -452,9 +452,10 @@ mod tests {
             &group.next::<Buffer<Array<f32x1, sm::Size<4>>, Storage, ReadWrite>>();
 
         let unsized_array: &ArrayRef<f32x1, Storage, Read> = &group.next::<Buffer<Array<f32x1>>>();
-        let f32x1 = group.next::<Buffer<Array<f32x1>>>().at(0);
+        let f: f32x1 = group.next::<Buffer<Array<f32x1>>>().at(0);
         let unsized_array: &Ref<Array<f32x1>, Storage, ReadWrite> =
             &group.next::<Buffer<Array<f32x1>, Storage, ReadWrite>>();
+        let f: Ref<f32x1, Storage, ReadWrite> = group.next::<Buffer<Array<f32x1>, Storage, ReadWrite>>().at(0);
 
         // this commented line should compile fail
         // let atomic: Buffer<sm::AtomicU32, Storage, Read> = group.next();
