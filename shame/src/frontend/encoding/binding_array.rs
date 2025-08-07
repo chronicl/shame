@@ -33,20 +33,18 @@ impl<T, L> BindingArray<T, L> {
     }
 }
 
-// Binding arrays don't support dynamic offsets in wgpu currently,
-// so it's only implemented for buffers with DYNAMIC_OFFSET = false
-impl<T, L, AS, AM> Binding for BindingArray<Buffer<T, AS, AM>, L>
+impl<T, L, AS, AM, const DO: bool> Binding for BindingArray<Buffer<T, AS, AM, DO>, L>
 where
     T: BufferContent<AS, AM> + GpuStore + GpuLayout + NoHandles + NoBools,
-    Buffer<T, AS, AM>: Binding,
+    Buffer<T, AS, AM, DO>: Binding,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
     L: ArrayLen,
 {
-    fn binding_type() -> BindingType { Buffer::<T, AS, AM>::binding_type() }
+    fn binding_type() -> BindingType { Buffer::<T, AS, AM, DO>::binding_type() }
     fn binding_array_len() -> Option<Option<std::num::NonZeroU32>> { Some(L::LEN) }
 
-    fn store_ty() -> StoreType { StoreType::BindingArray(Rc::new(<Buffer<T, AS, AM>>::store_ty()), L::LEN) }
+    fn store_ty() -> StoreType { StoreType::BindingArray(Rc::new(<Buffer<T, AS, AM, DO>>::store_ty()), L::LEN) }
     fn new_invalid(reason: InvalidReason) -> Self { Self::new_invalid(reason) }
     fn new_binding(args: BindingArgs) -> Self {
         let any = Context::try_with(call_info!(), |ctx| {
@@ -54,7 +52,7 @@ where
             get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check);
 
             let access = AM::ACCESS_MODE_READABLE;
-            let bind_ty = Buffer::<T, AS, AM>::binding_type();
+            let bind_ty = Self::binding_type();
 
             let vert_write_storage = ctx.settings().vertex_writable_storage_by_default;
             let vis = bind_ty.max_supported_stage_visibility(vert_write_storage);
@@ -94,29 +92,29 @@ where
     }
 }
 
-impl<T, AS, AM, L> BindingArray<Buffer<T, AS, AM>, L>
+impl<T, AS, AM, L, const DO: bool> BindingArray<Buffer<T, AS, AM, DO>, L>
 where
     T: BufferContent<AS, AM> + GpuStore + GpuLayout + NoHandles + NoBools,
-    Buffer<T, AS, AM>: Binding,
+    Buffer<T, AS, AM, DO>: Binding,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
     L: ArrayLen,
 {
-    pub fn at<Idx: ToInteger>(&self, index: Idx) -> Buffer<T, AS, AM> {
+    pub fn at<Idx: ToInteger>(&self, index: Idx) -> Buffer<T, AS, AM, DO> {
         let ref_any = self.bindings.binding_array_index(index.to_any());
         Buffer::from_ref(ref_any.into())
     }
 }
 
-impl<Idx: ToInteger, T, AS, AM, L> GpuIndex<Idx> for BindingArray<Buffer<T, AS, AM>, L>
+impl<Idx: ToInteger, T, AS, AM, L, const DO: bool> GpuIndex<Idx> for BindingArray<Buffer<T, AS, AM, DO>, L>
 where
     T: BufferContent<AS, AM> + GpuStore + GpuLayout + NoHandles + NoBools,
-    Buffer<T, AS, AM>: Binding,
+    Buffer<T, AS, AM, DO>: Binding,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
     L: ArrayLen,
 {
-    type Output = Buffer<T, AS, AM>;
+    type Output = Buffer<T, AS, AM, DO>;
     fn index(&self, index: Idx) -> Self::Output { self.at(index) }
 }
 
