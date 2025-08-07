@@ -416,6 +416,7 @@ fn write_binding_def(
     let WipBinding {
         user_defined_visibility: _,
         binding_ty: bind_ty,
+        binding_array_len: _,
         shader_ty: store_ty,
         call_info,
         node: _,

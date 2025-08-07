@@ -108,6 +108,11 @@ pub enum Decomposition {
     // (no test case yet)
     ArrayIndexConst(u32),
 
+    // (no test case yet)
+    BindingArrayIndex,
+    // (no test case yet)
+    BindingArrayIndexConst(u32),
+
     StructureAccess(CanonName),
 }
 
@@ -127,6 +132,8 @@ impl Display for Decomposition {
             Decomposition::MatrixIndexConst(i) => write!(f, "mat[const {}]", i),
             Decomposition::ArrayIndex => write!(f, "array[_]"),
             Decomposition::ArrayIndexConst(i) => write!(f, "array[const {}]", i),
+            Decomposition::BindingArrayIndex => write!(f, "binding-array[_]"),
+            Decomposition::BindingArrayIndexConst(i) => write!(f, "binding-array[const {}]", i),
             Decomposition::StructureAccess(canon_name) => write!(f, "struct.{}", canon_name),
         }
     }
@@ -191,6 +198,21 @@ impl TypeCheck for Decomposition {
                 [Ref(alloc, Sized(Array(t, n)), am)] if *i < n.get() => Ref(alloc.clone(), (**t).clone().into(), *am),
                 [Ref(alloc, RuntimeSizedArray(t), am)] => Ref(alloc.clone(), (*t).clone().into(), *am),
             )(self, args),
+            Decomposition::BindingArrayIndex => sig!(
+                { fmt: SigFormatting::RemoveAsterisksAndClone, },
+                // For texture binding arrays
+                [Store(BindingArray(t, n)), Store(Sized(Vector(X1, I32 | U32)))] => Type::Store((**t).clone()),
+                // For buffer binding arrays
+                [Ref(alloc, BindingArray(t, n), am), Store(Sized(Vector(X1, I32 | U32)))] => Ref(alloc.clone(), (**t).clone(), *am),
+            )(self, args),
+            Decomposition::BindingArrayIndexConst(i) => sig!(
+                {
+                    name: Decomposition::BindingArrayIndexConst(i),
+                    fmt: SigFormatting::RemoveAsterisksAndClone,
+                },
+                [Store(BindingArray(t, n))] if n.map(|n| *i < n.get()).unwrap_or(true) => Type::Store((**t).clone()),
+                [Ref(alloc, BindingArray(t, n), am)] if n.map(|n| *i < n.get()).unwrap_or(true) => Ref(alloc.clone(), (**t).clone(), *am),
+            )(self, args),
             Decomposition::StructureAccess(field) => self.infer_type_of_structure_access(args, field),
         }
     }
@@ -220,7 +242,7 @@ impl Decomposition {
             [arg] => arg,
             _ => {
                 return Err(no_matching_sig_with_comment(
-                    "struct access expressions require 
+                    "struct access expressions require
             having only a single (self) argument."
                         .into(),
                 ))
@@ -235,7 +257,7 @@ impl Decomposition {
 
             _ => {
                 return Err(no_matching_sig_with_comment(
-                    "struct access expressions require 
+                    "struct access expressions require
                 a single (self) argument of type struct/buffer-block or \
                 reference-to-struct/buffer-block."
                         .into(),
@@ -272,6 +294,7 @@ impl Any {
         pub fn array_index (&self, i: Any)        -> Any => [*self, i] Expr::Decomposition(Decomposition::ArrayIndex);
         pub fn vector_index(&self, i: Any)        -> Any => [*self, i] Expr::Decomposition(Decomposition::VectorIndex);
         pub fn matrix_index(&self, i: Any)        -> Any => [*self, i] Expr::Decomposition(Decomposition::MatrixIndex);
+        pub fn binding_array_index(&self, i: Any) -> Any => [*self, i] Expr::Decomposition(Decomposition::BindingArrayIndex);
         pub fn get_field(&self, name: CanonName)  -> Any => [*self]    Expr::Decomposition(Decomposition::StructureAccess(name));
         pub fn swizzle(&self, xyzw: VectorAccess) -> Any => [*self]    Expr::Decomposition(Decomposition::VectorAccess(xyzw));
     }

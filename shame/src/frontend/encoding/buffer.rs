@@ -150,9 +150,7 @@ where
     AM: AccessModeReadable,
 {
     type Target = T::DerefTarget;
-    fn deref(&self) -> &Self::Target {
-        &self.content
-    }
+    fn deref(&self) -> &Self::Target { &self.content }
 }
 
 impl<T, AS, AM, const DYNAMIC_OFFSET: bool> Buffer<T, AS, AM, DYNAMIC_OFFSET>
@@ -165,12 +163,10 @@ where
     where
         T: GpuLayout,
     {
-        Self::from_ref(Self::create_ref(args))
+        Self::from_ref(Self::create_ref_for_binding(args))
     }
 
-    fn new_invalid(reason: InvalidReason) -> Self {
-        Self::from_ref(Ref::from(Any::new_invalid(reason)))
-    }
+    fn new_invalid(reason: InvalidReason) -> Self { Self::from_ref(Ref::from(Any::new_invalid(reason))) }
 
     /// TODO(chronicl)
     pub fn from_ref(r: Ref<T, AS, AM>) -> Self {
@@ -180,11 +176,14 @@ where
         }
     }
 
-    fn create_ref(args: BindingArgs) -> Ref<T, AS, AM>
+    fn create_ref_for_binding(args: BindingArgs) -> Ref<T, AS, AM>
     where
         T: GpuLayout,
     {
         let any = Context::try_with(call_info!(), |ctx| {
+            let skip_stride_check = true; // not a vertex buffer
+            get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check);
+
             let access = AM::ACCESS_MODE_READABLE;
             let bind_ty = BindingType::Buffer {
                 ty: match AS::BUFFER_ADDRESS_SPACE {
@@ -239,9 +238,7 @@ pub trait BufferContent<AS: BufferAddressSpace, AM: AccessModeReadable>: GpuStor
 // Read-write buffers are simple, their deref target is always Ref<T>
 impl<T: GpuStore, AS: BufferAddressSpace> BufferContent<AS, ReadWrite> for T {
     type DerefTarget = Ref<Self, AS, ReadWrite>;
-    fn ref_to_deref_target(r: Ref<Self, AS, ReadWrite>) -> Self::DerefTarget {
-        r
-    }
+    fn ref_to_deref_target(r: Ref<Self, AS, ReadWrite>) -> Self::DerefTarget { r }
 }
 
 // Construcible types T can be dereferenced to themselves from Buffer<T, Read>.
@@ -274,9 +271,7 @@ impl<T: GpuType + GpuSized + GpuStore + NoAtomics + 'static, AS: BufferAddressSp
     for Array<T>
 {
     type DerefTarget = ArrayRef<T, AS, Read>;
-    fn ref_to_deref_target(r: Ref<Self, AS, Read>) -> Self::DerefTarget {
-        ArrayRef::new(r)
-    }
+    fn ref_to_deref_target(r: Ref<Self, AS, Read>) -> Self::DerefTarget { ArrayRef::new(r) }
 }
 
 // Sized structs T should allow to deref Buffer<T, Read> to T, but
@@ -370,18 +365,10 @@ where
             has_dynamic_offset: DYNAMIC_OFFSET,
         }
     }
-
+    fn new_invalid(reason: InvalidReason) -> Self { Self::new_invalid(reason) }
     #[track_caller]
-    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self {
-        match args {
-            Ok(args) => Self::new(args),
-            Err(reason) => Self::new_invalid(reason),
-        }
-    }
-
-    fn store_ty() -> ir::StoreType {
-        T::impl_category().to_store_ty()
-    }
+    fn new_binding(args: BindingArgs) -> Self { Self::new(args) }
+    fn store_ty() -> ir::StoreType { T::impl_category().to_store_ty() }
 }
 
 #[diagnostic::on_unimplemented(message = "atomics can only be used in read-write storage buffers`.")]

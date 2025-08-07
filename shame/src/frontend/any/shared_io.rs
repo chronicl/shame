@@ -1,5 +1,6 @@
 use std::fmt::Display;
-use std::num::NonZeroU64;
+use std::num::{NonZeroU32, NonZeroU64};
+use std::rc::Rc;
 
 use crate::any::layout::TypeLayoutRecipe;
 use crate::backend::language::Language;
@@ -170,8 +171,7 @@ fn layout_to_store_type(recipe: &TypeLayoutRecipe, binding_ty: &BindingType) -> 
         return Err(InternalError::new(
             true,
             format!(
-                "TypeLayoutRecipe to StoreType conversion did not result in a host-shareable type. TypeLayoutRecipe:\n{}",
-                recipe
+                "TypeLayoutRecipe to StoreType conversion did not result in a host-shareable type. TypeLayoutRecipe:\n{recipe}",
             ),
         )
         .into());
@@ -185,6 +185,7 @@ fn record_and_register_binding(
     path: BindPath,
     visibility: StageMask,
     binding_ty: BindingType,
+    binding_array_len: Option<Option<NonZeroU32>>,
     store_type: StoreType,
     ty: Type,
 ) -> Result<Any, EncodingErrorKind> {
@@ -202,6 +203,7 @@ fn record_and_register_binding(
                     call_info: call_info!(),
                     user_defined_visibility: visibility,
                     binding_ty,
+                    binding_array_len,
                     shader_ty: store_type,
                     node,
                 });
@@ -225,6 +227,56 @@ fn create_any_catch_errors(create_any: impl FnOnce(&Context) -> Result<Any, Enco
 }
 
 impl Any {
+    /// Create a binding array of buffers at the specified bind path.
+    ///
+    /// `layout` should be the layout of T in BindingArray<Buffer<T>>
+    pub fn buffer_binding_array<AS: BufferAddressSpace>(
+        bind_path: BindPath,
+        visibility: StageMask,
+        layout: TypeLayoutCompatibleWith<AS>,
+        access: AccessModeReadable,
+        has_dynamic_offset: bool,
+        binding_array_len: Option<NonZeroU32>,
+    ) -> Any {
+        let create_any = |ctx: &Context| -> Result<Any, EncodingErrorKind> {
+            let binding_type = BindingType::Buffer {
+                ty: match AS::BUFFER_ADDRESS_SPACE {
+                    BufferAddressSpaceEnum::Uniform => BufferBindingType::Uniform,
+                    BufferAddressSpaceEnum::Storage => BufferBindingType::Storage(access),
+                },
+                has_dynamic_offset,
+            };
+            let store_type = layout_to_store_type(layout.recipe(), &binding_type)?;
+            let store_type = StoreType::BindingArray(Rc::new(store_type), binding_array_len);
+
+            let ty = Type::Ref(
+                MemoryRegion::new(
+                    ctx.latest_user_caller(),
+                    store_type.clone(),
+                    None,
+                    None,
+                    access.into(),
+                    AS::ADDRESS_SPACE,
+                )?,
+                store_type.clone(),
+                access.into(),
+            );
+
+            record_and_register_binding(
+                ctx,
+                bind_path,
+                visibility,
+                binding_type,
+                Some(binding_array_len),
+                store_type,
+                ty,
+            )
+        };
+
+        create_any_catch_errors(create_any)
+    }
+
+
     /// Creates a uniform or storage buffer binding at the specified bind path.
     #[track_caller]
     pub fn buffer_binding<AS: BufferAddressSpace>(
@@ -235,20 +287,8 @@ impl Any {
         has_dynamic_offset: bool,
     ) -> Any {
         let create_any = |ctx: &Context| -> Result<Any, EncodingErrorKind> {
-            let space = AS::BUFFER_ADDRESS_SPACE;
-            // Ensure that uniform buffers are read only
-            match (space, access) {
-                (BufferAddressSpaceEnum::Uniform, AccessModeReadable::ReadWrite) => {
-                    let err: AddressSpaceError =
-                        RequirementsNotSatisfied::MustBeSized(layout.recipe().clone(), Language::Wgsl, space).into();
-                    return Err(err.into());
-                }
-                (BufferAddressSpaceEnum::Uniform, AccessModeReadable::Read)
-                | (BufferAddressSpaceEnum::Storage, AccessModeReadable::Read | AccessModeReadable::ReadWrite) => {}
-            }
-
             let binding_type = BindingType::Buffer {
-                ty: match space {
+                ty: match AS::BUFFER_ADDRESS_SPACE {
                     BufferAddressSpaceEnum::Uniform => BufferBindingType::Uniform,
                     BufferAddressSpaceEnum::Storage => BufferBindingType::Storage(access),
                 },
@@ -269,7 +309,48 @@ impl Any {
                 access.into(),
             );
 
-            record_and_register_binding(ctx, bind_path, visibility, binding_type, store_type, ty)
+            record_and_register_binding(ctx, bind_path, visibility, binding_type, None, store_type, ty)
+        };
+
+        create_any_catch_errors(create_any)
+    }
+
+
+    /// Create a binding array of textures at the specified bind path.
+    pub fn texture_binding_array(
+        bind_path: BindPath,
+        visibility: StageMask,
+        handle_type: HandleType,
+        binding_array_len: Option<NonZeroU32>,
+    ) -> Any {
+        let create_any = |ctx: &Context| -> Result<Any, EncodingErrorKind> {
+            let binding_type = match &handle_type {
+                HandleType::Sampler(s) => BindingType::Sampler(*s),
+                HandleType::SampledTexture(s, t, p) => BindingType::SampledTexture {
+                    shape: *s,
+                    sample_type: *t,
+                    samples_per_pixel: *p,
+                },
+                HandleType::StorageTexture(s, f, a) => BindingType::StorageTexture {
+                    shape: *s,
+                    format: f.clone(),
+                    access: *a,
+                },
+            };
+
+            let store_type = StoreType::Handle(handle_type);
+            let store_type = StoreType::BindingArray(Rc::new(store_type), binding_array_len);
+            let ty = Type::Store(store_type.clone());
+
+            record_and_register_binding(
+                ctx,
+                bind_path,
+                visibility,
+                binding_type,
+                Some(binding_array_len),
+                store_type,
+                ty,
+            )
         };
 
         create_any_catch_errors(create_any)
@@ -294,9 +375,11 @@ impl Any {
             };
 
             let store_type = StoreType::Handle(handle_type);
+            // TODO(chronicl) think about making this `Ref` instead and dereferncing
+            // the returned `Any` immediately
             let ty = Type::Store(store_type.clone());
 
-            record_and_register_binding(ctx, bind_path, visibility, binding_type, store_type, ty)
+            record_and_register_binding(ctx, bind_path, visibility, binding_type, None, store_type, ty)
         };
 
         create_any_catch_errors(create_any)

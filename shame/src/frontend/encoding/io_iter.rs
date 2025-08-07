@@ -362,7 +362,7 @@ impl BindingIter<'_> {
         })
         .unwrap_or_else(|| {
             self.next = BindPath(self.next.0, index + 1);
-            Binding::new_binding(Err(InvalidReason::CreatedWithNoActiveEncoding))
+            Binding::new_invalid(InvalidReason::CreatedWithNoActiveEncoding)
         })
     }
 
@@ -376,10 +376,10 @@ impl BindingIter<'_> {
     #[track_caller]
     pub fn at_with_visibility<T: Binding>(&mut self, index: u32, stages: StageMask) -> T {
         self.next = BindPath(self.next.0, index + 1);
-        Binding::new_binding(Ok(BindingArgs {
+        Binding::new_binding(BindingArgs {
             path: BindPath(self.next.0, index),
             visibility: stages,
-        }))
+        })
     }
 
     /// access the binding at index `index` within the bind group.
@@ -477,12 +477,12 @@ impl BindingIter<'_> {
         Context::try_with(call_info!(), |ctx| {
             let vert_write_storage = ctx.settings().vertex_writable_storage_by_default;
             let max_visibility = T::binding_type().max_supported_stage_visibility(vert_write_storage);
-            Binding::new_binding(Ok(BindingArgs {
+            Binding::new_binding(BindingArgs {
                 path,
                 visibility: max_visibility,
-            }))
+            })
         })
-        .unwrap_or_else(|| Binding::new_binding(Err(InvalidReason::CreatedWithNoActiveEncoding)))
+        .unwrap_or_else(|| Binding::new_invalid(InvalidReason::CreatedWithNoActiveEncoding))
     }
 
     /// access the next binding in the bind group with a custom shader stage
@@ -496,10 +496,10 @@ impl BindingIter<'_> {
     /// see [`BindingIter::next`] for more info on the `T` parameter
     #[track_caller]
     pub fn next_with_visibility<T: Binding>(&mut self, stages: StageMask) -> T {
-        Binding::new_binding(Ok(BindingArgs {
+        Binding::new_binding(BindingArgs {
             path: self.post_inc_path(),
             visibility: stages,
-        }))
+        })
     }
 
     fn post_inc_path(&mut self) -> BindPath {

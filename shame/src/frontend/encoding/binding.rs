@@ -43,123 +43,84 @@ use std::num::NonZeroU32;
 pub trait Binding {
     /// runtime representation of `Self`
     fn binding_type() -> BindingType;
-
+    /// Is None if the binding is not a binding array.
+    fn binding_array_len() -> Option<Option<NonZeroU32>> { None }
     /// shader type of `Self`
     fn store_ty() -> ir::StoreType;
 
     #[doc(hidden)]
+    fn new_invalid(reason: InvalidReason) -> Self;
+    #[doc(hidden)]
     #[track_caller]
-    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self;
+    fn new_binding(args: BindingArgs) -> Self;
 }
 
-impl<Format, Coords, SPP> Binding for Texture<Format, Coords, SPP>
+impl<T: TextureHandle> Binding for T {
+    fn binding_type() -> BindingType {
+        match T::texture_type() {
+            HandleType::SampledTexture(shape, sample_type, spp) => BindingType::SampledTexture {
+                shape,
+                sample_type,
+                samples_per_pixel: spp,
+            },
+            HandleType::StorageTexture(shape, format, access) => BindingType::StorageTexture { shape, format, access },
+            HandleType::Sampler(sampling_method) => BindingType::Sampler(sampling_method),
+        }
+    }
+
+    fn new_invalid(reason: InvalidReason) -> Self { T::from_any(Any::new_invalid(reason)) }
+    fn store_ty() -> ir::StoreType { ir::StoreType::Handle(T::texture_type()) }
+
+    fn new_binding(args: BindingArgs) -> Self {
+        let handle_type = T::texture_type();
+        let any = Any::texture_binding(args.path, args.visibility, handle_type);
+        T::from_any(any)
+    }
+}
+
+pub trait TextureHandle {
+    fn texture_type() -> HandleType;
+    fn from_any(any: Any) -> Self;
+}
+
+impl<Format, Coords, SPP> TextureHandle for Texture<Format, Coords, SPP>
 where
     Coords: TextureCoords + SupportsSpp<SPP>,
     Format: SamplingFormat + SupportsSpp<SPP> + SupportsCoords<Coords>,
     SPP: Spp,
 {
-    fn binding_type() -> BindingType {
-        BindingType::SampledTexture {
-            shape: Coords::SHAPE,
-            sample_type: Format::SAMPLE_TYPE.restrict_with_spp(SPP::SAMPLES_PER_PIXEL),
-            samples_per_pixel: SPP::SAMPLES_PER_PIXEL,
-        }
+    fn texture_type() -> HandleType {
+        HandleType::SampledTexture(
+            Coords::SHAPE,
+            Format::SAMPLE_TYPE.restrict_with_spp(SPP::SAMPLES_PER_PIXEL),
+            SPP::SAMPLES_PER_PIXEL,
+        )
     }
-
-    fn store_ty() -> ir::StoreType {
-        let shape = Coords::SHAPE;
-        let sample_type = Format::SAMPLE_TYPE;
-        let spp = SPP::SAMPLES_PER_PIXEL;
-        ir::StoreType::Handle(ir::HandleType::SampledTexture(
-            shape,
-            sample_type.restrict_with_spp(spp),
-            spp,
-        ))
-    }
-
-    #[track_caller]
-    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self {
-        let shape = Coords::SHAPE;
-        let sample_type = Format::SAMPLE_TYPE;
-        let spp = SPP::SAMPLES_PER_PIXEL;
-        let handle_type = HandleType::SampledTexture(shape, sample_type.restrict_with_spp(spp), spp);
-        let any = match args {
-            Err(reason) => Any::new_invalid(reason),
-            Ok(BindingArgs { path, visibility }) => Any::texture_binding(path, visibility, handle_type),
-        };
-        Texture::from_inner(TextureKind::Standalone(any))
-    }
+    fn from_any(any: Any) -> Self { Texture::from_inner(TextureKind::Standalone(any)) }
 }
 
 impl<Access: AccessMode, Format: StorageTextureFormat<Access> + SupportsCoords<Coords>, Coords: StorageTextureCoords>
-    Binding for StorageTexture<Format, Coords, Access>
+    TextureHandle for StorageTexture<Format, Coords, Access>
 {
-    fn binding_type() -> BindingType {
-        BindingType::StorageTexture {
-            shape: Coords::SHAPE,
-            format: Format::id().into(),
-            access: Access::ACCESS,
-        }
+    fn texture_type() -> HandleType {
+        HandleType::StorageTexture(Coords::SHAPE, TextureFormatWrapper::new(Format::id()), Access::ACCESS)
     }
-
-    fn store_ty() -> ir::StoreType {
-        let shape = Coords::SHAPE;
-        let access = Access::ACCESS;
-        let format = TextureFormatWrapper::new(Format::id());
-        ir::StoreType::Handle(ir::HandleType::StorageTexture(shape, format, access))
-    }
-
-    #[track_caller]
-    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self {
-        let shape = Coords::SHAPE;
-        let access = Access::ACCESS;
-        let format = TextureFormatWrapper::new(Format::id());
-        let handle_type = HandleType::StorageTexture(shape, format, access);
-        let any = match args {
-            Err(reason) => Any::new_invalid(reason),
-            Ok(BindingArgs { path, visibility }) => Any::texture_binding(path, visibility, handle_type),
-        };
-        StorageTexture::from_inner(TextureKind::Standalone(any))
-    }
+    fn from_any(any: Any) -> Self { StorageTexture::from_inner(TextureKind::Standalone(any)) }
 }
 
-impl<Format, const N: u32, Coords> Binding for TextureArray<Format, N, Coords>
+impl<Format, const N: u32, Coords> TextureHandle for TextureArray<Format, N, Coords>
 where
     Format: SamplingFormat + SupportsCoords<Coords>,
     Coords: TextureCoords + LayerCoords,
 {
-    fn binding_type() -> BindingType {
-        let samples_per_pixel = ir::SamplesPerPixel::Single;
-        BindingType::SampledTexture {
-            shape: Coords::ARRAY_SHAPE(Self::NONZERO_N),
-            sample_type: Format::SAMPLE_TYPE.restrict_with_spp(samples_per_pixel),
-            samples_per_pixel,
-        }
+    fn texture_type() -> HandleType {
+        HandleType::SampledTexture(
+            Coords::ARRAY_SHAPE(Self::NONZERO_N),
+            Format::SAMPLE_TYPE.restrict_with_spp(ir::SamplesPerPixel::Single),
+            ir::SamplesPerPixel::Single,
+        )
     }
-
-    fn store_ty() -> ir::StoreType {
-        let shape = Coords::ARRAY_SHAPE(Self::NONZERO_N);
-        let sample_type = Format::SAMPLE_TYPE;
-        let spp = ir::SamplesPerPixel::Single;
-        ir::StoreType::Handle(ir::HandleType::SampledTexture(
-            shape,
-            sample_type.restrict_with_spp(spp),
-            spp,
-        ))
-    }
-
-    #[track_caller]
-    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self {
-        let shape = Coords::ARRAY_SHAPE(Self::NONZERO_N);
-        let sample_type = Format::SAMPLE_TYPE;
-        let spp = ir::SamplesPerPixel::Single;
-        let handle_type = HandleType::SampledTexture(shape, sample_type.restrict_with_spp(spp), spp);
-        let any = match args {
-            Err(reason) => Any::new_invalid(reason),
-            Ok(BindingArgs { path, visibility }) => Any::texture_binding(path, visibility, handle_type),
-        };
-        TextureArray::from_inner(any)
-    }
+    fn from_any(any: Any) -> Self { TextureArray::from_inner(any) }
 }
 
 impl<
@@ -167,53 +128,19 @@ impl<
     Format: StorageTextureFormat<Access> + SupportsCoords<Coords>,
     const N: u32,
     Coords: StorageTextureCoords + LayerCoords,
-> Binding for StorageTextureArray<Format, N, Coords, Access>
+> TextureHandle for StorageTextureArray<Format, N, Coords, Access>
 {
-    fn binding_type() -> BindingType {
-        BindingType::StorageTexture {
-            shape: Coords::ARRAY_SHAPE(Self::NONZERO_N),
-            format: Format::id().into(),
-            access: Access::ACCESS,
-        }
+    fn texture_type() -> HandleType {
+        HandleType::StorageTexture(
+            Coords::ARRAY_SHAPE(Self::NONZERO_N),
+            TextureFormatWrapper::new(Format::id()),
+            Access::ACCESS,
+        )
     }
-
-    fn store_ty() -> ir::StoreType {
-        let shape = Coords::ARRAY_SHAPE(Self::NONZERO_N);
-        let access = Access::ACCESS;
-        let format = TextureFormatWrapper::new(Format::id());
-        ir::StoreType::Handle(ir::HandleType::StorageTexture(shape, format, access))
-    }
-
-    #[track_caller]
-    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self {
-        let shape = Coords::ARRAY_SHAPE(Self::NONZERO_N);
-        let access = Access::ACCESS;
-        let format = TextureFormatWrapper::new(Format::id());
-        let handle_type = HandleType::StorageTexture(shape, format, access);
-        let any = match args {
-            Err(reason) => Any::new_invalid(reason),
-            Ok(BindingArgs { path, visibility }) => Any::texture_binding(path, visibility, handle_type),
-        };
-        StorageTextureArray::from_inner(any)
-    }
+    fn from_any(any: Any) -> Self { StorageTextureArray::from_inner(any) }
 }
 
-impl<M: SamplingMethod> Binding for Sampler<M> {
-    fn binding_type() -> BindingType {
-        BindingType::Sampler(M::SAMPLING_METHOD)
-    }
-
-    fn store_ty() -> ir::StoreType {
-        ir::StoreType::Handle(ir::HandleType::Sampler(M::SAMPLING_METHOD))
-    }
-
-    #[track_caller]
-    fn new_binding(args: Result<BindingArgs, InvalidReason>) -> Self {
-        let handle_type = HandleType::Sampler(M::SAMPLING_METHOD);
-        let any = match args {
-            Err(reason) => Any::new_invalid(reason),
-            Ok(BindingArgs { path, visibility }) => Any::texture_binding(path, visibility, handle_type),
-        };
-        Self::from_inner(any)
-    }
+impl<M: SamplingMethod> TextureHandle for Sampler<M> {
+    fn texture_type() -> HandleType { HandleType::Sampler(M::SAMPLING_METHOD) }
+    fn from_any(any: Any) -> Self { Sampler::from_inner(any) }
 }

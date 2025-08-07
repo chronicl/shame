@@ -1,4 +1,9 @@
-use std::{collections::BTreeMap, num::IntErrorKind, ops::Range, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    num::{IntErrorKind, NonZeroU32},
+    ops::Range,
+    sync::Arc,
+};
 
 use crate::{
     backend::shader_code::ShaderCode,
@@ -312,6 +317,8 @@ pub struct BindingLayout {
     pub binding_ty: BindingType,
     /// (no documentation yet)
     pub shader_ty: StoreType,
+    /// (no documentation yet)
+    pub binding_array_len: Option<Option<NonZeroU32>>,
 }
 
 impl BindingLayout {
@@ -322,6 +329,7 @@ impl BindingLayout {
             visibility: binding_ty.max_supported_stage_visibility(vertex_writable_storage_supported),
             binding_ty,
             shader_ty: T::store_ty(),
+            binding_array_len: T::binding_array_len(),
         }
     }
 }

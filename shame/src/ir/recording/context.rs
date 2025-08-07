@@ -55,7 +55,7 @@ macro_rules! with_updated_latest_user_caller {
         // Therefore the incoming `$new_caller` is ignored in that case.
         let latest_user_caller = $ctx.latest_user_caller_since_first.get().unwrap_or($new_caller);
 
-        // remember whatever was in `latest_user_caller` before to 
+        // remember whatever was in `latest_user_caller` before to
         // restore it afterwards
         let restore = $ctx.latest_user_caller_since_first.replace(Some(latest_user_caller));
         let result = $expr_to_execute;
@@ -391,6 +391,7 @@ impl Context {
                     visibility: user_vis,
                     binding_ty: wip_binding.binding_ty.clone(),
                     shader_ty: wip_binding.shader_ty.clone(),
+                    binding_array_len: wip_binding.binding_array_len,
                 };
 
                 let BindPath(group_i, binding_i) = *path;

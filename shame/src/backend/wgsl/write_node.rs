@@ -121,12 +121,15 @@ fn write_expr(code: &mut CodeWriteSpan, node: &Node, ctx: &WgslContext) -> Resul
         Expr::Decomposition(decomp) => {
             use Decomposition as D;
             match decomp {
-                D::VectorIndexConst(i) | D::MatrixIndexConst(i) | D::ArrayIndexConst(i) => {
+                D::VectorIndexConst(i) |
+                D::MatrixIndexConst(i) |
+                D::ArrayIndexConst(i) |
+                D::BindingArrayIndexConst(i) => {
                     let arg = get_single_arg(node)?;
                     write_node_by_key(code, arg, false, ctx)?;
                     write!(code, "[{i}]")?;
                 }
-                D::ArrayIndex | D::VectorIndex | D::MatrixIndex => {
+                D::ArrayIndex | D::VectorIndex | D::MatrixIndex | D::BindingArrayIndex => {
                     let [arg, i] = get_n_args(node)?;
                     write_node_by_key(code, arg, false, ctx)?;
                     write!(code, "[")?;
@@ -799,6 +802,8 @@ pub(super) fn is_guaranteed_valid_as_statement(expr: &Expr) -> bool {
             Decomposition::MatrixIndexConst(_) |
             Decomposition::ArrayIndex |
             Decomposition::ArrayIndexConst(_) |
+            Decomposition::BindingArrayIndex |
+            Decomposition::BindingArrayIndexConst(_) |
             Decomposition::StructureAccess(_) => false,
         },
         Expr::BuiltinFn(builtin_fn) => match builtin_fn {

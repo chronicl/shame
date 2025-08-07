@@ -2,6 +2,8 @@
 //! output structs/enums to their wgpu counterparts. Features that are unsupported
 //! by wgpu are returned as [`ShameToWgpuError`]s
 
+use std::num::NonZeroU32;
+
 use shame::{self as sm, TextureFormatId};
 use shame::__private::SmallVec; // just to avoid some .collect() allocations.
 use shame::results as smr;
@@ -17,6 +19,9 @@ pub enum ShameToWgpuError {
     MustHaveConsecutiveIndices(&'static str),
     FragmentStageNeedsAttachmentInteraction,
     RuntimeSurfaceFormatNotProvided,
+    // TODO(chronicl) check whether this is actually the case for
+    // the texture types where this error comes up below.
+    TextureTypeDoesNotSupportBindingArray(smr::TextureShape),
 }
 
 impl std::error::Error for ShameToWgpuError {}
@@ -51,6 +56,9 @@ impl std::fmt::Display for ShameToWgpuError {
                 f,
                 "trying to convert runtime surface-format to wgpu, but `surface_format` is not available (`None`) in this context"
             ),
+            E::TextureTypeDoesNotSupportBindingArray(t) => {
+                write!(f, "texture type `{t:?}` does not support binding arrays in wgpu")
+            }
         }
     }
 }
@@ -231,6 +239,10 @@ pub fn binding_layout(index: u32, bl: &smr::BindingLayout) -> Result<wgpu::BindG
         smr::TextureShape::CubeArray(count) => (Some(count), wgpu::TextureViewDimension::CubeArray),
     };
 
+    // TODO(chronicl) this should not just default to 100
+    let binding_array_len = bl
+        .binding_array_len
+        .map(|len| len.unwrap_or(NonZeroU32::new(100).unwrap()));
     let (ty, count) = {
         match &bl.binding_ty {
             smr::BindingType::Buffer { ty, has_dynamic_offset } => {
@@ -249,7 +261,7 @@ pub fn binding_layout(index: u32, bl: &smr::BindingLayout) -> Result<wgpu::BindG
                         has_dynamic_offset: *has_dynamic_offset,
                         min_binding_size: bl.shader_ty.min_byte_size(),
                     },
-                    None,
+                    binding_array_len,
                 )
             }
             smr::BindingType::Sampler(method) => (
@@ -258,7 +270,7 @@ pub fn binding_layout(index: u32, bl: &smr::BindingLayout) -> Result<wgpu::BindG
                     smr::SamplingMethod::NonFiltering => wgpu::SamplerBindingType::NonFiltering,
                     smr::SamplingMethod::Comparison => wgpu::SamplerBindingType::Comparison,
                 }),
-                None,
+                binding_array_len,
             ),
             smr::BindingType::SampledTexture {
                 shape,
@@ -266,6 +278,9 @@ pub fn binding_layout(index: u32, bl: &smr::BindingLayout) -> Result<wgpu::BindG
                 samples_per_pixel: spp,
             } => {
                 let (count, dim) = tex_shape_to_count_dim(*shape);
+                if count.is_some() && bl.binding_array_len.is_some() {
+                    return Err(ShameToWgpuError::TextureTypeDoesNotSupportBindingArray(*shape));
+                }
 
                 let ty = wgpu::BindingType::Texture {
                     sample_type: sample_type(*st),
@@ -280,6 +295,9 @@ pub fn binding_layout(index: u32, bl: &smr::BindingLayout) -> Result<wgpu::BindG
             }
             smr::BindingType::StorageTexture { shape, format, access } => {
                 let (count, dim) = tex_shape_to_count_dim(*shape);
+                if count.is_some() && bl.binding_array_len.is_some() {
+                    return Err(ShameToWgpuError::TextureTypeDoesNotSupportBindingArray(*shape));
+                }
 
                 let ty = wgpu::BindingType::StorageTexture {
                     access: match access {

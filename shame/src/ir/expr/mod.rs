@@ -130,7 +130,9 @@ impl Expr {
                 Decomposition::MatrixIndex |
                 Decomposition::MatrixIndexConst(_) |
                 Decomposition::ArrayIndex |
-                Decomposition::ArrayIndexConst(_) => ExprCategory::Normal,
+                Decomposition::ArrayIndexConst(_) |
+                Decomposition::BindingArrayIndex |
+                Decomposition::BindingArrayIndexConst(_) => ExprCategory::Normal,
             },
             Expr::BuiltinFn(f) => match f.may_change_execution_state() {
                 true => ExprCategory::ChangesExecutionState,

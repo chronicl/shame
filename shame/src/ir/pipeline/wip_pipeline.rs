@@ -2,6 +2,7 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
     fmt::{Debug, Display},
+    num::NonZeroU32,
     ops::Range,
     rc::Rc,
 };
@@ -263,6 +264,7 @@ pub struct WipBinding {
     /// the visibility set by the user for this binding (or the default, if the user chose to not specify it)
     pub user_defined_visibility: StageMask,
     pub binding_ty: BindingType,
+    pub binding_array_len: Option<Option<NonZeroU32>>,
     pub shader_ty: StoreType,
     pub node: Key<Node>,
 }
