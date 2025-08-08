@@ -56,33 +56,42 @@ impl<L: Len, N: ScalarTypeNumber> vec<N, L> {
 }
 
 impl_ops! { + also implements lhs <-> rhs swapped
-    // f64 impls are commented out as they cause `1.0` generic float literals to be turned into f64 instead of f32 sometimes. Users can still manually call f64x1::from
     <L: Len> Add !op: add(l: vec<f16, L>, r: f16) -> vec<f16, L>: {op(l.as_any(), r.to_any()).into()};
     <L: Len> Add !op: add(l: vec<f32, L>, r: f32) -> vec<f32, L>: {op(l.as_any(), r.to_any()).into()};
-    //<L: Len> Add !op: add(l: vec<f64, L>, r: f64) -> vec<f64, L>: {op(l.as_any(), Any::new_scalar(ir::ScalarConstant::F64(r))).into()};
     <L: Len> Add !op: add(l: vec<i32, L>, r: i32) -> vec<i32, L>: {op(l.as_any(), r.to_any()).into()};
     <L: Len> Add !op: add(l: vec<u32, L>, r: u32) -> vec<u32, L>: {op(l.as_any(), r.to_any()).into()};
 
-    <L: Len> Sub !op: sub(l: vec<f16, L>, r: f16) -> vec<f16, L>: {op(l.as_any(), r.to_any()).into()};
-    <L: Len> Sub !op: sub(l: vec<f32, L>, r: f32) -> vec<f32, L>: {op(l.as_any(), r.to_any()).into()};
-    //<L: Len> Sub !op: sub(l: vec<f64, L>, r: f64) -> vec<f64, L>: {op(l.as_any(), Any::new_scalar(ir::ScalarConstant::F64(r))).into()};
-    <L: Len> Sub !op: sub(l: vec<i32, L>, r: i32) -> vec<i32, L>: {op(l.as_any(), r.to_any()).into()};
-    <L: Len> Sub !op: sub(l: vec<u32, L>, r: u32) -> vec<u32, L>: {op(l.as_any(), r.to_any()).into()};
-
     <L: Len> Mul !op: mul(l: vec<f16, L>, r: f16) -> vec<f16, L>: {op(l.as_any(), r.to_any()).into()};
     <L: Len> Mul !op: mul(l: vec<f32, L>, r: f32) -> vec<f32, L>: {op(l.as_any(), r.to_any()).into()};
-    //<L: Len> Mul !op: mul(l: vec<f64, L>, r: f64) -> vec<f64, L>: {op(l.as_any(), Any::new_scalar(ir::ScalarConstant::F64(r))).into()};
     <L: Len> Mul !op: mul(l: vec<i32, L>, r: i32) -> vec<i32, L>: {op(l.as_any(), r.to_any()).into()};
     <L: Len> Mul !op: mul(l: vec<u32, L>, r: u32) -> vec<u32, L>: {op(l.as_any(), r.to_any()).into()};
+}
+
+impl_ops! {
+    <L: Len> Sub !op: sub(l: vec<f16, L>, r: f16) -> vec<f16, L>: {op(l.as_any(), r.to_any()).into()};
+    <L: Len> Sub !op: sub(l: f16, r: vec<f16, L>) -> vec<f16, L>: {op(l.to_any(), r.as_any()).into()};
+    <L: Len> Sub !op: sub(l: vec<f32, L>, r: f32) -> vec<f32, L>: {op(l.as_any(), r.to_any()).into()};
+    <L: Len> Sub !op: sub(l: f32, r: vec<f32, L>) -> vec<f32, L>: {op(l.to_any(), r.as_any()).into()};
+
+    <L: Len> Sub !op: sub(l: vec<i32, L>, r: i32) -> vec<i32, L>: {op(l.as_any(), r.to_any()).into()};
+    <L: Len> Sub !op: sub(l: i32, r: vec<i32, L>) -> vec<i32, L>: {op(l.to_any(), r.as_any()).into()};
+    <L: Len> Sub !op: sub(l: vec<u32, L>, r: u32) -> vec<u32, L>: {op(l.as_any(), r.to_any()).into()};
+    <L: Len> Sub !op: sub(l: u32, r: vec<u32, L>) -> vec<u32, L>: {op(l.to_any(), r.as_any()).into()};
 
     <L: Len> Div !op: div(l: vec<f16, L>, r: f16) -> vec<f16, L>: {op(l.as_any(), r.to_any()).into()};
+    <L: Len> Div !op: div(l: f16, r: vec<f16, L>) -> vec<f16, L>: {op(l.to_any(), r.as_any()).into()};
     <L: Len> Div !op: div(l: vec<f32, L>, r: f32) -> vec<f32, L>: {op(l.as_any(), r.to_any()).into()};
-    //<L: Len> Div !op: div(l: vec<f64, L>, r: f64) -> vec<f64, L>: {op(l.as_any(), Any::new_scalar(ir::ScalarConstant::F64(r))).into()};
+    <L: Len> Div !op: div(l: f32, r: vec<f32, L>) -> vec<f32, L>: {op(l.to_any(), r.as_any()).into()};
+
     <L: Len> Div !op: div(l: vec<i32, L>, r: i32) -> vec<i32, L>: {op(l.as_any(), r.to_any()).into()};
+    <L: Len> Div !op: div(l: i32, r: vec<i32, L>) -> vec<i32, L>: {op(l.to_any(), r.as_any()).into()};
     <L: Len> Div !op: div(l: vec<u32, L>, r: u32) -> vec<u32, L>: {op(l.as_any(), r.to_any()).into()};
+    <L: Len> Div !op: div(l: u32, r: vec<u32, L>) -> vec<u32, L>: {op(l.to_any(), r.as_any()).into()};
 
     <L: Len> Rem !op: rem(l: vec<i32, L>, r: i32) -> vec<i32, L>: {op(l.as_any(), r.to_any()).into()};
+    <L: Len> Rem !op: rem(l: i32, r: vec<i32, L>) -> vec<i32, L>: {op(l.to_any(), r.as_any()).into()};
     <L: Len> Rem !op: rem(l: vec<u32, L>, r: u32) -> vec<u32, L>: {op(l.as_any(), r.to_any()).into()};
+    <L: Len> Rem !op: rem(l: u32, r: vec<u32, L>) -> vec<u32, L>: {op(l.to_any(), r.as_any()).into()};
 }
 
 // Ref impls
@@ -202,6 +211,10 @@ impl_ops! {
     <L: Len, N: ScalarTypeInteger> BitOr  !op: bitor (l: vec<N, L>, r: vec<N, L>) -> vec<N, L>: {op(l.as_any(), r.as_any()).into()};
     <L: Len, N: ScalarTypeInteger> BitXor !op: bitxor(l: vec<N, L>, r: vec<N, L>) -> vec<N, L>: {op(l.as_any(), r.as_any()).into()};
 
+    <L: Len> BitAnd !op: bitand(l: vec<bool, L>, r: vec<bool, L>) -> vec<bool, L>: {op(l.as_any(), r.as_any()).into()};
+    <L: Len> BitOr  !op: bitor (l: vec<bool, L>, r: vec<bool, L>) -> vec<bool, L>: {op(l.as_any(), r.as_any()).into()};
+    <L: Len> BitXor !op: bitxor(l: vec<bool, L>, r: vec<bool, L>) -> vec<bool, L>: {op(l.as_any(), r.as_any()).into()};
+
     <L: Len , N: ScalarTypeInteger> Shl !op: shl(l: vec<N, L>, r: vec<u32, L >) -> vec<N, L>: {op(l.as_any(), r.as_any()).into()};
     <L: Len , N: ScalarTypeInteger> Shr !op: shr(l: vec<N, L>, r: vec<u32, L >) -> vec<N, L>: {op(l.as_any(), r.as_any()).into()};
     <L: Len2, N: ScalarTypeInteger> Shl !op: shl(l: vec<N, L>, r: vec<u32, x1>) -> vec<N, L>: {op(l.as_any(), r.as_any().splat(L::LEN, u32::SCALAR_TYPE)).into()};
@@ -244,7 +257,7 @@ impl<T: ScalarType, L: Len, AS: AddressSpace> Ref<vec<T, L>, AS, ReadWrite> {
     #[track_caller] pub fn set_div<x1_or_L: OneOr<L>>(mut self, rhs: impl To<vec<T, x1_or_L>>) where T: ScalarTypeNumber { self.as_any().div_assign(rhs.to_any().splat(L::LEN, T::SCALAR_TYPE)) }
     /// (no documentation yet)
     #[track_caller] pub fn set_rem<x1_or_L: OneOr<L>>(mut self, rhs: impl To<vec<T, x1_or_L>>) where T: ScalarTypeNumber { self.as_any().rem_assign(rhs.to_any().splat(L::LEN, T::SCALAR_TYPE)) }
-    
+
     /// (no documentation yet)
     #[track_caller] pub fn set_bitand(mut self, rhs: impl To<vec<T, L>>) where T: ScalarTypeInteger {self.bitand_assign(rhs.to_gpu())}
     /// (no documentation yet)

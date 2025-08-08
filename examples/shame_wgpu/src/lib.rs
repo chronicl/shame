@@ -169,7 +169,7 @@ impl Gpu {
     ///         // `enc` is generic over the pipeline kind, which decided by calling
     ///         // either `enc.new_render_pipeline` or `enc.new_compute_pipeline`.
     ///         // Without this additional call, there will be a compiler error.
-    ///        
+    ///
     ///         let mut drawcall = enc.new_render_pipeline(sm::Indexing::Incremental);
     ///
     ///         // ... use `drawcall` to build your pipeline
@@ -214,7 +214,7 @@ impl Gpu {
 
 pub struct PipelineEncoder<P: IsPipelineKind> {
     gpu: wgpu::Device,
-    enc_guard: EncodingGuard<P>,
+    pub enc_guard: EncodingGuard<P>,
     surface_format: Option<wgpu::TextureFormat>,
 }
 
@@ -246,9 +246,9 @@ impl PipelineEncoder<Render> {
     ///     &drawcall.vertices; // access to vertex-shader related functionality
     ///     &drawcall.bind_groups; // access to bind groups (descriptor-sets)
     ///     &drawcall.push_constants; // access to push constant data
-    ///     
+    ///
     ///     let fragments = drawcall.vertices.assemble(...).rasterize(...);
-    ///     
+    ///
     ///     // use fragments object for per-fragment computation and io
     ///
     ///     enc.finish()?
@@ -289,7 +289,7 @@ impl PipelineEncoder<Compute> {
     ///     The compute grid is 3D and all thread positions are 3D vectors
     ///     even though the workgroup is only a flat 2D 8x4 slice.
     ///     Thread indices are still 1D scalars.
-    ///     
+    ///
     ///   The amount of workgroups dispatched is controlled at runtime by the
     ///   dispatch command.
     ///
@@ -349,7 +349,7 @@ impl PipelineEncoder<Render> {
     pub fn finish(self) -> Result<wgpu::RenderPipeline, Error> {
         let pdef = self.enc_guard.finish()?;
 
-        if shame::__private::DEBUG_PRINT_ENABLED {
+        if true {
             //println!("code spans:\n{:?}", pdef.shader.code);
             println!("pipeline info: {:#?}", pdef.pipeline);
             println!("generated code:\n{}", pdef.shaders.vert_code.syntax_highlight());

@@ -6,7 +6,7 @@ use crate::conversion::ShameToWgpuError;
 pub trait AsBindingResource: sm::Binding {
     type BindingResource<'a>: ?Sized;
 
-    fn binding_resource<'a>(resource: &'a Self::BindingResource<'a>) -> wgpu::BindingResource<'a>;
+    fn binding_resource(resource: Self::BindingResource<'_>) -> wgpu::BindingResource<'_>;
 
     fn bind_group_layout_entry(
         device: &wgpu::Device,
@@ -26,18 +26,47 @@ where
     AM: sm::AccessModeReadable,
     Self: sm::Binding,
 {
-    type BindingResource<'a> = wgpu::BufferBinding<'a>;
+    type BindingResource<'a> = &'a wgpu::BufferBinding<'a>;
 
-    fn binding_resource<'a>(resource: &'a Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
+    fn binding_resource<'a>(resource: Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
         wgpu::BindingResource::Buffer(resource.clone())
     }
 }
 
-impl<M: sm::SamplingMethod> AsBindingResource for sm::Sampler<M> {
-    type BindingResource<'a> = wgpu::Sampler;
+impl<T, AS, AM, L, const DYNAMIC_OFFSET: bool> AsBindingResource
+    for sm::BindingArray<sm::Buffer<T, AS, AM, DYNAMIC_OFFSET>, L>
+where
+    T: sm::BufferContent<AS, AM> + sm::GpuStore + sm::NoHandles + sm::NoBools,
+    AS: sm::BufferAddressSpace,
+    AM: sm::AccessModeReadable,
+    L: sm::ArrayLen,
+    Self: sm::Binding,
+{
+    type BindingResource<'a> = &'a [wgpu::BufferBinding<'a>];
 
-    fn binding_resource<'a>(resource: &'a Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
+    fn binding_resource<'a>(resource: Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
+        wgpu::BindingResource::BufferArray(resource)
+    }
+}
+
+impl<M: sm::SamplingMethod> AsBindingResource for sm::Sampler<M> {
+    type BindingResource<'a> = &'a wgpu::Sampler;
+
+    fn binding_resource<'a>(resource: Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
         wgpu::BindingResource::Sampler(resource)
+    }
+}
+
+impl<M: sm::SamplingMethod, L> AsBindingResource for sm::BindingArray<sm::Sampler<M>, L>
+where
+    M: sm::SamplingMethod,
+    L: sm::ArrayLen,
+    Self: sm::Binding,
+{
+    type BindingResource<'a> = &'a [&'a wgpu::Sampler];
+
+    fn binding_resource<'a>(resource: Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
+        wgpu::BindingResource::SamplerArray(resource)
     }
 }
 
@@ -47,10 +76,24 @@ where
     Format: sm::SamplingFormat + sm::SupportsSpp<SPP> + sm::SupportsCoords<Coords>,
     SPP: sm::Spp,
 {
-    type BindingResource<'a> = wgpu::TextureView;
+    type BindingResource<'a> = &'a wgpu::TextureView;
 
-    fn binding_resource<'a>(resource: &'a Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
+    fn binding_resource<'a>(resource: Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
         wgpu::BindingResource::TextureView(resource)
+    }
+}
+
+impl<Format, Coords, SPP, L> AsBindingResource for sm::BindingArray<sm::Texture<Format, Coords, SPP>, L>
+where
+    Coords: sm::TextureCoords + sm::SupportsSpp<SPP>,
+    Format: sm::SamplingFormat + sm::SupportsSpp<SPP> + sm::SupportsCoords<Coords>,
+    SPP: sm::Spp,
+    L: sm::ArrayLen,
+{
+    type BindingResource<'a> = &'a [&'a wgpu::TextureView];
+
+    fn binding_resource<'a>(resource: Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
+        wgpu::BindingResource::TextureViewArray(resource)
     }
 }
 
@@ -59,9 +102,9 @@ where
     Coords: sm::TextureCoords + sm::LayerCoords,
     Format: sm::SamplingFormat + sm::SupportsCoords<Coords>,
 {
-    type BindingResource<'a> = [&'a wgpu::TextureView];
+    type BindingResource<'a> = &'a [&'a wgpu::TextureView];
 
-    fn binding_resource<'a>(resource: &'a Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
+    fn binding_resource<'a>(resource: Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
         wgpu::BindingResource::TextureViewArray(resource)
     }
 }
@@ -72,10 +115,25 @@ where
     Format: sm::StorageTextureFormat<Access> + sm::SupportsCoords<Coords>,
     Access: sm::AccessMode,
 {
-    type BindingResource<'a> = wgpu::TextureView;
+    type BindingResource<'a> = &'a wgpu::TextureView;
 
-    fn binding_resource<'a>(resource: &'a Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
+    fn binding_resource<'a>(resource: Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
         wgpu::BindingResource::TextureView(resource)
+    }
+}
+
+impl<Format, Coords, Access, L> AsBindingResource for sm::BindingArray<sm::StorageTexture<Format, Coords, Access>, L>
+where
+    Coords: sm::StorageTextureCoords,
+    Format: sm::StorageTextureFormat<Access> + sm::SupportsCoords<Coords>,
+    Access: sm::AccessMode,
+    L: sm::ArrayLen,
+    Self: sm::Binding,
+{
+    type BindingResource<'a> = &'a [&'a wgpu::TextureView];
+
+    fn binding_resource<'a>(resource: Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
+        wgpu::BindingResource::TextureViewArray(resource)
     }
 }
 
@@ -85,9 +143,9 @@ where
     Format: sm::StorageTextureFormat<Access> + sm::SupportsCoords<Coords>,
     Access: sm::AccessMode,
 {
-    type BindingResource<'a> = [&'a wgpu::TextureView];
+    type BindingResource<'a> = &'a [&'a wgpu::TextureView];
 
-    fn binding_resource<'a>(resource: &'a Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
+    fn binding_resource<'a>(resource: Self::BindingResource<'a>) -> wgpu::BindingResource<'a> {
         wgpu::BindingResource::TextureViewArray(resource)
     }
 }

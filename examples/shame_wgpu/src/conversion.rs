@@ -243,6 +243,7 @@ pub fn binding_layout(index: u32, bl: &smr::BindingLayout) -> Result<wgpu::BindG
     let binding_array_len = bl
         .binding_array_len
         .map(|len| len.unwrap_or(NonZeroU32::new(100).unwrap()));
+    println!("{:?} {:?}", bl.binding_array_len, binding_array_len);
     let (ty, count) = {
         match &bl.binding_ty {
             smr::BindingType::Buffer { ty, has_dynamic_offset } => {
@@ -278,9 +279,11 @@ pub fn binding_layout(index: u32, bl: &smr::BindingLayout) -> Result<wgpu::BindG
                 samples_per_pixel: spp,
             } => {
                 let (count, dim) = tex_shape_to_count_dim(*shape);
-                if count.is_some() && bl.binding_array_len.is_some() {
-                    return Err(ShameToWgpuError::TextureTypeDoesNotSupportBindingArray(*shape));
-                }
+                let count = match (count, binding_array_len) {
+                    (Some(_), Some(_)) => return Err(ShameToWgpuError::TextureTypeDoesNotSupportBindingArray(*shape)),
+                    (Some(count), None) | (None, Some(count)) => Some(count),
+                    (None, None) => None,
+                };
 
                 let ty = wgpu::BindingType::Texture {
                     sample_type: sample_type(*st),
@@ -295,9 +298,11 @@ pub fn binding_layout(index: u32, bl: &smr::BindingLayout) -> Result<wgpu::BindG
             }
             smr::BindingType::StorageTexture { shape, format, access } => {
                 let (count, dim) = tex_shape_to_count_dim(*shape);
-                if count.is_some() && bl.binding_array_len.is_some() {
-                    return Err(ShameToWgpuError::TextureTypeDoesNotSupportBindingArray(*shape));
-                }
+                let count = match (count, binding_array_len) {
+                    (Some(_), Some(_)) => return Err(ShameToWgpuError::TextureTypeDoesNotSupportBindingArray(*shape)),
+                    (Some(count), None) | (None, Some(count)) => Some(count),
+                    (None, None) => None,
+                };
 
                 let ty = wgpu::BindingType::StorageTexture {
                     access: match access {
@@ -331,6 +336,16 @@ pub fn binding_layout(index: u32, bl: &smr::BindingLayout) -> Result<wgpu::BindG
             }
         }
     };
+
+    println!(
+        "{:#?}",
+        wgpu::BindGroupLayoutEntry {
+            binding: index,
+            visibility,
+            ty,
+            count,
+        }
+    );
 
     Ok(wgpu::BindGroupLayoutEntry {
         binding: index,
