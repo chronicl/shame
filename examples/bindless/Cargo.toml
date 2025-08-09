@@ -9,7 +9,7 @@ shame_wgpu = { path = "../shame_wgpu" }
 shame = { path = "../../shame" }
 wgpu = "25.0.0"
 bytemuck = { version = "1.19", features = ["derive"] }
-glam = { version = "0.30.2", features = [
+glam = { version = "0.30", features = [
     "bytemuck",
     "cuda",
 ] } # "cuda" for 8-byte aligned Vec2

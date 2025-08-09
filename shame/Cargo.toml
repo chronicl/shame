@@ -18,12 +18,14 @@ shorthand_float_ranges = []
 # enables the `shame::Settings::error_excerpt` setting
 error_excerpt = []
 debug_print = []
+glam-cuda = ["glam/cuda"]
 
 [dependencies]
 thiserror = "1.0.47"
 shame_derive = { path = "../shame_derive/" }
+glam = { version = "0.30", optional = true }
 
 [dev-dependencies]
 static_assertions = "1.1.0"
 pretty_assertions = "1.4.1"
-glam = "0.29.0"
+glam = "0.30"

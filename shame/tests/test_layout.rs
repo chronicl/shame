@@ -185,14 +185,13 @@ impl CpuLayout for f32x4_align4 {
 struct f32x3_align4(pub [f32; 3]);
 
 // the tests assume that this is the alignment of glam vecs.
-static_assertions::assert_eq_align!(glam::Vec2, f32x2_align4);
 static_assertions::assert_eq_align!(glam::Vec3, f32x3_align4);
 static_assertions::assert_eq_align!(glam::Vec4, f32x4_cpu);
 
 impl CpuLayout for f32x3_align4 {
     fn cpu_layout() -> shame::TypeLayout {
         let mut layout = gpu_layout::<f32x3>();
-        layout.set_align(shame::any::U32PowerOf2::_4.into());
+        layout.set_align(shame::any::U32PowerOf2::_4);
         layout
     }
 }
@@ -347,10 +346,12 @@ fn external_vec_type() {
             fn cpu_layout() -> shame::TypeLayout;
         }
 
+        #[cfg(not(feature = "glam"))]
         impl CpuLayoutExt for glam::Vec4 {
             fn cpu_layout() -> shame::TypeLayout { gpu_layout::<f32x4>() }
         }
 
+        #[cfg(not(feature = "glam"))]
         impl CpuLayoutExt for glam::Vec3 {
             fn cpu_layout() -> shame::TypeLayout {
                 let mut layout = gpu_layout::<f32x3>();
