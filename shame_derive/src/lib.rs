@@ -130,9 +130,6 @@ enum TransformMode {
 
 /// A procedural macro that transforms control flow constructs into shame control flow functions.
 ///
-/// This macro is an attribute macro that can be applied to functions to transform
-/// control flow constructs into the corresponding shame control flow functions.
-///
 /// ## Modes:
 ///
 /// - `#[gpu_control_flow(selective)]` - Only transforms control flow marked with `#[gpu]`
