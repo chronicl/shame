@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+shame_utils = { path = "../../shame_utils" }
 shame_wgpu = { path = "../shame_wgpu" }
 shame = { path = "../../shame" }
 wgpu = "25.0.0"

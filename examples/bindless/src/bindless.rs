@@ -6,6 +6,7 @@ use shame::mem::Uniform;
 use shame::pipeline_kind::Render;
 use shame::tf::Rgba8Unorm;
 use shame::{BindGroupIter, BindingArray, Buffer, CpuLayout, DrawContext, EncodingGuard, GpuLayout, MipFn, Texture};
+use shame_utils::gpu_control_flow;
 use shame_wgpu::bind_group::AsBindGroupLayout;
 use thiserror::Error;
 
@@ -49,7 +50,7 @@ impl BindlessExample {
         })
     }
 
-    #[sm::gpu_control_flow(all)]
+    #[gpu_control_flow(all)]
     fn new_pipeline(gpu: &sm::Gpu) -> Result<wgpu::RenderPipeline, Error> {
         let mut enc = gpu.create_pipeline_encoder(Default::default())?;
         let mut fullscreen = fullscreen_vertex_shader(&mut enc.enc_guard);

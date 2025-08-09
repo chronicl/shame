@@ -5,6 +5,8 @@ members = [
     "shame_derive",
     "shame",
     "examples/*",
+    "shame_utils",
+    "shame_utils/macros",
 ]
 
 [profile.dev]

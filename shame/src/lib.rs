@@ -315,7 +315,6 @@ pub use frontend::texture::texture_formats as tf;
 // # derive macros
 pub use shame_derive::CpuLayout;
 pub use shame_derive::GpuLayout;
-pub use shame_derive::gpu_control_flow;
 pub use frontend::rust_types::layout_traits::GpuLayout;
 pub use frontend::rust_types::layout_traits::gpu_layout;
 pub use frontend::rust_types::layout_traits::CpuLayout;
