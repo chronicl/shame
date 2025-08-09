@@ -243,7 +243,6 @@ pub fn binding_layout(index: u32, bl: &smr::BindingLayout) -> Result<wgpu::BindG
     let binding_array_len = bl
         .binding_array_len
         .map(|len| len.unwrap_or(NonZeroU32::new(100).unwrap()));
-    println!("{:?} {:?}", bl.binding_array_len, binding_array_len);
     let (ty, count) = {
         match &bl.binding_ty {
             smr::BindingType::Buffer { ty, has_dynamic_offset } => {
