@@ -17,7 +17,6 @@ pub mod atomic;
 pub mod barrier;
 pub mod constructors;
 pub mod error;
-pub mod glam;
 pub mod index;
 pub mod layout_traits;
 pub mod len;

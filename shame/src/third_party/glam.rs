@@ -1,6 +1,5 @@
-#![cfg(feature = "glam")]
 use core::mem::{align_of, size_of};
-use super::{
+use crate::frontend::rust_types::{
     aliases::rust_simd::*,
     layout_traits::{gpu_layout, CpuLayout, GpuLayout},
     type_layout::TypeLayout,
@@ -22,7 +21,6 @@ macro_rules! impl_layout {
                 fn cpu_layout() -> TypeLayout { gpu_layout_with_cpu_align_and_size::<$cpu, $gpu>() }
             }
         )*
-
     };
 }
 

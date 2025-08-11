@@ -9,6 +9,7 @@ mod backend;
 mod common;
 mod frontend;
 mod ir;
+mod third_party;
 
 // public interface starts here:
 pub mod prelude;
