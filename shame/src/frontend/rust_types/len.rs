@@ -56,6 +56,7 @@ use crate::frontend::rust_types::reference::Ref;
     message = "`{Self}` is not a component count of at least 2. The `Len2` trait is only implemented by the marker types `x2`, `x3` and `x4`"
 )]
 pub trait Len2: Len + AtLeastLen<x2> {
+    /// (no documentation yet)
     const LEN2: ir::Len2;
 }
 

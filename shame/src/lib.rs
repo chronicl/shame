@@ -153,7 +153,7 @@ pub use frontend::rust_types::To; // shorthand for `ToGpuType`
 // `vec`
 pub use frontend::rust_types::vec::vec;
 pub use frontend::rust_types::len::{x1, x2, x3, x4};
-pub use frontend::rust_types::len::Len;
+pub use frontend::rust_types::len::{Len, Len2};
 pub use common::floating_point::f16;
 pub use frontend::rust_types::vec::ToScalar; // .splat()
 
