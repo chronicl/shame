@@ -63,10 +63,7 @@ fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: Transform
     // Determine if we should transform based on mode and gpu attribute
     let should_transform = match mode {
         TransformMode::Selective => has_gpu_attr,
-        TransformMode::All => match expr {
-            syn::Expr::If(_) | syn::Expr::ForLoop(_) | syn::Expr::While(_) => true,
-            _ => false,
-        },
+        TransformMode::All => matches!(expr, syn::Expr::If(_) | syn::Expr::ForLoop(_) | syn::Expr::While(_)),
     };
 
     if should_transform {

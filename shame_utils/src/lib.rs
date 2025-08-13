@@ -1,9 +1,3 @@
-use any::layout::{self, Repr};
-use shame::{
-    any, vec, Array, ArrayLen, GpuSized, GpuType, Len, Len2, NoBools, ScalarType, ScalarTypeFp, ScalarTypeInteger,
-    SizedFields, Struct,
-};
-
 mod const_str;
 mod no_padding;
 mod to_glam;
