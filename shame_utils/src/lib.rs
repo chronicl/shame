@@ -134,11 +134,11 @@ macro_rules! padding_to_fields {
     ($padding:ident, $field_counter:ident) => {
         match $padding {
             0 => "\n",
-            2 => $crate::const_concat!("  _", $crate::const_100_to_str($field_counter), ": f16x1,\n"),
-            4 => $crate::const_concat!("  _", $crate::const_100_to_str($field_counter), ": f32x1,\n"),
-            8 => $crate::const_concat!("  _", $crate::const_100_to_str($field_counter), ": f32x2,\n"),
+            2 => $crate::const_concat!("  _", $field_counter, ": f16x1,\n"),
+            4 => $crate::const_concat!("  _", $field_counter, ": f32x1,\n"),
+            8 => $crate::const_concat!("  _", $field_counter, ": f32x2,\n"),
             12 => $crate::const_concat!(
-                "  _", $crate::const_100_to_str($field_counter), ": f32x1, _", $crate::const_100_to_str($field_counter + 1), ": f32x1, _", $crate::const_100_to_str($field_counter + 2), ": f32x1, // or _", $crate::const_100_to_str($field_counter), ": Array<f32x1, 3> if not used in uniform buffer\n"
+                "  _", $field_counter, ": f32x1, _", $field_counter + 1, ": f32x1, _", $field_counter + 2, ": f32x1, // or _", $field_counter, ": Array<f32x1, 3> if not used in uniform buffer\n"
             ),
             _ => panic!("Unsupported padding size"),
         }
@@ -193,64 +193,108 @@ impl<T: SizedFields + NoPadding + ToGlam> ToGlam for Struct<T> {
     type GlamType = T::GlamType;
 }
 
-#[macro_export]
-macro_rules! const_concat {
-    ($($strs:expr),+) => {{
-        const STRINGS: &[&str] = &[$($strs),+];
-        const TOTAL_LEN: usize = {
-            let mut len = 0;
+
+pub enum StrBuf<'a, const N: usize> {
+    Bytes([u8; N]),
+    Str(&'a str),
+}
+
+impl<const N: usize> StrBuf<'_, N> {
+    pub const fn as_str(&self) -> &str {
+        match self {
+            StrBuf::Bytes(b) => match str::from_utf8(b) {
+                Ok(s) => s,
+                Err(_) => panic!("Invalid UTF-8 sequence in concatenated string"),
+            },
+            StrBuf::Str(s) => s,
+        }
+    }
+}
+
+pub struct ToStr<T>(pub T);
+
+impl ToStr<&str> {
+    pub const fn bytes_len(&self) -> usize { self.0.len() }
+
+    pub const fn as_str<const N: usize>(&self) -> StrBuf<'_, N> { StrBuf::Str(self.0) }
+}
+
+impl ToStr<usize> {
+    pub const fn bytes_len(&self) -> usize {
+        let mut n = self.0;
+
+        let mut digits = 1;
+        while n > 9 {
+            n /= 10;
+            digits += 1;
+        }
+        digits
+    }
+
+    /// Must be called with N = Self.output_len()
+    pub const fn as_str<const N: usize>(&self) -> StrBuf<'_, N> {
+        let mut buf = [0; N];
+        let mut i = N - 1; // N is at least one method is used correctly
+        let mut n = self.0;
+        loop {
+            buf[i] = b'0' + (n % 10) as u8;
+            n /= 10;
+            if n == 0 {
+                break;
+            }
+            i -= 1;
+        }
+        assert!(i == 0);
+        StrBuf::Bytes(buf)
+    }
+}
+
+impl ToStr<&[&str]> {
+    pub const fn bytes_len(&self) -> usize {
+        let mut len = 0;
+        let mut i = 0;
+        while i < self.0.len() {
+            len += self.0[i].len();
+            i += 1;
+        }
+        len
+    }
+
+    pub const fn as_str<const N: usize>(&self) -> StrBuf<'_, N> {
+        let mut buf = [0u8; N];
+        let mut pos = 0;
+        let mut str_idx = 0;
+
+        while str_idx < self.0.len() {
+            let bytes = self.0[str_idx].as_bytes();
             let mut i = 0;
-            while i < STRINGS.len() {
-                len += STRINGS[i].len();
+            while i < bytes.len() {
+                buf[pos] = bytes[i];
+                pos += 1;
                 i += 1;
             }
-            len
-        };
 
-        const RESULT_BYTES: [u8; TOTAL_LEN] = const {
-            let mut result = [0u8; TOTAL_LEN];
-            let mut pos = 0;
-            let mut str_idx = 0;
-
-            while str_idx < STRINGS.len() {
-                let current_str = STRINGS[str_idx];
-                let current_bytes = current_str.as_bytes();
-                let mut byte_idx = 0;
-
-                while byte_idx < current_bytes.len() {
-                    result[pos] = current_bytes[byte_idx];
-                    pos += 1;
-                    byte_idx += 1;
-                }
-
-                str_idx += 1;
-            }
-
-            result
-        };
-
-        match str::from_utf8(&RESULT_BYTES) {
-            Ok(s) => s,
-            Err(_) => panic!("Invalid UTF-8 sequence in concatenated string"),
+            str_idx += 1;
         }
+        StrBuf::Bytes(buf)
+    }
+}
+
+#[macro_export]
+macro_rules! const_concat {
+    ($($s:expr),*) => {{
+        const STRINGS: &[&str] = &[$($crate::const_to_str!($s)),*];
+        $crate::const_to_str!(STRINGS)
     }};
 }
 
-#[rustfmt::skip]
-pub const fn const_100_to_str(n: usize) -> &'static str {
-    match n {
-        0 => "0", 1 => "1", 2 => "2", 3 => "3", 4 => "4", 5 => "5", 6 => "6", 7 => "7", 8 => "8", 9 => "9",
-        10 => "10", 11 => "11", 12 => "12", 13 => "13", 14 => "14", 15 => "15", 16 => "16", 17 => "17", 18 => "18", 19 => "19",
-        20 => "20", 21 => "21", 22 => "22", 23 => "23", 24 => "24", 25 => "25", 26 => "26", 27 => "27", 28 => "28", 29 => "29",
-        30 => "30", 31 => "31", 32 => "32", 33 => "33", 34 => "34", 35 => "35", 36 => "36", 37 => "37", 38 => "38", 39 => "39",
-        40 => "40", 41 => "41", 42 => "42", 43 => "43", 44 => "44", 45 => "45", 46 => "46", 47 => "47", 48 => "48", 49 => "49",
-        50 => "50", 51 => "51", 52 => "52", 53 => "53", 54 => "54", 55 => "55", 56 => "56", 57 => "57", 58 => "58", 59 => "59",
-        60 => "60", 61 => "61", 62 => "62", 63 => "63", 64 => "64", 65 => "65", 66 => "66", 67 => "67", 68 => "68", 69 => "69",
-        70 => "70", 71 => "71", 72 => "72", 73 => "73", 74 => "74", 75 => "75", 76 => "76", 77 => "77", 78 => "78", 79 => "79",
-        80 => "80", 81 => "81", 82 => "82", 83 => "83", 84 => "84", 85 => "85", 86 => "86", 87 => "87", 88 => "88", 89 => "89",
-        90 => "90", 91 => "91", 92 => "92", 93 => "93", 94 => "94", 95 => "95", 96 => "96", 97 => "97", 98 => "98", 99 => "99",
-        _ => panic!("Number out of range, create an issue on github and we can raise this limit.")
-    }
+#[macro_export]
+macro_rules! const_to_str {
+    ($x:expr) => {{
+        const LEN: usize = $crate::ToStr($x).bytes_len();
+        const S: $crate::StrBuf<LEN> = $crate::ToStr($x).as_str();
+        S.as_str()
+    }};
 }
 
 #[cfg(test)]

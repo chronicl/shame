@@ -22,31 +22,31 @@ fn main() {
     };
     let vertex = VertexCpu::zeroed();
 
-    let s = UnsizedCpu {
-        a: glam::Vec3::ZERO,
-        b: vec![glam::Vec2::ZERO, glam::Vec2::ZERO],
-        ..Default::default()
-    };
+    // let s = UnsizedCpu {
+    //     a: glam::Vec3::ZERO,
+    //     b: vec![glam::Vec2::ZERO, glam::Vec2::ZERO],
+    //     ..Default::default()
+    // };
 }
 
-#[derive(GpuLayout, NoPadding, ToGlam, Clone)]
-#[cpu_derive(Default)]
-#[rustfmt::skip]
-struct Unsized {
-    a: f32x3,     _0: f32x1,
-    b: Array<f32x2>
-}
+// #[derive(GpuLayout, NoPadding, ToGlam, Clone)]
+// #[cpu_derive(Default)]
+// #[rustfmt::skip]
+// struct Unsized {
+//     a: f32x3,     _0: f32x1,
+//     b: Array<f32x2>
+// }
 
-#[derive(GpuLayout, NoPadding, ToGlam, Clone)]
-#[rustfmt::skip]
-struct A {
-    a: f32x3,     _0: f32x1,
-    b: Struct<B>,
-}
+// #[derive(GpuLayout, NoPadding, ToGlam, Clone)]
+// #[rustfmt::skip]
+// struct A {
+//     a: f32x3,     _0: f32x1,
+//     b: Struct<B>,
+// }
 
-#[derive(GpuLayout, NoPadding, ToGlam, Clone, Copy)]
-#[rustfmt::skip]
-struct B {
-    b: Array<f32x3, Size<3>>,
-    a: f32x3,  _0: f32x1,
-}
+// #[derive(GpuLayout, NoPadding, ToGlam, Clone, Copy)]
+// #[rustfmt::skip]
+// struct B {
+//     b: Array<f32x3, Size<3>>,
+//     a: f32x3,  _0: f32x1,
+// }
