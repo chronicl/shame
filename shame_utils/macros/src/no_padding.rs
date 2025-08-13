@@ -169,7 +169,7 @@ fn generate_padding_check2(
             #(#fields)*
 
             if #(#padding_conditions)||* {
-                const S: &str = ::shame_utils::const_concat![
+                const S: &str = ::shame_utils::const_concat_str![
                     #struct_start,
                     #(#field_decls),*,
                     #struct_end

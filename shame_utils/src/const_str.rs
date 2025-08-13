@@ -6,6 +6,17 @@ macro_rules! const_concat {
     }};
 }
 
+/// Produces less code than `const_concat`, but only takes &str as input
+#[macro_export]
+macro_rules! const_concat_str {
+    ($($s:expr),*) => {{
+        const STRINGS: &[&str] = &[$($s),*];
+        const LEN: usize = $crate::ToStr(STRINGS).bytes_len();
+        const S: $crate::StrBuf<LEN> = $crate::ToStr(STRINGS).to_buf();
+        S.as_str()
+    }};
+}
+
 #[macro_export]
 macro_rules! const_to_str {
     ($x:expr) => {{
