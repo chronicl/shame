@@ -104,7 +104,7 @@ fn generate_padding_check2(
 
         let tokens = if i == 0 {
             quote! {
-                const #layout: shame_utils::Layout = <#field_type as NoPadding>::LAYOUT;
+                const #layout: ::shame_utils::Layout = <#field_type as NoPadding>::LAYOUT;
                 const #field_decl: &str = #field_decl_str;
                 const #padding_bytes: usize = 0;
                 const #padding_field_counter: usize = 0;
@@ -115,11 +115,11 @@ fn generate_padding_check2(
             let previous_padding_field_counter = PaddingFieldCounter(i - 1);
 
             quote! {
-                const #layout: shame_utils::Layout = #previous_layout.extend(<#field_type as NoPadding>::LAYOUT);
+                const #layout: ::shame_utils::Layout = #previous_layout.extend(<#field_type as NoPadding>::LAYOUT);
                 const #field_decl: &str = #field_decl_str;
                 const #padding_bytes: usize = #layout.offset - #previous_layout.size.expect("non-last fields must be sized");
-                const #padding_field_counter: usize = #previous_padding_field_counter + shame_utils::padding_to_padding_field_count::<#padding_bytes>();
-                const #padding_decls: &str = shame_utils::padding_to_fields!(#padding_bytes, #previous_padding_field_counter);
+                const #padding_field_counter: usize = #previous_padding_field_counter + ::shame_utils::padding_to_padding_field_count::<#padding_bytes>();
+                const #padding_decls: &str = ::shame_utils::padding_to_fields!(#padding_bytes, #previous_padding_field_counter);
             }
         };
 
@@ -139,7 +139,7 @@ fn generate_padding_check2(
             (Some(rounded_size), Some(size)) => rounded_size - size,
             _ => 0, // unsized structs have no padding at the end
         };
-        const #final_padding_decls: &str = shame_utils::padding_to_fields!(#final_padding_bytes, #last_field_counter);
+        const #final_padding_decls: &str = ::shame_utils::padding_to_fields!(#final_padding_bytes, #last_field_counter);
     };
     fields.push(final_padding_tokens);
 
@@ -169,7 +169,7 @@ fn generate_padding_check2(
             #(#fields)*
 
             if #(#padding_conditions)||* {
-                const S: &str = shame_utils::const_concat![
+                const S: &str = ::shame_utils::const_concat![
                     #struct_start,
                     #(#field_decls),*,
                     #struct_end

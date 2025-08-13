@@ -40,7 +40,7 @@ pub fn derive_to_glam_impl(input: TokenStream) -> TokenStream {
             let field_type = &field.ty;
 
             quote! {
-                #field_vis #field_name: <#field_type as shame_utils::ToGlam>::GlamType
+                #field_vis #field_name: <#field_type as ::shame_utils::ToGlam>::GlamType
             }
         })
         .collect();
@@ -65,7 +65,7 @@ pub fn derive_to_glam_impl(input: TokenStream) -> TokenStream {
 
     // Generate ToGlam implementation for the original struct
     let to_glam_impl = quote! {
-        impl #impl_generics shame_utils::ToGlam for #original_name #ty_generics #where_clause {
+        impl #impl_generics ::shame_utils::ToGlam for #original_name #ty_generics #where_clause {
             type GlamType = #cpu_name #ty_generics;
         }
     };
