@@ -91,24 +91,30 @@ fn generate_padding_check2(
     let tab = "    ";
     let format_type = |ty: &syn::Type| ty.to_token_stream().to_string().replace(' ', "");
 
-    let longest_field_name = field_names
-        .iter()
-        .map(|name| name.to_string().chars().count())
-        .max()
-        .unwrap_or(0);
-    let longest_type_name = field_types
-        .iter()
-        .map(|ty| format_type(ty).chars().count())
-        .max()
-        .unwrap_or(0);
+    #[cfg(feature = "pretty")]
+    let format_field_decl = {
+        let longest_field_name = field_names
+            .iter()
+            .map(|name| name.to_string().chars().count())
+            .max()
+            .unwrap_or(0);
+        let longest_type_name = field_types
+            .iter()
+            .map(|ty| format_type(ty).chars().count())
+            .max()
+            .unwrap_or(0);
 
-    let name_pad = longest_field_name + 1;
-    let type_pad = longest_type_name + 1;
-    let format_field_decl = |name: &Ident, ty: &syn::Type| {
-        let field_name = format!("{}:", name);
-        let field_type = format!("{},", format_type(ty));
-        format!("\n{tab}{:<name_pad$} {:<type_pad$}", field_name, field_type)
+        let name_pad = longest_field_name + 1;
+        let type_pad = longest_type_name + 1;
+
+        move |name: &Ident, ty: &syn::Type| {
+            let field_name = format!("{}:", name);
+            let field_type = format!("{},", format_type(ty));
+            format!("\n{tab}{:<name_pad$} {:<type_pad$}", field_name, field_type)
+        }
     };
+    #[cfg(not(feature = "pretty"))]
+    let format_field_decl = |name: &Ident, ty: &syn::Type| format!("\n{tab}{}: {},", name, format_type(ty));
 
     let mut fields = Vec::new();
     for (i, (field_name, field_type)) in field_names.iter().zip(field_types.iter()).enumerate() {
