@@ -8,9 +8,9 @@ use bytemuck::{Pod, Zeroable};
 #[cpu_derive(Default, Pod, Zeroable, Debug, Clone, Copy)]
 #[rustfmt::skip]
 struct Vertex {
-    uv:  f32x2,  _0: f32x2,
-    pos: f32x3,  _1: f32x1,
-    nor: f32x3,  _2: f32x1,
+    uv:  f32x2,
+    pos: f32x3,
+    nor: f32x3,
 }
 
 fn main() {

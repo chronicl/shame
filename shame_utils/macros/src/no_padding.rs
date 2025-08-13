@@ -110,11 +110,11 @@ fn generate_padding_check2(
         move |name: &Ident, ty: &syn::Type| {
             let field_name = format!("{}:", name);
             let field_type = format!("{},", format_type(ty));
-            format!("\n{tab}{:<name_pad$} {:<type_pad$}", field_name, field_type)
+            format!("{tab}{:<name_pad$} {:<type_pad$}", field_name, field_type)
         }
     };
     #[cfg(not(feature = "pretty"))]
-    let format_field_decl = |name: &Ident, ty: &syn::Type| format!("\n{tab}{}: {},", name, format_type(ty));
+    let format_field_decl = |name: &Ident, ty: &syn::Type| format!("{tab}{}: {},", name, format_type(ty));
 
     let mut fields = Vec::new();
     for (i, (field_name, field_type)) in field_names.iter().zip(field_types.iter()).enumerate() {
@@ -174,7 +174,7 @@ fn generate_padding_check2(
         .collect();
 
     let struct_start = format!(
-        "\n\nImplicit padding detected. The struct definition with the implicit padding made explicit is:\n\n#[rustfmt::skip]\nstruct {} {{\n\n",
+        "\n\nImplicit padding detected. The struct definition with the implicit padding made explicit is:\n\n#[rustfmt::skip]\nstruct {} {{\n",
         struct_name
     );
     let struct_end = "}\n\n";
