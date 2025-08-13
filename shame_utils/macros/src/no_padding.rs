@@ -1,5 +1,5 @@
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, Ident};
 
 pub fn derive_no_padding_impl(input: TokenStream) -> TokenStream {
@@ -29,7 +29,7 @@ pub fn derive_no_padding_impl(input: TokenStream) -> TokenStream {
     let layout_calc = generate_layout_calculation(&field_types);
 
     // Generate padding check
-    let padding_check = generate_padding_check(name, &field_names, &field_types);
+    let padding_check = generate_padding_check2(name, &field_names, &field_types);
 
     let expanded = quote! {
         impl #impl_generics NoPadding for #name #ty_generics #where_clause {
@@ -54,148 +54,125 @@ fn generate_layout_calculation(field_types: &[&syn::Type]) -> proc_macro2::Token
     layout_expr
 }
 
-/// The first field of the struct has index 1, index 0 is used for initial values
-enum Const {
-    /// Layout of the struct up to the ith field
-    Layout,
-    /// Padding field counter for the padding fields after the ith field
-    PaddingFieldCounter,
-    /// Padding byte size after the ith field
-    Padding,
-    /// Field declaration of the ith field
-    FieldDecl,
-    /// Padding declarations after the ith field
-    PaddingDecls,
+#[derive(Clone, Copy)]
+enum ConstIdent {
+    Layout(usize),
+    PaddingFieldCounter(usize),
+    Padding(usize),
+    FieldDecl(usize),
+    PaddingDecls(usize),
 }
+use ConstIdent::*;
 
-impl Const {
-    pub fn get_ident(&self, i: usize) -> syn::Ident {
-        let letter = match self {
-            Const::Layout => "L",
-            Const::PaddingFieldCounter => "C",
-            Const::Padding => "P",
-            Const::FieldDecl => "FD",
-            Const::PaddingDecls => "PD",
+impl From<ConstIdent> for syn::Ident {
+    fn from(ident: ConstIdent) -> syn::Ident {
+        let (name, i) = match ident {
+            Layout(i) => ("L", i),
+            PaddingFieldCounter(i) => ("C", i),
+            Padding(i) => ("P", i),
+            FieldDecl(i) => ("FD", i),
+            PaddingDecls(i) => ("PD", i),
         };
-        syn::Ident::new(&format!("{letter}{i}"), proc_macro2::Span::call_site())
+        syn::Ident::new(&format!("{name}{i}"), proc_macro2::Span::call_site())
+    }
+}
+impl ToTokens for ConstIdent {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let ident: syn::Ident = (*self).into();
+        tokens.extend(ident.to_token_stream());
     }
 }
 
-fn generate_padding_check(
+fn generate_padding_check2(
     struct_name: &Ident,
     field_names: &[&Ident],
     field_types: &[&syn::Type],
 ) -> proc_macro2::TokenStream {
-    let struct_name_str = struct_name.to_string();
-
-    // Generate layout calculations for each step
-    let mut layouts = Vec::new();
-    let mut padding_calculations = Vec::new();
-    let mut field_counters = Vec::new();
-    let mut struct_string_parts = Vec::new();
-
-    // Initial values
-    let initial_layout_ident = Const::Layout.get_ident(0);
-    layouts.push(quote! {
-        const #initial_layout_ident: Layout = Layout::from_align_size(1, Some(0));
-    });
-    let initial_field_counter_ident = Const::PaddingFieldCounter.get_ident(0);
-    field_counters.push(quote! {
-        const #initial_field_counter_ident: usize = 0;
-    });
-
-    // Generate calculations for each field
+    let mut fields = Vec::new();
     for (i, (field_name, field_type)) in field_names.iter().zip(field_types.iter()).enumerate() {
-        let layout_prev = Const::Layout.get_ident(i);
-        let layout_curr = Const::Layout.get_ident(i + 1);
-        let padding_curr = Const::Padding.get_ident(i);
-        let counter_curr = Const::PaddingFieldCounter.get_ident(i);
-        let field_curr = Const::FieldDecl.get_ident(i + 1);
-        let padding_decl_curr = Const::PaddingDecls.get_ident(i + 1);
+        let layout = Layout(i); // layout of struct with all fields up to and including the ith field
+        let field_decl = FieldDecl(i); // declaration of the ith field
+        let padding_bytes = Padding(i); // padding bytes directly before the ith field
+        let padding_field_counter = PaddingFieldCounter(i); // total number of padding fields before the ith field
+        let padding_decls = PaddingDecls(i); // declarations of padding fields directly before the ith field
+        let field_decl_str = format!(
+            "    {}: {},",
+            field_name,
+            // TODO(chronicL) but now this also removes the space in between the element and size of an array: Array<f32x4,Size<4>>
+            field_type.to_token_stream().to_string().replace(' ', "") // otherwise `shame :: Array< f32x4 >` is inserted
+        );
 
-        layouts.push(quote! {
-            const #layout_curr: Layout = #layout_prev.extend(<#field_type as NoPadding>::LAYOUT);
-        });
+        let tokens = if i == 0 {
+            quote! {
+                const #layout: shame_utils::Layout = <#field_type as NoPadding>::LAYOUT;
+                const #field_decl: &str = #field_decl_str;
+                const #padding_bytes: usize = 0;
+                const #padding_field_counter: usize = 0;
+                const #padding_decls: &str = "";
+            }
+        } else {
+            let previous_layout = Layout(i - 1);
+            let previous_padding_field_counter = PaddingFieldCounter(i - 1);
 
-        padding_calculations.push(quote! {
-            const #padding_curr: usize = #layout_curr.offset - #layout_prev.size.unwrap();
-        });
+            quote! {
+                const #layout: shame_utils::Layout = #previous_layout.extend(<#field_type as NoPadding>::LAYOUT);
+                const #field_decl: &str = #field_decl_str;
+                const #padding_bytes: usize = #layout.offset - #previous_layout.size.expect("non-last fields must be sized");
+                const #padding_field_counter: usize = #previous_padding_field_counter + shame_utils::padding_to_padding_field_count::<#padding_bytes>();
+                const #padding_decls: &str = shame_utils::padding_to_fields!(#padding_bytes, #previous_padding_field_counter);
+            }
+        };
 
-        if i > 0 {
-            let counter_prev = Const::PaddingFieldCounter.get_ident(i - 1);
-            let padding_prev = Const::Padding.get_ident(i - 1);
-            field_counters.push(quote! {
-                const #counter_curr: usize = #counter_prev + shame_utils::padding_to_padding_field_count::<#padding_prev>();
-            });
-        }
-
-        let field_name_str = field_name.to_string();
-        let field_line = format!("    {}: {},", field_name_str, quote!(#field_type));
-        struct_string_parts.push(quote! {
-            const #field_curr: &str = #field_line;
-        });
-
-        struct_string_parts.push(quote! {
-            const #padding_decl_curr: &str = shame_utils::padding_to_fields!(#padding_curr, #counter_curr);
-        });
+        fields.push(tokens)
     }
 
-    // Final padding calculation
-    let last_layout = Const::Layout.get_ident(field_names.len());
-    let final_padding = Const::Padding.get_ident(field_names.len());
-    let final_counter = Const::PaddingFieldCounter.get_ident(field_names.len());
+    let last_field_index = fields
+        .len()
+        .checked_sub(1)
+        .expect("shame structs must have at least one field");
+    let last_layout = Layout(last_field_index);
+    let last_field_counter = PaddingFieldCounter(last_field_index);
+    let final_padding_bytes = Padding(fields.len());
+    let final_padding_decls = PaddingDecls(fields.len());
+    let final_padding_tokens = quote! {
+        const #final_padding_bytes: usize = match (#last_layout.size_rounded_to_align(), #last_layout.size) {
+            (Some(rounded_size), Some(size)) => rounded_size - size,
+            _ => 0, // unsized structs have no padding at the end
+        };
+        const #final_padding_decls: &str = shame_utils::padding_to_fields!(#final_padding_bytes, #last_field_counter);
+    };
+    fields.push(final_padding_tokens);
 
-    padding_calculations.push(quote! {
-        const #final_padding: usize = #last_layout.size_rounded_to_align().unwrap() - #last_layout.size.unwrap();
-    });
-
-    let prev_counter = Const::PaddingFieldCounter.get_ident(field_names.len() - 1);
-    let prev_padding = Const::Padding.get_ident(field_names.len() - 1);
-    field_counters.push(quote! {
-        const #final_counter: usize = #prev_counter + shame_utils::padding_to_padding_field_count::<#prev_padding>();
-    });
-
-    let final_sp = Const::PaddingDecls.get_ident(field_names.len() + 1);
-    struct_string_parts.push(quote! {
-        const #final_sp: &str = shame_utils::padding_to_fields!(#final_padding, #final_counter);
-    });
-
-    // Generate padding condition
-    let padding_conditions: Vec<_> = (0..=field_names.len())
+    let padding_conditions: Vec<_> = (0..fields.len())
         .map(|i| {
-            let p = Const::Padding.get_ident(i);
-            quote! { #p != 0 }
+            let padding_bytes = Padding(i);
+            quote! { #padding_bytes != 0 }
         })
         .collect();
 
-    // Generate struct string concatenation
-    let struct_header = format!("\n#[rustfmt::skip]\nstruct {} {{", struct_name_str);
-    let mut concat_parts = vec![
-        quote! { "\n\nImplicit padding detected. The struct definition with the implicit padding made explicit is:\n" },
-        quote! { #struct_header },
-    ];
+    let struct_start = format!(
+        "\n\nImplicit padding detected. The struct definition with the implicit padding made explicit is:\n\n#[rustfmt::skip]\nstruct {} {{\n\n",
+        struct_name
+    );
+    let struct_end = "}\n\n";
 
-    for i in 0..field_names.len() {
-        let s = Const::PaddingDecls.get_ident(i + 1);
-        let s_field = Const::FieldDecl.get_ident(i + 1);
-        concat_parts.push(quote! { #s });
-        concat_parts.push(quote! { #s_field });
+    let mut field_decls = Vec::<ConstIdent>::new();
+    let original_fields_len = field_names.len();
+    for i in 0..original_fields_len {
+        field_decls.push(PaddingDecls(i));
+        field_decls.push(FieldDecl(i));
     }
-
-    let final_padding_decl = Const::PaddingDecls.get_ident(field_names.len() + 1);
-    concat_parts.push(quote! { #final_padding_decl });
-    concat_parts.push(quote! { "}\n" });
+    field_decls.push(final_padding_decls);
 
     quote! {
         const _: () = {
-            #(#layouts)*
-            #(#padding_calculations)*
-            #(#field_counters)*
-            #(#struct_string_parts)*
+            #(#fields)*
 
             if #(#padding_conditions)||* {
-                const S: &str = shame_utils::const_str::concat![
-                    #(#concat_parts),*
+                const S: &str = shame_utils::const_concat![
+                    #struct_start,
+                    #(#field_decls),*,
+                    #struct_end
                 ];
                 panic!("{}", S);
             }
