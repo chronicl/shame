@@ -28,7 +28,7 @@ macro_rules! const_len {
 
 /// Writes the result of `const_concat` to a buffer at the location of pos.
 /// This can be used in conjunction with `const_len` to implement ToStr(T)
-/// for complex types `T`, see PaddingToFields as an example.
+/// for complex types `T`, see `PaddingToFields` as an example.
 #[macro_export]
 macro_rules! const_write {
     ($pos:ident, $buf:ident <- $($to_str:expr),*) => {{
