@@ -88,6 +88,28 @@ fn generate_padding_check2(
     field_names: &[&Ident],
     field_types: &[&syn::Type],
 ) -> proc_macro2::TokenStream {
+    let tab = "    ";
+    let format_type = |ty: &syn::Type| ty.to_token_stream().to_string().replace(' ', "");
+
+    let longest_field_name = field_names
+        .iter()
+        .map(|name| name.to_string().chars().count())
+        .max()
+        .unwrap_or(0);
+    let longest_type_name = field_types
+        .iter()
+        .map(|ty| format_type(ty).chars().count())
+        .max()
+        .unwrap_or(0);
+
+    let name_pad = longest_field_name + 1;
+    let type_pad = longest_type_name + 1;
+    let format_field_decl = |name: &Ident, ty: &syn::Type| {
+        let field_name = format!("{}:", name);
+        let field_type = format!("{},", format_type(ty));
+        format!("\n{tab}{:<name_pad$} {:<type_pad$}", field_name, field_type)
+    };
+
     let mut fields = Vec::new();
     for (i, (field_name, field_type)) in field_names.iter().zip(field_types.iter()).enumerate() {
         let layout = Layout(i); // layout of struct with all fields up to and including the ith field
@@ -95,12 +117,7 @@ fn generate_padding_check2(
         let padding_bytes = Padding(i); // padding bytes directly before the ith field
         let padding_field_counter = PaddingFieldCounter(i); // total number of padding fields before the ith field
         let padding_decls = PaddingDecls(i); // declarations of padding fields directly before the ith field
-        let field_decl_str = format!(
-            "    {}: {},",
-            field_name,
-            // TODO(chronicL) but now this also removes the space in between the element and size of an array: Array<f32x4,Size<4>>
-            field_type.to_token_stream().to_string().replace(' ', "") // otherwise `shame :: Array< f32x4 >` is inserted
-        );
+        let field_decl_str = format_field_decl(field_name, field_type);
 
         let tokens = if i == 0 {
             quote! {
