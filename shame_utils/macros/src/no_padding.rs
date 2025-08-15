@@ -8,7 +8,6 @@ pub fn derive_no_padding_impl(input: TokenStream) -> TokenStream {
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
-    // Extract struct fields
     let fields = match &input.data {
         Data::Struct(data_struct) => match &data_struct.fields {
             Fields::Named(FieldsNamed { named, .. }) => named,
@@ -21,37 +20,21 @@ pub fn derive_no_padding_impl(input: TokenStream) -> TokenStream {
         panic!("NoPadding cannot be derived for empty structs");
     }
 
-    // Generate field types and names
     let field_types: Vec<_> = fields.iter().map(|f| &f.ty).collect();
     let field_names: Vec<_> = fields.iter().map(|f| f.ident.as_ref().unwrap()).collect();
 
-    // Generate layout calculation
-    let layout_calc = generate_layout_calculation(&field_types);
-
-    // Generate padding check
-    let padding_check = generate_padding_check2(name, &field_names, &field_types);
+    let padding_check = generate_padding_check(name, &field_names, &field_types);
 
     let expanded = quote! {
         impl #impl_generics NoPadding for #name #ty_generics #where_clause {
-            const LAYOUT: Layout = #layout_calc;
+            const LAYOUT: ::shame_utils::Layout = ::shame_utils::Layout::from_align_size(1, Some(0))
+                                                  #(.extend(<#field_types as ::shame_utils::NoPadding>::LAYOUT))*;
         }
 
         #padding_check
     };
 
     TokenStream::from(expanded)
-}
-
-fn generate_layout_calculation(field_types: &[&syn::Type]) -> proc_macro2::TokenStream {
-    let mut layout_expr = quote! { Layout::from_align_size(1, Some(0)) };
-
-    for field_type in field_types {
-        layout_expr = quote! {
-            #layout_expr.extend(<#field_type as NoPadding>::LAYOUT)
-        };
-    }
-
-    layout_expr
 }
 
 #[derive(Clone, Copy)]
@@ -83,7 +66,7 @@ impl ToTokens for ConstIdent {
     }
 }
 
-fn generate_padding_check2(
+fn generate_padding_check(
     struct_name: &Ident,
     field_names: &[&Ident],
     field_types: &[&syn::Type],
