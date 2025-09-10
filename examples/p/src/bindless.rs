@@ -38,6 +38,7 @@ shame_wgpu::bind_group! {
         sampler: sm::Sampler<sm::Nearest>,
         textures: BindingArray<Texture<Rgba8Unorm>>,
         tex_indices: BindingArray<Buffer<u32x1>>,
+        tex_indices_write: BindingArray<Buffer<u32x1, Storage>>,
     }
 }
 
@@ -165,6 +166,10 @@ impl BindlessExample {
                 sampler: &sampler,
                 textures: &texture_views.iter().collect::<Vec<_>>(),
                 tex_indices: &tex_indices
+                    .iter()
+                    .map(|b| b.as_entire_buffer_binding())
+                    .collect::<Vec<_>>(),
+                tex_indices_write: &tex_indices
                     .iter()
                     .map(|b| b.as_entire_buffer_binding())
                     .collect::<Vec<_>>(),
