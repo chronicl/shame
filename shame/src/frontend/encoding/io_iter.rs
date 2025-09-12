@@ -332,6 +332,16 @@ impl<'a> BindGroupIter<'a> {
             phantom: PhantomData,
         }
     }
+
+    /// The returned bind group iter will panic if bind groups are added outside
+    /// of it's encoding context.
+    pub fn make_static(self) -> BindGroupIter<'static> {
+        BindGroupIter {
+            next: self.next,
+            private_ctor: (),
+            phantom: PhantomData,
+        }
+    }
 }
 
 /// iterator over the bindings of a bind group that also allows random access.
@@ -500,6 +510,21 @@ impl BindingIter<'_> {
             path: self.post_inc_path(),
             visibility: stages,
         })
+    }
+
+    /// Index of the bind group whose bindings are being iterated over.
+    pub fn bind_group_index(&self) -> u32 { self.next.0 }
+
+    /// Index of the next binding in the bind group. Does not advance the iterator.
+    pub fn next_binding_index(&self) -> u32 { self.next.1 }
+
+    /// Returned iter can panic if used outside of an encoding guard.
+    #[doc(hidden)]
+    pub fn make_static(self) -> BindingIter<'static> {
+        BindingIter {
+            next: self.next,
+            phantom: PhantomData::<&'static ()>,
+        }
     }
 
     fn post_inc_path(&mut self) -> BindPath {
