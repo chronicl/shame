@@ -9,7 +9,10 @@ use self::{
 use crate::{
     backend::{language::Language, shader_code::ShaderCode, wgsl::WgslErrorKind},
     call_info,
-    common::marker::{Unsend, Unsync},
+    common::{
+        marker::{Unsend, Unsync},
+        proc_macro_utils::CpuLayoutImplMismatch,
+    },
     frontend::{
         encoding::{
             features::ComputeGrid,
@@ -286,6 +289,8 @@ pub enum EncodingErrorKind {
         current: PipelineKind,
         required: PipelineKind,
     },
+    #[error("{0}")]
+    LayoutError(#[from] CpuLayoutImplMismatch),
     #[error("`shame::any::Any` instance is not available. reason: {0}")]
     ValueUnavailable(InvalidReason),
     #[error("{0}")]
