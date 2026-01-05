@@ -56,6 +56,10 @@ pub struct TypeLayoutCompatibleWith<AddressSpace> {
 }
 
 impl<AS: BufferAddressSpace> TypeLayoutCompatibleWith<AS> {
+    /// TODO(chronicl)
+    pub fn recipe(&self) -> &TypeLayoutRecipe { &self.recipe }
+
+    /// TODO(chronicl)
     pub fn try_from(language: Language, recipe: TypeLayoutRecipe) -> Result<Self, AddressSpaceError> {
         let address_space = AS::BUFFER_ADDRESS_SPACE;
         let layout = recipe.layout();
