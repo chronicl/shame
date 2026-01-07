@@ -1,6 +1,4 @@
-#![allow(unused, clippy::no_effect)]
-use std::vec;
-
+#![allow(unused, clippy::no_effect, clippy::unnecessary_operation)]
 use shame as sm;
 use shame::prelude::*;
 use shame::aliases::*;
