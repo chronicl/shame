@@ -223,6 +223,11 @@ pub fn get_layout_compare_with_cpu_push_error<T: GpuLayout>(ctx: &Context, skip_
     gpu_layout
 }
 
+fn repr_c_array_stride_from_array_element_size(element_size: u64) -> u64 {
+    // in repr(C) the stride is equal to the element size
+    element_size
+}
+
 pub(crate) fn check_layout_push_error(
     ctx: &Context,
     cpu_name: &str,
@@ -245,9 +250,10 @@ pub(crate) fn check_layout_push_error(
                     (Some(_), None) => Err(CpuLayoutCompareError::UnsizedStride {
                         name: gpu_layout.short_name(),
                     }),
+                    
                     (Some(cpu_size), Some(gpu_size)) => {
-                        let cpu_stride = cpu_size;
-                        //
+                        let cpu_stride = repr_c_array_stride_from_array_element_size(cpu_size);
+
                         let gpu_stride = array_stride(gpu_layout.align(), gpu_size, Repr::default());
 
                         if cpu_stride != gpu_stride {
