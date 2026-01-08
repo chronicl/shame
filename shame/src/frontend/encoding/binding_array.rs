@@ -64,8 +64,7 @@ where
     fn new_invalid(reason: InvalidReason) -> Self { Self::new_invalid(reason) }
     fn new_binding(args: BindingArgs) -> Self {
         let (any, is_generated_struct) = Context::try_with(call_info!(), |ctx| {
-            let skip_stride_check = true; // not a vertex buffer
-            get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check);
+            get_layout_compare_with_cpu_push_error::<T>(ctx, None);
 
             let access = AM::ACCESS_MODE_READABLE;
             let bind_ty = Self::binding_type();

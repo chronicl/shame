@@ -2,7 +2,7 @@
 use std::{cell::Cell, iter, marker::PhantomData, rc::Rc};
 
 use crate::{
-    any::layout::TypeLayoutRecipe,
+    any::layout::{Repr, TypeLayoutRecipe},
     call_info,
     common::{
         integer::post_inc_u32,
@@ -110,8 +110,16 @@ impl<T: VertexLayout> VertexBuffer<'_, T> {
     fn new(slot: u32, location_counter: Rc<LocationCounter>) -> Self {
         let call_info = call_info!();
         let attribs_and_stride = Context::try_with(call_info, |ctx| {
-            let skip_stride_check = false; // it is implied that T is in an array, the strides must match
-            let gpu_layout = get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check);
+            // it is implied that T is in an array, the strides must match
+            //
+            // the stride check repr only affects vertex buffers where `T = f32x3`.
+            // In those cases we assume a stride of 16 bytes, so that the stride of `T` is
+            // identical to what it would be in an `array<T>`. If the `T` itself is a struct that
+            // uses #[gpu_repr(packed)], that makes `T`s alignment equal to 1 and therefore the
+            // chosen repr here doesn't matter.
+            let stride_check = Some(Repr::default());
+
+            let gpu_layout = get_layout_compare_with_cpu_push_error::<T>(ctx, stride_check);
 
             let attribs_and_stride = Attrib::get_attribs_and_stride(&gpu_layout, &location_counter).ok_or_else(|| {
                 ctx.push_error(FrontendError::MalformedVertexBufferLayout(gpu_layout).into());
@@ -592,9 +600,8 @@ impl PushConstants<'_> {
         let _caller_scope = Context::call_info_scope();
 
         // the push constants structure as a whole doesn't need to have the same stride
-        let skip_stride_check = true;
         Context::try_with(call_info!(), |ctx| {
-            let _ = get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check);
+            let _ = get_layout_compare_with_cpu_push_error::<T>(ctx, None);
         });
 
         T::from_anys(Any::get_immediates(T::layout_recipe(), T::expected_num_anys(), None, None).into_iter())

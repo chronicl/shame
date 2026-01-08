@@ -220,8 +220,7 @@ where
     AM: AccessModeReadable,
 {
     let any = Context::try_with(call_info!(), |ctx| {
-        let skip_stride_check = true; // not a vertex buffer
-        get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check);
+        get_layout_compare_with_cpu_push_error::<T>(ctx, None);
 
         let access = AM::ACCESS_MODE_READABLE;
         let bind_ty = BindingType::Buffer {
