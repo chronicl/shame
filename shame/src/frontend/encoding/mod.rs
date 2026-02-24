@@ -1,4 +1,4 @@
-use features::{ComputeGrid, WorkGroup, GridSize};
+use features::{ComputeGridInner, WorkGroup, GridSize};
 use io_iter::PushConstants;
 use pipeline_info::{ComputePipeline, PipelineDefinition, RenderPipeline};
 
@@ -12,6 +12,7 @@ use crate::{
     common::marker::{Unsend, Unsync},
     frontend::{
         encoding::{
+            features::ComputeGrid,
             io_iter::{BindGroupIter, VertexBufferIter},
             rasterizer::{PrimitiveAssembly, VertexStage},
         },
@@ -23,8 +24,8 @@ use crate::{
     ir::{
         pipeline::{PipelineError, PipelineKind, StageSolverErrorKind},
         recording::{
-            next_thread_generation, AllocError, BlockError, CallInfo, Context, FnError, NodeRecordingError, StmtError,
-            ThreadContextGuard,
+            AllocError, BlockError, CallInfo, Context, FnError, NodeRecordingError, StmtError, ThreadContextGuard,
+            next_thread_generation,
         },
     },
     try_ctx_track_caller,
@@ -467,8 +468,6 @@ impl EncodingGuard<Render> {
             vertices: VertexStage::new(),
             bind_groups: BindGroupIter::new(),
             push_constants: PushConstants::new(),
-            encoding: self,
-            phantom: PhantomData,
         }
     }
 }
@@ -545,8 +544,6 @@ impl EncodingGuard<Compute> {
         DispatchContext {
             bind_groups: BindGroupIter::new(),
             push_constants: PushConstants::new(),
-            encoding: self,
-            phantom: PhantomData,
             grid: ComputeGrid::new(),
         }
     }

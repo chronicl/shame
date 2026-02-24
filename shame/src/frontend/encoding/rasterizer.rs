@@ -1,3 +1,4 @@
+use crate::common::marker::{Unsend, Unsync};
 use crate::frontend::any::render_io::{VertexBufferLookupIndex, Location};
 use crate::frontend::any::{Any, InvalidReason};
 use crate::frontend::rust_types::array::{Array, Size, UpTo8};
@@ -60,7 +61,7 @@ pub struct VertexStage<'a> {
     ///
     /// use `.next()` or `.at(...)`/`.index(...)` to access individual vertex buffers
     pub buffers: VertexBufferIter,
-    phantom: PhantomData<&'a ()>,
+    phantom: PhantomData<(&'a (), Unsend, Unsync)>,
     private_ctor: (),
 }
 
@@ -975,7 +976,7 @@ pub enum Draw {
         ///   or [triangle lists](https://registry.khronos.org/vulkan/specs/latest/html/vkspec.html#drawing-triangle-lists)
         ///   depending on the value of [`Draw::Line::strip`].
         ///
-        /// - `false` interpret the vertex sequence as  
+        /// - `false` interpret the vertex sequence as
         ///   [line strips](https://registry.khronos.org/vulkan/specs/latest/html/vkspec.html#drawing-line-strips)
         ///   or [line lists](https://registry.khronos.org/vulkan/specs/latest/html/vkspec.html#drawing-line-lists)
         ///   depending on the value of [`Draw::Line::strip`].

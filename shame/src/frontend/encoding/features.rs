@@ -140,8 +140,6 @@ pub struct DrawContext<'a> {
     /// ```
     /// see documentation of [`PushConstants::get`] for more examples.
     pub push_constants: PushConstants<'a>,
-    pub(super) encoding: &'a EncodingGuard<Render>,
-    pub(super) phantom: PhantomData<(Unsend, Unsync)>,
 }
 
 /// The context of a compute dispatch command received from the Cpu.
@@ -152,9 +150,9 @@ pub struct DispatchContext<'a, Dim: GridDim> {
     pub bind_groups: BindGroupIter<'a>,
     /// access to push-constant memory that was set before the dispatch
     pub push_constants: PushConstants<'a>,
-    pub(super) grid: ComputeGrid<Dim>,
-    pub(super) encoding: &'a EncodingGuard<Compute>,
-    pub(super) phantom: PhantomData<(Unsend, Unsync, Dim)>,
+    /// access to the grid hierarchy, consisting of a grid of workgroups which in turn consist
+    /// of a fixed (pipeline-defined) size grid of threads which execute the compute pipeline
+    pub grid: ComputeGrid<Dim>,
 }
 
 impl<Dim: GridDim> Deref for DispatchContext<'_, Dim> {
@@ -195,8 +193,28 @@ pub trait GridSize {
 
 /// the grid hierarchy, consisting of a grid of workgroups which in turn consist
 /// of a fixed (pipeline-defined) size grid of threads which execute the compute pipeline
-#[allow(clippy::manual_non_exhaustive)]
 pub struct ComputeGrid<Dim: GridDim> {
+    inner: ComputeGridInner<Dim>,
+}
+
+impl<Dim: GridDim> std::ops::Deref for ComputeGrid<Dim> {
+    type Target = ComputeGridInner<Dim>;
+
+    fn deref(&self) -> &Self::Target { &self.inner }
+}
+
+impl<Dim: GridDim> ComputeGrid<Dim> {
+    pub(super) fn new() -> Self {
+        Self {
+            inner: ComputeGridInner::new(),
+        }
+    }
+}
+
+/// the grid hierarchy, consisting of a grid of workgroups which in turn consist
+/// of a fixed (pipeline-defined) size grid of threads which execute the compute pipeline
+#[allow(clippy::manual_non_exhaustive)]
+pub struct ComputeGridInner<Dim: GridDim> {
     /// A group of threads that works on a subset of the whole compute workload.
     /// The size of every Workgroup in a pipeline is the same, but can be chosen
     /// freely when creating the pipeline.
@@ -225,7 +243,7 @@ pub struct ComputeGrid<Dim: GridDim> {
     private_ctor: (),
 }
 
-impl<Dim: GridDim> ComputeGrid<Dim> {
+impl<Dim: GridDim> ComputeGridInner<Dim> {
     #[track_caller]
     pub(crate) fn new() -> Self {
         let dim = Dim::LEN;
