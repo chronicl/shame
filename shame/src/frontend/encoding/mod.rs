@@ -1,4 +1,4 @@
-use features::{ComputeGrid, WorkGroup, GridSize};
+use features::{ComputeGridInner, WorkGroup, GridSize};
 use io_iter::PushConstants;
 use pipeline_info::{ComputePipeline, PipelineDefinition, RenderPipeline};
 
@@ -11,6 +11,7 @@ use crate::{
     call_info,
     common::marker::{Unsend, Unsync},
     frontend::encoding::{
+        features::ComputeGrid,
         io_iter::{BindGroupIter, VertexBufferIter},
         rasterizer::{PrimitiveAssembly, VertexStage},
     },
@@ -18,8 +19,8 @@ use crate::{
         ir_type::LayoutError,
         pipeline::{PipelineError, PipelineKind, StageSolverErrorKind},
         recording::{
-            next_thread_generation, AllocError, BlockError, CallInfo, Context, FnError, NodeRecordingError, StmtError,
-            ThreadContextGuard,
+            AllocError, BlockError, CallInfo, Context, FnError, NodeRecordingError, StmtError, ThreadContextGuard,
+            next_thread_generation,
         },
     },
     try_ctx_track_caller,
@@ -95,7 +96,7 @@ use crate as shame;
 ///         // `enc` is generic over the pipeline kind, which decided by calling
 ///         // either `enc.new_render_pipeline` or `enc.new_compute_pipeline`.
 ///         // Without this additional call, there will be a compiler error.
-///        
+///
 ///         let mut drawcall = enc.new_render_pipeline(sm::Indexing::Incremental);
 ///
 ///         // ... use `drawcall` to build your pipeline
@@ -436,9 +437,9 @@ impl EncodingGuard<Render> {
     ///     &drawcall.vertices; // access to vertex-shader related functionality
     ///     &drawcall.bind_groups; // access to bind groups (descriptor-sets)
     ///     &drawcall.push_constants; // access to push constant data
-    ///     
+    ///
     ///     let fragments = drawcall.vertices.assemble(...).rasterize(...);
-    ///     
+    ///
     ///     // use fragments object for per-fragment computation and io
     ///
     ///     enc.finish()?
@@ -458,8 +459,6 @@ impl EncodingGuard<Render> {
             vertices: VertexStage::new(),
             bind_groups: BindGroupIter::new(),
             push_constants: PushConstants::new(),
-            encoding: self,
-            phantom: PhantomData,
         }
     }
 }
@@ -487,7 +486,7 @@ impl EncodingGuard<Compute> {
     ///     The compute grid is 3D and all thread positions are 3D vectors
     ///     even though the workgroup is only a flat 2D 8x4 slice.
     ///     Thread indices are still 1D scalars.
-    ///     
+    ///
     ///   The amount of workgroups dispatched is controlled at runtime by the
     ///   dispatch command.
     ///
@@ -536,8 +535,6 @@ impl EncodingGuard<Compute> {
         DispatchContext {
             bind_groups: BindGroupIter::new(),
             push_constants: PushConstants::new(),
-            encoding: self,
-            phantom: PhantomData,
             grid: ComputeGrid::new(),
         }
     }

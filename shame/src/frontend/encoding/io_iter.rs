@@ -3,40 +3,42 @@ use std::{cell::Cell, iter, marker::PhantomData, rc::Rc};
 
 use crate::{
     call_info,
-    common::integer::post_inc_u32,
+    common::{
+        integer::post_inc_u32,
+        marker::{Unsend, Unsync},
+    },
     frontend::{
         any::{
+            Any, InvalidReason,
             render_io::{Attrib, Location, VertexAttribFormat, VertexBufferLayout},
             shared_io::{BindPath, BindingType},
-            Any, InvalidReason,
         },
         error::InternalError,
         rust_types::{
+            GpuType,
             error::FrontendError,
             layout_traits::{
-                cpu_type_name_and_layout, get_layout_compare_with_cpu_push_error, ArrayElementsUnsizedError, FromAnys,
-                GpuLayout, VertexLayout,
+                ArrayElementsUnsizedError, FromAnys, GpuLayout, VertexLayout, cpu_type_name_and_layout,
+                get_layout_compare_with_cpu_push_error,
             },
             reference::AccessMode,
             struct_::SizedFields,
             type_traits::{BindingArgs, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools},
-            GpuType,
         },
         texture::{
+            Sampler, Texture, TextureKind,
             texture_array::{StorageTextureArray, TextureArray},
             texture_traits::{
                 LayerCoords, SamplingFormat, SamplingMethod, Spp, StorageTextureCoords, StorageTextureFormat,
                 SupportsCoords, SupportsSpp, TextureCoords,
             },
-            Sampler, Texture, TextureKind,
         },
     },
     ir::{
-        self,
+        self, TextureFormatWrapper,
         ir_type::{Field, LayoutError},
         pipeline::{PipelineError, StageMask},
         recording::Context,
-        TextureFormatWrapper,
     },
 };
 
@@ -283,7 +285,7 @@ impl<T: VertexLayout> VertexBuffer<'_, T> {
 pub struct BindGroupIter<'a> {
     next: u32,
     private_ctor: (),
-    phantom: PhantomData<&'a ()>,
+    phantom: PhantomData<(&'a (), Unsend, Unsync)>,
 }
 
 impl<'a> BindGroupIter<'a> {
@@ -337,7 +339,7 @@ impl<'a> BindGroupIter<'a> {
 /// see [`BindingIter::next`] and [`BindingIter::at`]/[`BindingIter::index`]
 pub struct BindingIter<'a> {
     next: BindPath,
-    phantom: PhantomData<&'a ()>,
+    phantom: PhantomData<(&'a (), Unsend, Unsync)>,
 }
 
 impl BindingIter<'_> {
@@ -454,13 +456,13 @@ impl BindingIter<'_> {
     /// let texarr: sm::TextureArray<sm::tf::Rgba8Unorm, 4> = bind_group.next();
     /// let texarr: sm::TextureArray<sm::Filterable<f32x4>, 4> = bind_group.next();
     /// ```
-    /// ---    
+    /// ---
     /// ## storage textures
     /// ```
     /// let texsto: sm::StorageTexture<sm::tf::Rgba8Unorm> = bind_group.next();
     /// let texsto: sm::StorageTexture<sm::tf::Rgba8Unorm, u32x2> = bind_group.next();
     /// ```
-    /// ---    
+    /// ---
     /// ## Arrays of storage textures
     /// ```
     /// let texstoarr: sm::StorageTextureArray<sm::tf::Rgba8Unorm, 4> = bind_group.next();
@@ -512,7 +514,7 @@ impl BindingIter<'_> {
 ///
 /// use [`PushConstants::get`] to downcast into a specific [`GpuLayout`]
 pub struct PushConstants<'a> {
-    phantom: PhantomData<&'a ()>,
+    phantom: PhantomData<(&'a (), Unsend, Unsync)>,
 }
 
 impl PushConstants<'_> {
