@@ -163,7 +163,7 @@ where
     where
         T: GpuLayout,
     {
-        Self::from_ref(Self::create_ref_for_binding(args))
+        Self::from_ref(create_ref_for_buffer_binding(args, DYNAMIC_OFFSET))
     }
 
     fn new_invalid(reason: InvalidReason) -> Self { Self::from_ref(Ref::from(Any::new_invalid(reason))) }
@@ -175,56 +175,60 @@ where
             _phantom: PhantomData,
         }
     }
+}
 
-    fn create_ref_for_binding(args: BindingArgs) -> Ref<T, AS, AM>
-    where
-        T: GpuLayout,
-    {
-        let any = Context::try_with(call_info!(), |ctx| {
-            let skip_stride_check = true; // not a vertex buffer
-            get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check);
+/// Bind a new buffer with the binding arguments provided. This skips a lot of static type checks
+/// that [`Buffer`] performs. Those type checks instead are runtime errors.
+pub fn create_ref_for_buffer_binding<T, AS, AM>(args: BindingArgs, has_dynamic_offset: bool) -> Ref<T, AS, AM>
+where
+    T: GpuLayout + GpuStore,
+    AS: BufferAddressSpace,
+    AM: AccessModeReadable,
+{
+    let any = Context::try_with(call_info!(), |ctx| {
+        let skip_stride_check = true; // not a vertex buffer
+        get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check);
 
-            let access = AM::ACCESS_MODE_READABLE;
-            let bind_ty = BindingType::Buffer {
-                ty: match AS::BUFFER_ADDRESS_SPACE {
-                    BufferAddressSpaceEnum::Storage => BufferBindingType::Storage(access),
-                    BufferAddressSpaceEnum::Uniform => BufferBindingType::Uniform,
-                },
-                has_dynamic_offset: DYNAMIC_OFFSET,
-            };
+        let access = AM::ACCESS_MODE_READABLE;
+        let bind_ty = BindingType::Buffer {
+            ty: match AS::BUFFER_ADDRESS_SPACE {
+                BufferAddressSpaceEnum::Storage => BufferBindingType::Storage(access),
+                BufferAddressSpaceEnum::Uniform => BufferBindingType::Uniform,
+            },
+            has_dynamic_offset,
+        };
 
-            let vert_write_storage = ctx.settings().vertex_writable_storage_by_default;
-            let vis = bind_ty.max_supported_stage_visibility(vert_write_storage);
+        let vert_write_storage = ctx.settings().vertex_writable_storage_by_default;
+        let vis = bind_ty.max_supported_stage_visibility(vert_write_storage);
 
-            // Check that the layout of `T` is compatible with the address space
-            // and if it is, create the binding.
-            let recipe = T::layout_recipe();
-            match AS::BUFFER_ADDRESS_SPACE {
-                // Bad duplication in match arms, but not worth abstracting away
-                BufferAddressSpaceEnum::Uniform => {
-                    match TypeLayoutCompatibleWith::<mem::Uniform>::try_from(crate::Language::Wgsl, recipe) {
-                        Ok(l) => Any::buffer_binding(args.path, vis, l, access, DYNAMIC_OFFSET),
-                        Err(e) => {
-                            ctx.push_error(e.into());
-                            Any::new_invalid(InvalidReason::ErrorThatWasPushed)
-                        }
-                    }
-                }
-                BufferAddressSpaceEnum::Storage => {
-                    match TypeLayoutCompatibleWith::<mem::Storage>::try_from(crate::Language::Wgsl, recipe) {
-                        Ok(layout) => Any::buffer_binding(args.path, vis, layout, access, DYNAMIC_OFFSET),
-                        Err(e) => {
-                            ctx.push_error(e.into());
-                            Any::new_invalid(InvalidReason::ErrorThatWasPushed)
-                        }
+        // Check that the layout of `T` is compatible with the address space
+        // and if it is, create the binding.
+        let recipe = T::layout_recipe();
+        match AS::BUFFER_ADDRESS_SPACE {
+            // Bad duplication in match arms, but not worth abstracting away
+            BufferAddressSpaceEnum::Uniform => {
+                match TypeLayoutCompatibleWith::<mem::Uniform>::try_from(crate::Language::Wgsl, recipe) {
+                    Ok(l) => Any::buffer_binding(args.path, vis, l, access, has_dynamic_offset),
+                    Err(e) => {
+                        ctx.push_error(e.into());
+                        Any::new_invalid(InvalidReason::ErrorThatWasPushed)
                     }
                 }
             }
-        })
-        .unwrap_or_else(|| Any::new_invalid(InvalidReason::CreatedWithNoActiveEncoding));
+            BufferAddressSpaceEnum::Storage => {
+                match TypeLayoutCompatibleWith::<mem::Storage>::try_from(crate::Language::Wgsl, recipe) {
+                    Ok(layout) => Any::buffer_binding(args.path, vis, layout, access, has_dynamic_offset),
+                    Err(e) => {
+                        ctx.push_error(e.into());
+                        Any::new_invalid(InvalidReason::ErrorThatWasPushed)
+                    }
+                }
+            }
+        }
+    })
+    .unwrap_or_else(|| Any::new_invalid(InvalidReason::CreatedWithNoActiveEncoding));
 
-        Ref::from(any)
-    }
+    Ref::from(any)
 }
 
 /// TODO(chronicl)

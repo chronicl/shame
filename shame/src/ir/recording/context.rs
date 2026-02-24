@@ -64,6 +64,7 @@ macro_rules! with_updated_latest_user_caller {
     }};
 }
 
+/// TODO(chronicl)
 pub struct Context {
     /// settings provided by the user on encoding start
     settings: Settings,
@@ -108,7 +109,7 @@ impl Context {
     /// access the context mutably and register `call_info` to automatically be
     /// added to errors that are pushed within `f`'s execution.
     #[allow(unused)]
-    pub(crate) fn with_mut<R>(call_info: CallInfo, f: impl FnOnce(&mut Context) -> R) -> R {
+    pub fn with_mut<R>(call_info: CallInfo, f: impl FnOnce(&mut Context) -> R) -> R {
         CONTEXT.with(|ctx| {
             let mut ctx = ctx.borrow_mut();
             let ctx = ctx.as_mut().expect("Context::with_mut with no active recording");
@@ -118,7 +119,7 @@ impl Context {
 
     /// access the context and register `call_info` to automatically be
     /// added to errors that are pushed within `f`'s execution.
-    pub(crate) fn with<R>(call_info: CallInfo, f: impl FnOnce(&Context) -> R) -> R {
+    pub fn with<R>(call_info: CallInfo, f: impl FnOnce(&Context) -> R) -> R {
         CONTEXT.with(|ctx| {
             let ctx = ctx.borrow();
             let ctx = ctx.as_ref().expect("Context::with_mut with no active recording");
@@ -128,7 +129,7 @@ impl Context {
 
     /// fallible version of `with`
     #[allow(clippy::manual_map)] //map would make the callstack deeper, bad for debugging experience
-    pub(crate) fn try_with<R>(call_info: CallInfo, f: impl FnOnce(&Context) -> R) -> Option<R> {
+    pub fn try_with<R>(call_info: CallInfo, f: impl FnOnce(&Context) -> R) -> Option<R> {
         CONTEXT.with(|ctx| match ctx.borrow().as_ref() {
             Some(ctx) => Some(with_updated_latest_user_caller!(call_info, ctx, f(ctx))),
             None => None,
@@ -150,7 +151,8 @@ impl Context {
 
     pub(crate) fn generation(&self) -> NonZeroU32 { self.pools.generation() }
 
-    pub(crate) fn settings(&self) -> &Settings { &self.settings }
+    /// TODO(chronic)
+    pub fn settings(&self) -> &Settings { &self.settings }
 
     pub(crate) fn pipeline_kind(&self) -> PipelineKind { self.wip_pipeline.kind }
 
@@ -232,7 +234,8 @@ impl Context {
         self.wip_pipeline.special.compute.borrow()
     }
 
-    pub(crate) fn push_error(&self, error: EncodingErrorKind) {
+    /// TODO(chronicl)
+    pub fn push_error(&self, error: EncodingErrorKind) {
         self.push_assembled_error(self.assemble_error(self.latest_user_caller(), error));
     }
 

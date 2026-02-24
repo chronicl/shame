@@ -211,10 +211,7 @@ pub(crate) fn cpu_type_name_and_layout<T: GpuLayout>(ctx: &Context) -> Option<(C
 }
 
 /// returns the `TypeLayout` of `T` and pushes an error to the provided context if it is incompatible with its associated cpu layout
-pub(crate) fn get_layout_compare_with_cpu_push_error<T: GpuLayout>(
-    ctx: &Context,
-    skip_stride_check: bool,
-) -> TypeLayout {
+pub fn get_layout_compare_with_cpu_push_error<T: GpuLayout>(ctx: &Context, skip_stride_check: bool) -> TypeLayout {
     const ERR_COMMENT: &str = "`GpuLayout` uses WGSL layout rules unless #[gpu_repr(packed)] is used.\nsee https://www.w3.org/TR/WGSL/#structure-member-layout\n`CpuLayout` uses #[repr(C)].\nsee https://doc.rust-lang.org/reference/type-layout.html#r-layout.repr.c.struct";
 
     let gpu_layout = gpu_layout::<T>();

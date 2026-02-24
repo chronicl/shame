@@ -180,7 +180,8 @@ impl Any {
 
     pub(crate) fn from_parts(key: Result<Key<Node>, InvalidReason>) -> Self { Self { node: key } }
 
-    pub(crate) fn new_invalid(reason: InvalidReason) -> Self { Self::from_parts(Err(reason)) }
+    /// Create an invalid `Any` with the given `reason`.
+    pub fn new_invalid(reason: InvalidReason) -> Self { Self::from_parts(Err(reason)) }
 
     /// create an invalid `Any` which is caused by `user_error`.
     ///

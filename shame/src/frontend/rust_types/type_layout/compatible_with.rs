@@ -55,12 +55,12 @@ pub struct TypeLayoutCompatibleWith<AddressSpace> {
 }
 
 impl<AS> TypeLayoutCompatibleWith<AS> {
-    pub fn recipe(&self) -> &TypeLayoutRecipe {
-        &self.recipe
-    }
+    /// TODO(chronicl)
+    pub fn recipe(&self) -> &TypeLayoutRecipe { &self.recipe }
 }
 
 impl<AS: BufferAddressSpace> TypeLayoutCompatibleWith<AS> {
+    /// TODO(chronicl)
     pub fn try_from(language: Language, recipe: TypeLayoutRecipe) -> Result<Self, AddressSpaceError> {
         let address_space = AS::BUFFER_ADDRESS_SPACE;
         let layout = recipe.layout();
@@ -70,8 +70,8 @@ impl<AS: BufferAddressSpace> TypeLayoutCompatibleWith<AS> {
             (Language::Wgsl, BufferAddressSpaceEnum::Uniform, None) => {
                 return Err(RequirementsNotSatisfied::MustBeSized(recipe, language, address_space).into());
             }
-            (Language::Wgsl, BufferAddressSpaceEnum::Uniform, Some(_))
-            | (Language::Wgsl, BufferAddressSpaceEnum::Storage, _) => {}
+            (Language::Wgsl, BufferAddressSpaceEnum::Uniform, Some(_)) |
+            (Language::Wgsl, BufferAddressSpaceEnum::Storage, _) => {}
         }
 
         // Check that the recipe is representable in the target language.
@@ -470,9 +470,9 @@ fn write_struct_mismatch(
                 }
             }
         }
-        StructMismatch::FieldCount
-        | StructMismatch::FieldName { .. }
-        | StructMismatch::FieldLayout {
+        StructMismatch::FieldCount |
+        StructMismatch::FieldName { .. } |
+        StructMismatch::FieldLayout {
             mismatch: TopLevelMismatch::Type,
             ..
         } => {

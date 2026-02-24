@@ -269,6 +269,7 @@ pub use frontend::encoding::binding_array::BindingArray;
 pub use frontend::encoding::buffer::Buffer;
 pub use frontend::encoding::buffer::BufferContent;
 pub use frontend::encoding::buffer::BufferAddressSpace;
+pub use frontend::encoding::buffer::BufferAddressSpaceEnum;
 
 // `Sampler`
 pub use frontend::texture::Sampler;
@@ -430,7 +431,15 @@ pub mod any {
 
     // type erased
     pub use any::Any;
+    pub use any::InvalidReason;
     pub use crate::frontend::rust_types::AsAny;
+
+    // context
+    pub use crate::ir::recording::Context;
+    pub use crate::call_info;
+
+    // Helper for buffer creation
+    pub use crate::frontend::encoding::buffer::create_ref_for_buffer_binding;
 
     // runtime types
     pub use crate::ir::ir_type::AccessMode;
@@ -465,11 +474,13 @@ pub mod any {
     pub use crate::ir::ir_type::StructureDefinitionError;
     pub use crate::ir::ir_type::StructureFieldNamesMustBeUnique;
 
+
     pub mod layout {
         use crate::frontend::rust_types::type_layout;
 
         // type layout
         pub use type_layout::TypeLayout;
+        pub use type_layout::compatible_with::TypeLayoutCompatibleWith;
         pub use type_layout::Repr;
         pub mod repr {
             use crate::frontend::rust_types::type_layout;
@@ -518,6 +529,7 @@ pub mod any {
     // runtime binding api
     pub use any::shared_io::BindPath;
     pub use any::shared_io::BindingType;
+    pub use crate::frontend::rust_types::type_traits::BindingArgs;
     pub use any::shared_io::BufferBindingType;
     pub use any::shared_io::SamplingMethod;
 

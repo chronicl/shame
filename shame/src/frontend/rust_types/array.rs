@@ -82,7 +82,7 @@ impl<const N: usize> ArrayLen for Size<N> {
 // |          |                                   |
 /// (no documentation yet)
 #[derive(Clone, Copy)]
-pub struct Array<T: GpuType + GpuSized, N: ArrayLen = RuntimeSize> {
+pub struct Array<T, N = RuntimeSize> {
     any: Any,
     phantom: PhantomData<(T, N)>,
 }
