@@ -86,12 +86,7 @@ pub mod texture_traits;
 /// [`Filterable<T>`]: crate::Filterable
 /// [`NonFilterable<T>`]: crate::NonFilterable
 /// [`Depth`]: crate::Depth
-pub struct Texture<Format, Coords = vec<f32, x2>, SPP = Single>
-where
-    Coords: TextureCoords + SupportsSpp<SPP>, // TODO(release) SupportsFormat<Format> (example: 3d cube textures exist)
-    Format: SamplingFormat + SupportsSpp<SPP> + SupportsCoords<Coords>,
-    SPP: Spp,
-{
+pub struct Texture<Format, Coords = vec<f32, x2>, SPP = Single> {
     inner: TextureKind,
     phantom: PhantomData<(Coords, Format, SPP)>,
 }
