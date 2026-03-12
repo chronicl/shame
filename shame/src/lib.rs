@@ -524,6 +524,9 @@ pub mod any {
         // conversion and builder errors
         pub use type_layout::recipe::builder::IsUnsizedStructError;
         pub use type_layout::recipe::builder::StructFromPartsError;
+
+        // helpful cpu layout comparison
+        pub use crate::frontend::rust_types::layout_traits::get_layout_compare_with_cpu_push_error;
     }
 
     // runtime binding api
