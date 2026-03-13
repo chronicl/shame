@@ -156,6 +156,7 @@ pub use frontend::rust_types::len::{x1, x2, x3, x4};
 pub use frontend::rust_types::len::{Len, Len2};
 pub use common::floating_point::f16;
 pub use frontend::rust_types::vec::ToScalar; // .splat()
+pub use frontend::rust_types::vec::ToInteger;
 
 pub use frontend::rust_types::vec::zero;
 pub use frontend::rust_types::vec::one;
@@ -264,6 +265,7 @@ pub mod mem {
 // # Binding
 pub use frontend::encoding::binding::Binding;
 pub use frontend::encoding::binding_array::BindingArray;
+pub use frontend::encoding::binding::TextureHandle;
 
 // Buffer
 pub use frontend::encoding::buffer::Buffer;

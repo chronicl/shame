@@ -78,8 +78,11 @@ impl<T: TextureHandle> Binding for T {
     }
 }
 
+/// (no documentation yet)
 pub trait TextureHandle {
+    /// (no documentation yet)
     fn texture_type() -> HandleType;
+    /// (no documentation yet)
     fn from_any(any: Any) -> Self;
 }
 
