@@ -457,7 +457,7 @@ fn write_push_constant_var_def(
     let [first, ..] = pc_info else { return Ok(()) };
 
     let mut code = parent_span.sub_span(first.call_info);
-    writeln!(code, "var<push_constant> sm_pushc: sm_PushConstants;")?;
+    writeln!(code, "var<immediate> sm_pushc: sm_PushConstants;")?;
     writeln!(code, "struct sm_PushConstants {{");
     let indent = ctx.indent.deeper();
     for (i, field) in pc_info.iter().enumerate() {
