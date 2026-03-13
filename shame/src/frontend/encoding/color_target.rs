@@ -141,6 +141,9 @@ impl<SPP: Spp> ColorTargetIter<SPP> {
     }
 
     /// (no documentation yet)
+    pub fn next_index(&self) -> u32 { self.next_slot }
+
+    /// (no documentation yet)
     #[allow(clippy::should_implement_trait)]
     pub fn next<Format>(&mut self) -> ColorTarget<Format, SPP>
     where
