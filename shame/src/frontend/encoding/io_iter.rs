@@ -595,34 +595,8 @@ impl PushConstants<'_> {
         let skip_stride_check = true;
         Context::try_with(call_info!(), |ctx| {
             let _ = get_layout_compare_with_cpu_push_error::<T>(ctx, skip_stride_check);
+        });
 
-            match T::layout_recipe() {
-                TypeLayoutRecipe::UnsizedStruct(s) => {
-                    let msg = format!("Push constant type `{}` contains unsized last field", s.name);
-                    let any = ctx.push_error_get_invalid_any(InternalError::new(true, msg).into());
-                    T::from_anys(std::iter::repeat_n(any, T::expected_num_anys()))
-                }
-                TypeLayoutRecipe::RuntimeSizedArray(a) => {
-                    let msg = format!("Push constant type `{}` is a runtime-sized array", a);
-                    let any = ctx.push_error_get_invalid_any(InternalError::new(true, msg).into());
-                    T::from_anys(std::iter::repeat_n(any, T::expected_num_anys()))
-                }
-                TypeLayoutRecipe::Sized(recipe::SizedType::Struct(s)) => {
-                    let fields = s
-                        .fields()
-                        .iter()
-                        .map(|f| Any::next_push_constants_field(f.ty.clone(), f.custom_min_size, f.custom_min_align));
-                    T::from_anys(fields)
-                }
-                TypeLayoutRecipe::Sized(sized_type) => {
-                    T::from_anys(std::iter::once(Any::next_push_constants_field(sized_type, None, None)))
-                }
-            }
-        })
-        .unwrap_or_else(|| {
-            T::from_anys(std::iter::once(Any::new_invalid(
-                InvalidReason::CreatedWithNoActiveEncoding,
-            )))
-        })
+        T::from_anys(Any::get_immediates(T::layout_recipe(), T::expected_num_anys(), None, None).into_iter())
     }
 }

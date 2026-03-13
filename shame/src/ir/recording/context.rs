@@ -242,7 +242,8 @@ impl Context {
     // all push error functions flow through here
     pub(crate) fn push_assembled_error(&self, error: EncodingError) { self.errors.borrow_mut().push(error); }
 
-    pub(crate) fn push_error_get_invalid_any(&self, error: EncodingErrorKind) -> Any {
+    /// (no documentation yet)
+    pub fn push_error_get_invalid_any(&self, error: EncodingErrorKind) -> Any {
         self.push_error(error);
         Any::new_invalid(InvalidReason::ErrorThatWasPushed)
     }

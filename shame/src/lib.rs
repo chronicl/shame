@@ -433,6 +433,7 @@ pub mod any {
 
     // type erased
     pub use any::Any;
+    pub use crate::frontend::rust_types::layout_traits::FromAnys;
     pub use any::InvalidReason;
     pub use crate::frontend::rust_types::AsAny;
 

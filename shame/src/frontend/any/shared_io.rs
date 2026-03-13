@@ -401,7 +401,7 @@ impl Any {
     /// > will always result in either the entire
     /// > struct being visible or invisible in a given shader stage.
     #[track_caller]
-    pub fn next_push_constants_field(
+    pub fn next_push_constants_field_sized(
         recipe_ty: recipe::SizedType,
         custom_min_size: Option<u64>,
         custom_min_align: Option<U32PowerOf2>,
@@ -447,5 +447,62 @@ impl Any {
             any
         })
         .unwrap_or(Any::new_invalid(InvalidReason::CreatedWithNoActiveEncoding))
+    }
+
+    /// (no documentation yet)
+    #[track_caller]
+    pub fn get_immediates(
+        recipe_ty: recipe::TypeLayoutRecipe,
+        expected_anys: usize,
+        custom_min_size: Option<u64>,
+        custom_min_align: Option<U32PowerOf2>,
+    ) -> Vec<Any> {
+        // the push constants structure as a whole doesn't need to have the same stride
+        let skip_stride_check = true;
+        Context::try_with(call_info!(), |ctx| {
+            let anys: Vec<_> = match recipe_ty {
+                TypeLayoutRecipe::UnsizedStruct(s) => {
+                    let msg = format!("Push constant type `{}` contains unsized last field", s.name);
+                    std::iter::repeat_n(
+                        ctx.push_error_get_invalid_any(InternalError::new(true, msg).into()),
+                        expected_anys,
+                    )
+                    .collect()
+                }
+                TypeLayoutRecipe::RuntimeSizedArray(a) => {
+                    let msg = format!("Push constant type `{}` is a runtime-sized array", a);
+                    std::iter::repeat_n(
+                        ctx.push_error_get_invalid_any(InternalError::new(true, msg).into()),
+                        expected_anys,
+                    )
+                    .collect()
+                }
+                TypeLayoutRecipe::Sized(recipe::SizedType::Struct(s)) => s
+                    .fields()
+                    .iter()
+                    .map(|f| Any::next_push_constants_field_sized(f.ty.clone(), f.custom_min_size, f.custom_min_align))
+                    .collect(),
+                TypeLayoutRecipe::Sized(sized_type) => {
+                    vec![Any::next_push_constants_field_sized(sized_type, None, None)]
+                }
+            };
+
+            let anys = match anys.len() == expected_anys {
+                true => anys,
+                false => {
+                    let msg = format!(
+                        "`next_push_constants_field` was called with a wrong amount for `expected_anys` for the provided `recipe_ty`.",
+                    );
+                    std::iter::repeat_n(
+                        ctx.push_error_get_invalid_any(InternalError::new(true, msg).into()),
+                        expected_anys,
+                    )
+                    .collect()
+                }
+            };
+
+            anys
+        })
+        .unwrap_or_else(|| vec![Any::new_invalid(InvalidReason::CreatedWithNoActiveEncoding)])
     }
 }
