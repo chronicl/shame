@@ -237,7 +237,7 @@ fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: Transform
             let left = &*bin.left;
             let right = &*bin.right;
             let method_ident = syn::Ident::new(method_name, proc_macro2::Span::call_site());
-            let ts = quote! { #left.#method_ident(#right) };
+            let ts = quote! { (#left).#method_ident((#right)) };
             *expr = syn::parse2(ts).expect("failed to parse comparison method call");
             return;
         }
