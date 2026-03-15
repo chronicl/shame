@@ -135,6 +135,8 @@ fn transform_stmt(stmt: &mut syn::Stmt, mode: TransformMode) {
 /// - Index rewriting         (expr[i] -> expr.at(i))
 /// - Assignment rewriting    (expr = expr -> expr.set(expr))
 /// - Comparison rewriting    (a < b -> a.less_than(b), a <= b -> a.less_eq(b), a > b -> a.greater_than(b), a >= b -> a.greater_eq(b), a == b -> a.equals(b), a != b -> a.not_equals(b))
+/// - Assign-op rewriting     (a += b -> a.set_add(b), a -= b -> a.set_sub(b), a *= b -> a.set_mul(b), a /= b -> a.set_div(b), a %= b -> a.set_rem(b), a &= b -> a.set_bitand(b), a |= b -> a.set_bitor(b), a ^= b -> a.set_bitxor(b), a <<= b -> a.set_shl(b), a >>= b -> a.set_shr(b))
+/// - Unary rewriting         (!a -> a.set_not(), -a -> a.set_neg())
 /// - Generic recursive descent into everything else
 fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: TransformMode) {
     // control flow rewriting
@@ -207,6 +209,7 @@ fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: Transform
     }
 
     // comparison / equality operators -> method calls
+    // assign-op operators -> method calls
     if let syn::Expr::Binary(bin) = expr {
         let method = match bin.op {
             syn::BinOp::Lt(_) => Some("less_than"),
@@ -215,6 +218,16 @@ fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: Transform
             syn::BinOp::Ge(_) => Some("greater_eq"),
             syn::BinOp::Eq(_) => Some("equals"),
             syn::BinOp::Ne(_) => Some("not_equals"),
+            syn::BinOp::AddAssign(_) => Some("set_add"),
+            syn::BinOp::SubAssign(_) => Some("set_sub"),
+            syn::BinOp::MulAssign(_) => Some("set_mul"),
+            syn::BinOp::DivAssign(_) => Some("set_div"),
+            syn::BinOp::RemAssign(_) => Some("set_rem"),
+            syn::BinOp::BitAndAssign(_) => Some("set_bitand"),
+            syn::BinOp::BitOrAssign(_) => Some("set_bitor"),
+            syn::BinOp::BitXorAssign(_) => Some("set_bitxor"),
+            syn::BinOp::ShlAssign(_) => Some("set_shl"),
+            syn::BinOp::ShrAssign(_) => Some("set_shr"),
             _ => None,
         };
         if let Some(method_name) = method {
