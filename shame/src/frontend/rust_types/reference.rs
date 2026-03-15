@@ -335,9 +335,9 @@ macro_rules! impl_ref_binop {
             fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
         }
 
+        // This probably doesn't really implement much
         impl<A, T, AS, AM, const N: usize> std::ops::$trait<Ref<T, AS, AM>> for crate::Array<A, crate::Size<N>>
         where
-            A: GpuSized,
             T: GpuType + GpuStore + GpuSized + NoAtomics,
             AS: AddressSpace,
             AM: AccessModeReadable,
