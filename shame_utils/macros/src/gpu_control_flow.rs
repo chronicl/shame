@@ -10,11 +10,57 @@ use syn::{
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum TransformMode {
     SelectiveGpu,
-    SelectiveCpu,
-    All,
+    SelectiveCpu { transform_let_mut: bool },
+    All { transform_let_mut: bool },
+}
+
+impl TransformMode {
+    pub fn should_transform_let_mut(&self) -> bool {
+        match self {
+            TransformMode::SelectiveGpu => false,
+            TransformMode::SelectiveCpu { transform_let_mut } => *transform_let_mut,
+            TransformMode::All { transform_let_mut } => *transform_let_mut,
+        }
+    }
 }
 
 pub(crate) fn gpu_control_flow_impl(args: TokenStream, input: TokenStream) -> TokenStream {
+    fn parse_mode(args: TokenStream) -> Result<TransformMode, syn::Error> {
+        if args.is_empty() {
+            return Ok(TransformMode::SelectiveGpu);
+        }
+
+        struct ModeArgs {
+            idents: syn::punctuated::Punctuated<syn::Ident, syn::Token![,]>,
+        }
+        impl Parse for ModeArgs {
+            fn parse(input: ParseStream) -> syn::Result<Self> {
+                Ok(ModeArgs {
+                    idents: syn::punctuated::Punctuated::parse_terminated(input)?,
+                })
+            }
+        }
+
+        let mode_args: ModeArgs = syn::parse(args)?;
+        let mut idents = mode_args.idents.iter();
+
+        let first = idents
+            .next()
+            .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), "expected `selective` or `all`"))?;
+
+        let skip_let_mut = idents.any(|i| i == "skip_let_mut");
+
+        match first.to_string().as_str() {
+            "selective" => Ok(TransformMode::SelectiveGpu),
+            // for attribute macros we always don't transform let mut
+            "all" => Ok(TransformMode::All {
+                transform_let_mut: !skip_let_mut,
+            }),
+            _ => Err(syn::Error::new(first.span(), "expected `selective` or `all`")),
+        }
+    }
+
+
     let mut item_fn = parse_macro_input!(input as syn::ItemFn);
 
     let mode = match parse_mode(args) {
@@ -27,17 +73,6 @@ pub(crate) fn gpu_control_flow_impl(args: TokenStream, input: TokenStream) -> To
     quote! { #item_fn }.into()
 }
 
-fn parse_mode(args: TokenStream) -> Result<TransformMode, syn::Error> {
-    if args.is_empty() {
-        return Ok(TransformMode::SelectiveGpu);
-    }
-    let ident: syn::Ident = syn::parse(args)?;
-    match ident.to_string().as_str() {
-        "selective" => Ok(TransformMode::SelectiveGpu),
-        "all" => Ok(TransformMode::All),
-        _ => Err(syn::Error::new(ident.span(), "expected `selective` or `all`")),
-    }
-}
 
 pub(crate) fn gpu_control_flow_fn_impl(input: TokenStream, mode: TransformMode) -> TokenStream {
     struct StmtList(Vec<syn::Stmt>);
@@ -66,6 +101,25 @@ fn transform_stmt(stmt: &mut syn::Stmt, mode: TransformMode) {
     match stmt {
         syn::Stmt::Expr(expr, semi) => transform_expr(expr, semi, mode),
         syn::Stmt::Local(local) => {
+            if mode.should_transform_let_mut() {
+                // transform_let_mut`let mut pat = expr` → `let pat = ::shame::Cell::new(expr)`
+                if let syn::Pat::Ident(ref mut pat_ident) = local.pat {
+                    if pat_ident.mutability.take().is_some() {
+                        if let Some(ref mut init) = local.init {
+                            transform_expr(&mut init.expr, &mut None, mode);
+                            if let Some((_, ref mut diverge)) = init.diverge {
+                                transform_expr(diverge, &mut None, mode);
+                            }
+                            let inner = init.expr.clone();
+                            init.expr = Box::new(
+                                syn::parse2(quote! { ::shame::Cell::new(#inner) })
+                                    .expect("failed to parse Cell::new wrapping"),
+                            );
+                            return;
+                        }
+                    }
+                }
+            }
             if let Some(ref mut init) = local.init {
                 transform_expr(&mut init.expr, &mut None, mode);
                 if let Some((_, ref mut diverge)) = init.diverge {
@@ -97,9 +151,9 @@ fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: Transform
     };
 
     let rewrite_cf = match mode {
-        TransformMode::SelectiveCpu => !has_cpu,
+        TransformMode::SelectiveCpu { .. } => !has_cpu,
         TransformMode::SelectiveGpu => has_gpu,
-        TransformMode::All => {
+        TransformMode::All { .. } => {
             matches!(expr, syn::Expr::If(_) | syn::Expr::ForLoop(_) | syn::Expr::While(_))
         }
     };

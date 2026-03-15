@@ -52,7 +52,7 @@ impl BindlessExample {
         })
     }
 
-    #[gpu_control_flow(all)]
+    #[gpu_control_flow(all, skip_let_mut)]
     fn new_pipeline(gpu: &sm::Gpu) -> Result<wgpu::RenderPipeline, Error> {
         let mut enc = gpu.create_pipeline_encoder(Default::default())?;
         let mut fullscreen = fullscreen_vertex_shader(&mut enc.enc_guard);

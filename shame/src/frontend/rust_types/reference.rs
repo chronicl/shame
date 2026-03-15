@@ -14,6 +14,7 @@ use super::{
     AsAny, GpuType, To,
 };
 use crate::{
+    ToGpuType,
     common::proc_macro_reexports::GpuStoreImplCategory,
     frontend::any::Any,
     ir::{SizedStruct, SizedType, StoreType},
@@ -116,9 +117,7 @@ where
 impl<T: GpuStore, AS: AddressSpace, AM: AccessMode> Copy for Ref<T, AS, AM> {}
 
 impl<T: GpuStore, AS: AddressSpace, AM: AccessMode> Clone for Ref<T, AS, AM> {
-    fn clone(&self) -> Self {
-        *self
-    }
+    fn clone(&self) -> Self { *self }
 }
 
 impl<T, AS, AM> AsAny for Ref<T, AS, AM>
@@ -127,9 +126,17 @@ where
     AS: AddressSpace,
     AM: AccessMode,
 {
-    fn as_any(&self) -> Any {
-        self.any
-    }
+    fn as_any(&self) -> Any { self.any }
+}
+
+impl<T, AS, AM> ToGpuType for Ref<T, AS, AM>
+where
+    T: GpuType + GpuStore + GpuSized + NoAtomics,
+    AS: AddressSpace,
+    AM: AccessModeReadable,
+{
+    type Gpu = T;
+    fn to_gpu(&self) -> Self::Gpu { self.get() }
 }
 
 impl<T, AS, AM> Ref<T, AS, AM>
@@ -165,9 +172,7 @@ where
 {
     type Target = T::RefFields<AS, AM>;
 
-    fn deref(&self) -> &Self::Target {
-        &self.fields_as_refs
-    }
+    fn deref(&self) -> &Self::Target { &self.fields_as_refs }
 }
 
 impl<T, AS, AM> Ref<T, AS, AM>
@@ -194,9 +199,7 @@ where
     AM: AccessMode,
 {
     #[track_caller]
-    fn from(any: Any) -> Self {
-        ref_from_any_and_store_type(any, T::impl_category().to_store_ty())
-    }
+    fn from(any: Any) -> Self { ref_from_any_and_store_type(any, T::impl_category().to_store_ty()) }
 }
 
 fn ref_from_any_and_store_type<T, AS, AM>(any: Any, expected_store_ty: StoreType) -> Ref<T, AS, AM>
@@ -247,9 +250,7 @@ where
 {
     /// (no documentation yet)
     #[track_caller]
-    pub fn at(&self, index: impl ToInteger) -> Ref<T, AS, AM> {
-        self.as_any().array_index(index.to_any()).into()
-    }
+    pub fn at(&self, index: impl ToInteger) -> Ref<T, AS, AM> { self.as_any().array_index(index.to_any()).into() }
 }
 
 impl<T, AM> Ref<T, mem::WorkGroup, AM>
@@ -260,7 +261,5 @@ where
 {
     // see WGSL https://www.w3.org/TR/WGSL/#workgroupUniformLoad-builtin
     /// (no documentation yet)
-    pub fn uniform_load(&self) -> T {
-        self.as_any().address().workgroup_uniform_load().into()
-    }
+    pub fn uniform_load(&self) -> T { self.as_any().address().workgroup_uniform_load().into() }
 }

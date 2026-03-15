@@ -75,13 +75,23 @@ pub fn gpu_control_flow(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro]
 pub fn gpu_code(input: TokenStream) -> TokenStream {
-    gpu_control_flow::gpu_control_flow_fn_impl(input, gpu_control_flow::TransformMode::All)
+    gpu_control_flow::gpu_control_flow_fn_impl(
+        input,
+        gpu_control_flow::TransformMode::All {
+            transform_let_mut: true,
+        },
+    )
 }
 
 /// Same as `gpu_code`, but by marking control flow with `#[cpu]` it won't be transformed.
 #[proc_macro]
 pub fn gpu_code_selective_cpu(input: TokenStream) -> TokenStream {
-    gpu_control_flow::gpu_control_flow_fn_impl(input, gpu_control_flow::TransformMode::SelectiveCpu)
+    gpu_control_flow::gpu_control_flow_fn_impl(
+        input,
+        gpu_control_flow::TransformMode::SelectiveCpu {
+            transform_let_mut: true,
+        },
+    )
 }
 
 /// Same as `gpu_code`, but control flow is only transformed if it's marked with `#[gpu]`.
