@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 shame_utils_macros = { path = "macros" }
-shame = { path = "../shame" }
+shame = { path = "../shame", features = ["relaxed_control_flow"] }
 glam = { version = "0.30", features = ["bytemuck"] }
 
 [dev-dependencies]

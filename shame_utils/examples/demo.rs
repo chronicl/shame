@@ -1,6 +1,6 @@
 #![allow(dead_code, unused)]
 use shame::{aliases::*, Array, GpuLayout, Size, Struct};
-use shame_utils::{Layout, NoPadding, ToGlam};
+use shame_utils::{Layout, NoPadding, ToGlam, gpu_code};
 use bytemuck::{Pod, Zeroable};
 
 
@@ -49,4 +49,35 @@ struct A {
 struct B {
     b: Array<f32x3,Size<3>>,
     a: f32x3,                 _0: f32x1,
+}
+
+fn gpu_code_macro_example() {
+    gpu_code! {
+        let mut a = 0u32;
+        let mut b = [0u32; 10];
+        for i in 0..10u32 {
+            if i % 2 == 0u32 {
+                a += a * 2 + 1;
+                b[i] = a;
+            } else {
+                a += 1u32;
+            }
+        }
+    }
+
+    // expands to
+    let a = ::shame::Cell::new(0u32);
+    let b = ::shame::Cell::new([0u32; 10]);
+    ::shame::for_range(0..10u32, |i| {
+        ::shame::if_else(
+            (i % 2).equals((0u32)),
+            || {
+                (a).set_add((a * 2 + 1));
+                ((b).at((i))).set((a));
+            },
+            || {
+                (a).set_add((1u32));
+            },
+        );
+    });
 }
