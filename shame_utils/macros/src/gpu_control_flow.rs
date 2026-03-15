@@ -1,8 +1,9 @@
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, quote_spanned};
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
+    spanned::Spanned as _,
     token::Semi,
 };
 
@@ -104,7 +105,8 @@ fn transform_stmt(stmt: &mut syn::Stmt, mode: TransformMode) {
             if mode.should_transform_let_mut() {
                 // transform_let_mut`let mut pat = expr` → `let pat = ::shame::Cell::new(expr)`
                 if let syn::Pat::Ident(ref mut pat_ident) = local.pat {
-                    if pat_ident.mutability.take().is_some() {
+                    if let Some(mut_token) = pat_ident.mutability.take() {
+                        let span = mut_token.span;
                         if let Some(ref mut init) = local.init {
                             transform_expr(&mut init.expr, &mut None, mode);
                             if let Some((_, ref mut diverge)) = init.diverge {
@@ -112,7 +114,7 @@ fn transform_stmt(stmt: &mut syn::Stmt, mode: TransformMode) {
                             }
                             let inner = init.expr.clone();
                             init.expr = Box::new(
-                                syn::parse2(quote! { ::shame::Cell::new(#inner) })
+                                syn::parse2(quote_spanned! { span => ::shame::Cell::new(#inner) })
                                     .expect("failed to parse Cell::new wrapping"),
                             );
                             return;
@@ -136,7 +138,6 @@ fn transform_stmt(stmt: &mut syn::Stmt, mode: TransformMode) {
 /// - Assignment rewriting    (expr = expr -> expr.set(expr))
 /// - Comparison rewriting    (a < b -> a.less_than(b), a <= b -> a.less_eq(b), a > b -> a.greater_than(b), a >= b -> a.greater_eq(b), a == b -> a.equals(b), a != b -> a.not_equals(b))
 /// - Assign-op rewriting     (a += b -> a.set_add(b), a -= b -> a.set_sub(b), a *= b -> a.set_mul(b), a /= b -> a.set_div(b), a %= b -> a.set_rem(b), a &= b -> a.set_bitand(b), a |= b -> a.set_bitor(b), a ^= b -> a.set_bitxor(b), a <<= b -> a.set_shl(b), a >>= b -> a.set_shr(b))
-/// - Unary rewriting         (!a -> a.set_not(), -a -> a.set_neg())
 /// - Generic recursive descent into everything else
 fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: TransformMode) {
     // control flow rewriting
@@ -184,26 +185,28 @@ fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: Transform
 
     // expr[i] -> expr.at(i)
     if let syn::Expr::Index(idx) = expr {
+        let span = idx.bracket_token.span.join();
         // Recurse into sub-expressions first so nested indices are rewritten too.
         transform_expr(&mut idx.expr, &mut None, mode);
         transform_expr(&mut idx.index, &mut None, mode);
 
         let base = &*idx.expr;
         let index = &*idx.index;
-        let ts = quote! { #base.at(#index) };
+        let ts = quote_spanned! { span => (#base).at((#index)) };
         *expr = syn::parse2(ts).expect("failed to parse .at() call");
         return;
     }
 
     // expr = expr → expr.set(expr)
     if let syn::Expr::Assign(assign) = expr {
+        let span = assign.eq_token.span;
         // Recurse into both sides first so nested rewrites (index, etc.) apply.
         transform_expr(&mut assign.left, &mut None, mode);
         transform_expr(&mut assign.right, &mut None, mode);
 
         let left = &*assign.left;
         let right = &*assign.right;
-        let ts = quote! { #left.set(#right) };
+        let ts = quote_spanned! { span => (#left).set((#right)) };
         *expr = syn::parse2(ts).expect("failed to parse .set() call");
         return;
     }
@@ -231,14 +234,15 @@ fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: Transform
             _ => None,
         };
         if let Some(method_name) = method {
+            let span = bin.op.span();
             transform_expr(&mut bin.left, &mut None, mode);
             transform_expr(&mut bin.right, &mut None, mode);
 
             let left = &*bin.left;
             let right = &*bin.right;
-            let method_ident = syn::Ident::new(method_name, proc_macro2::Span::call_site());
-            let ts = quote! { (#left).#method_ident((#right)) };
-            *expr = syn::parse2(ts).expect("failed to parse comparison method call");
+            let method_ident = syn::Ident::new(method_name, span);
+            let ts = quote_spanned! { span => (#left).#method_ident((#right)) };
+            *expr = syn::parse2(ts).expect("failed to parse binary method call");
             return;
         }
     }
