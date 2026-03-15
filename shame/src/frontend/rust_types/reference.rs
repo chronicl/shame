@@ -129,6 +129,7 @@ where
     fn as_any(&self) -> Any { self.any }
 }
 
+// TODO: this is a misuse of ToGpuType
 impl<T, AS, AM> ToGpuType for Ref<T, AS, AM>
 where
     T: GpuType + GpuStore + GpuSized + NoAtomics,
