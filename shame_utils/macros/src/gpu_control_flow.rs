@@ -134,6 +134,7 @@ fn transform_stmt(stmt: &mut syn::Stmt, mode: TransformMode) {
 /// - Control-flow rewriting  (if / for / while -> shame::*)
 /// - Index rewriting         (expr[i] -> expr.at(i))
 /// - Assignment rewriting    (expr = expr -> expr.set(expr))
+/// - Comparison rewriting    (a < b -> a.less_than(b), a <= b -> a.less_eq(b), a > b -> a.greater_than(b), a >= b -> a.greater_eq(b), a == b -> a.equals(b), a != b -> a.not_equals(b))
 /// - Generic recursive descent into everything else
 fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: TransformMode) {
     // control flow rewriting
@@ -203,6 +204,30 @@ fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: Transform
         let ts = quote! { #left.set(#right) };
         *expr = syn::parse2(ts).expect("failed to parse .set() call");
         return;
+    }
+
+    // comparison / equality operators -> method calls
+    if let syn::Expr::Binary(bin) = expr {
+        let method = match bin.op {
+            syn::BinOp::Lt(_) => Some("less_than"),
+            syn::BinOp::Le(_) => Some("less_eq"),
+            syn::BinOp::Gt(_) => Some("greater_than"),
+            syn::BinOp::Ge(_) => Some("greater_eq"),
+            syn::BinOp::Eq(_) => Some("equals"),
+            syn::BinOp::Ne(_) => Some("not_equals"),
+            _ => None,
+        };
+        if let Some(method_name) = method {
+            transform_expr(&mut bin.left, &mut None, mode);
+            transform_expr(&mut bin.right, &mut None, mode);
+
+            let left = &*bin.left;
+            let right = &*bin.right;
+            let method_ident = syn::Ident::new(method_name, proc_macro2::Span::call_site());
+            let ts = quote! { #left.#method_ident(#right) };
+            *expr = syn::parse2(ts).expect("failed to parse comparison method call");
+            return;
+        }
     }
 
     recurse_into_children(expr, mode);
