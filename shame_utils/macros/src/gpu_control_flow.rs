@@ -103,7 +103,7 @@ fn transform_stmt(stmt: &mut syn::Stmt, mode: TransformMode) {
         syn::Stmt::Expr(expr, semi) => transform_expr(expr, semi, mode),
         syn::Stmt::Local(local) => {
             if mode.should_transform_let_mut() {
-                // transform_let_mut`let mut pat = expr` → `let pat = ::shame::Cell::new(expr)`
+                // transform_let_mut `let mut pat = expr` → `let pat = ::shame::Cell::new(expr)`
                 if let syn::Pat::Ident(ref mut pat_ident) = local.pat {
                     if let Some(mut_token) = pat_ident.mutability.take() {
                         let span = mut_token.span;
@@ -136,8 +136,8 @@ fn transform_stmt(stmt: &mut syn::Stmt, mode: TransformMode) {
 /// - Control-flow rewriting  (if / for / while -> shame::*)
 /// - Index rewriting         (expr[i] -> expr.at(i))
 /// - Assignment rewriting    (expr = expr -> expr.set(expr))
-/// - Comparison rewriting    (a < b -> a.less_than(b), a <= b -> a.less_eq(b), a > b -> a.greater_than(b), a >= b -> a.greater_eq(b), a == b -> a.equals(b), a != b -> a.not_equals(b))
-/// - Assign-op rewriting     (a += b -> a.set_add(b), a -= b -> a.set_sub(b), a *= b -> a.set_mul(b), a /= b -> a.set_div(b), a %= b -> a.set_rem(b), a &= b -> a.set_bitand(b), a |= b -> a.set_bitor(b), a ^= b -> a.set_bitxor(b), a <<= b -> a.set_shl(b), a >>= b -> a.set_shr(b))
+/// - Comparison rewriting    (a < b -> a.less_than(b), a <= b -> a.less_eq(b), ...)
+/// - Assign-op rewriting     (a += b -> a.set_add(b), a -= b -> a.set_sub(b), ...)
 /// - Generic recursive descent into everything else
 fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: TransformMode) {
     // control flow rewriting
