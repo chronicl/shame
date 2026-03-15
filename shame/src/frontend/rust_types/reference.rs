@@ -264,6 +264,30 @@ where
     pub fn uniform_load(&self) -> T { self.as_any().address().workgroup_uniform_load().into() }
 }
 
+// Unary ops
+impl<T, AS, AM> std::ops::Neg for Ref<T, AS, AM>
+where
+    T: GpuType + GpuStore + GpuSized + NoAtomics,
+    AS: AddressSpace,
+    AM: AccessModeReadable,
+    T: std::ops::Neg,
+{
+    type Output = <T as std::ops::Neg>::Output;
+    fn neg(self) -> Self::Output { self.get().neg() }
+}
+
+impl<T, AS, AM> std::ops::Not for Ref<T, AS, AM>
+where
+    T: GpuType + GpuStore + GpuSized + NoAtomics,
+    AS: AddressSpace,
+    AM: AccessModeReadable,
+    T: std::ops::Not,
+{
+    type Output = <T as std::ops::Not>::Output;
+    fn not(self) -> Self::Output { self.get().not() }
+}
+
+// Binary ops
 macro_rules! impl_ref_binop {
     ($trait:ident, $method:ident) => {
         impl<T1, T2, AS, AM> std::ops::$trait<T1> for Ref<T2, AS, AM>
