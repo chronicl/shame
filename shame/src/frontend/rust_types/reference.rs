@@ -14,7 +14,7 @@ use super::{
     AsAny, GpuType, To,
 };
 use crate::{
-    ToGpuType,
+    Cell, Len, ScalarTypeNumber, ToGpuType,
     common::proc_macro_reexports::GpuStoreImplCategory,
     frontend::any::Any,
     ir::{SizedStruct, SizedType, StoreType},
@@ -262,4 +262,125 @@ where
     // see WGSL https://www.w3.org/TR/WGSL/#workgroupUniformLoad-builtin
     /// (no documentation yet)
     pub fn uniform_load(&self) -> T { self.as_any().address().workgroup_uniform_load().into() }
+}
+
+macro_rules! impl_ref_binop {
+    ($trait:ident, $method:ident) => {
+        impl<T1, T2, AS, AM> std::ops::$trait<T1> for Ref<T2, AS, AM>
+        where
+            T2: GpuType + GpuStore + GpuSized + NoAtomics,
+            AS: AddressSpace,
+            AM: AccessModeReadable,
+            T2: std::ops::$trait<T1>,
+        {
+            type Output = <T2 as std::ops::$trait<T1>>::Output;
+            fn $method(self, rhs: T1) -> Self::Output { self.get().$method(rhs) }
+        }
+
+        impl<N, L, T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for vec<N, L>
+        where
+            N: ScalarTypeNumber,
+            L: Len,
+            T: GpuType + GpuStore + GpuSized + NoAtomics,
+            AS: AddressSpace,
+            AM: AccessModeReadable,
+            vec<N, L>: std::ops::$trait<T>,
+        {
+            type Output = <vec<N, L> as std::ops::$trait<T>>::Output;
+            fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
+        }
+
+        impl<T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for u32
+        where
+            T: GpuType + GpuStore + GpuSized + NoAtomics,
+            AS: AddressSpace,
+            AM: AccessModeReadable,
+            u32: std::ops::$trait<T>,
+        {
+            type Output = <u32 as std::ops::$trait<T>>::Output;
+            fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
+        }
+
+        impl<T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for i32
+        where
+            T: GpuType + GpuStore + GpuSized + NoAtomics,
+            AS: AddressSpace,
+            AM: AccessModeReadable,
+            i32: std::ops::$trait<T>,
+        {
+            type Output = <i32 as std::ops::$trait<T>>::Output;
+            fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
+        }
+
+        impl<T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for f32
+        where
+            T: GpuType + GpuStore + GpuSized + NoAtomics,
+            AS: AddressSpace,
+            AM: AccessModeReadable,
+            f32: std::ops::$trait<T>,
+        {
+            type Output = <f32 as std::ops::$trait<T>>::Output;
+            fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
+        }
+
+        impl<S, T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for crate::Struct<S>
+        where
+            S: SizedFields,
+            T: GpuType + GpuStore + GpuSized + NoAtomics,
+            AS: AddressSpace,
+            AM: AccessModeReadable,
+            crate::Struct<S>: std::ops::$trait<T>,
+        {
+            type Output = <crate::Struct<S> as std::ops::$trait<T>>::Output;
+            fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
+        }
+
+        impl<A, T, AS, AM, const N: usize> std::ops::$trait<Ref<T, AS, AM>> for crate::Array<A, crate::Size<N>>
+        where
+            A: GpuSized,
+            T: GpuType + GpuStore + GpuSized + NoAtomics,
+            AS: AddressSpace,
+            AM: AccessModeReadable,
+            crate::Array<A, crate::Size<N>>: std::ops::$trait<T>,
+        {
+            type Output = <crate::Array<A, crate::Size<N>> as std::ops::$trait<T>>::Output;
+            fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
+        }
+    };
+}
+
+impl_ref_binop!(Add, add);
+impl_ref_binop!(Sub, sub);
+impl_ref_binop!(Mul, mul);
+impl_ref_binop!(Div, div);
+impl_ref_binop!(Rem, rem);
+impl_ref_binop!(BitAnd, bitand);
+impl_ref_binop!(BitOr, bitor);
+impl_ref_binop!(BitXor, bitxor);
+impl_ref_binop!(Shl, shl);
+impl_ref_binop!(Shr, shr);
+
+#[test]
+fn test_ref_ops() {
+    macro_rules! test_ops {
+        ($a:expr, $ax2:expr) => {
+            let a = $a;
+            let ax2 = $ax2;
+            // a_raw + ax2_raw; // fails
+            a + a;
+            ax2 + ax2;
+            a + 1;
+            ax2 + 1;
+            1 + a;
+            1 + ax2;
+            1 | a;
+            a | 1;
+            ax2 << 1;
+            ax2 << a;
+        };
+    }
+
+    use crate::ToScalar;
+    test_ops!(0u32.to_gpu(), crate::vec![1u32, 2u32]);
+    test_ops!(Cell::new(0u32), Cell::new(crate::vec![1u32, 2u32]));
 }
