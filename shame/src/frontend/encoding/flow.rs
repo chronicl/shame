@@ -168,7 +168,9 @@ pub fn while_(condition: impl FnOnce() -> boolx1 + FlowFn, body: impl FnOnce() +
 /// })
 /// ```
 #[track_caller]
-pub fn for_range(range: impl VecRange<i32, x1>, body: impl FnOnce(i32x1) + FlowFn) { for_range_impl(range, body); }
+pub fn for_range<T: ScalarTypeInteger>(range: impl VecRange<T, x1>, body: impl FnOnce(vec<T, x1>) + FlowFn) {
+    for_range_impl(range, body);
+}
 
 #[track_caller]
 pub(crate) fn for_range_impl<T: ScalarTypeInteger>(

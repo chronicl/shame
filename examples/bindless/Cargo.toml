@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 shame_utils = { path = "../../shame_utils" }
 shame_wgpu = { path = "../shame_wgpu" }
-shame = { path = "../../shame" }
+shame = { path = "../../shame", features = ["relaxed_control_flow"] }
 wgpu = "25.0.0"
 bytemuck = { version = "1.19", features = ["derive"] }
 glam = { version = "0.30", features = [
