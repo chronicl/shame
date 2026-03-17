@@ -1,8 +1,5 @@
 use self::struct_::SizedStruct;
-use crate::{
-    frontend::{any::shared_io},
-    ir::recording::MemoryRegion,
-};
+use crate::{any::layout::Repr, frontend::any::shared_io, ir::recording::MemoryRegion};
 
 use super::*;
 use std::{
@@ -29,26 +26,135 @@ pub enum Type {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StoreType {
     /// WGSL "creation-fixed-footprint"
-    Sized(SizedType),
+    LayoutType(LayoutType),
     Handle(HandleType),
-    RuntimeSizedArray(SizedType),
-    BufferBlock(BufferBlock),
     BindingArray(Rc<StoreType>, Option<NonZeroU32>),
 }
 
-/// types that have a size which is known at shader creation time.
+/// `TypeLayoutRecipe` describes how a type should be laid out in memory.
+///
+/// It does not contain any layout information itself, but can be converted to a `TypeLayout`
+/// using the `TypeLayoutRecipe::layout` method.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum LayoutType {
+    /// A type with a known size.
+    Sized(SizedType),
+    /// A struct with a runtime sized array as it's last field.
+    UnsizedStruct(UnsizedStruct),
+    /// An array whose size is determined at runtime.
+    RuntimeSizedArray(RuntimeSizedArray),
+}
+
+/// Types that have a size which is known at shader creation time.
 /// WGSL "creation-fixed-footprint"
-#[doc(hidden)] // runtime api
+#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SizedType {
-    /// Scalar or Vector
-    ///
-    /// A Scalar is represented as `Vector(Len::X1, _)`
-    Vector(Len, ScalarType),
-    Matrix(Len2, Len2, ScalarTypeFp),
-    Array(Rc<SizedType>, NonZeroU32),
-    Atomic(ScalarTypeInteger),
-    Structure(SizedStruct),
+    Vector(Vector),
+    Matrix(Matrix),
+    Array(SizedArray),
+    Atomic(Atomic),
+    Struct(SizedStruct),
+}
+
+#[allow(missing_docs)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Vector {
+    pub scalar: ScalarType,
+    pub len: Len,
+}
+
+#[allow(missing_docs)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Matrix {
+    pub scalar: ScalarTypeFp,
+    pub columns: Len2,
+    pub rows: Len2,
+}
+
+#[allow(missing_docs)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SizedArray {
+    pub element: Rc<SizedType>,
+    pub len: NonZeroU32,
+}
+
+#[allow(missing_docs)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Atomic {
+    pub scalar: ScalarTypeInteger,
+}
+
+//   Conversions to ScalarType, SizedType and LayoutType   //
+macro_rules! impl_into_sized_type {
+    ($($ty:ident -> $variant:path),*) => {
+       $(
+           impl From<$ty> for SizedType {
+               fn from(v: $ty) -> Self { $variant(v) }
+           }
+       )*
+    };
+}
+impl_into_sized_type!(
+    Vector       -> SizedType::Vector,
+    Matrix       -> SizedType::Matrix,
+    SizedArray   -> SizedType::Array,
+    Atomic       -> SizedType::Atomic,
+    SizedStruct  -> SizedType::Struct
+);
+
+impl<T> From<T> for LayoutType
+where
+    SizedType: From<T>,
+{
+    fn from(value: T) -> Self { LayoutType::Sized(SizedType::from(value)) }
+}
+
+impl From<UnsizedStruct> for LayoutType {
+    fn from(s: UnsizedStruct) -> Self { LayoutType::UnsizedStruct(s) }
+}
+impl From<RuntimeSizedArray> for LayoutType {
+    fn from(a: RuntimeSizedArray) -> Self { LayoutType::RuntimeSizedArray(a) }
+}
+
+impl ScalarTypeInteger {
+    pub const fn as_scalar_type(self) -> ScalarType {
+        match self {
+            ScalarTypeInteger::I32 => ScalarType::I32,
+            ScalarTypeInteger::U32 => ScalarType::U32,
+        }
+    }
+}
+impl ScalarTypeFp {
+    pub const fn as_scalar_type(self) -> ScalarType {
+        match self {
+            ScalarTypeFp::F16 => ScalarType::F16,
+            ScalarTypeFp::F32 => ScalarType::F32,
+            ScalarTypeFp::F64 => ScalarType::F64,
+        }
+    }
+}
+
+// END conversions
+
+
+impl SizedArray {
+    /// Creates a new `SizedArray` from it's element type and length.
+    pub fn new(element_ty: Rc<SizedType>, len: NonZeroU32) -> Self {
+        Self {
+            element: element_ty,
+            len,
+        }
+    }
+}
+
+impl RuntimeSizedArray {
+    /// Creates a new `RuntimeSizedArray` from it's element type.
+    pub fn new(element_ty: impl Into<SizedType>) -> Self {
+        RuntimeSizedArray {
+            element: element_ty.into(),
+        }
+    }
 }
 
 /// types that represent handles to resources (Textures and Samplers).
@@ -60,16 +166,20 @@ pub enum HandleType {
     Sampler(shared_io::SamplingMethod),
 }
 
+// TODO(chronicl) these are somewhat random here
 impl From<SizedType> for StoreType {
-    fn from(value: SizedType) -> Self { StoreType::Sized(value) }
+    fn from(value: SizedType) -> Self { StoreType::LayoutType(LayoutType::Sized(value)) }
 }
-
 impl From<SizedType> for Type {
-    fn from(value: SizedType) -> Self { Type::Store(StoreType::Sized(value)) }
+    fn from(value: SizedType) -> Self { Type::Store(value.into()) }
 }
-
 impl From<ScalarType> for Type {
-    fn from(value: ScalarType) -> Self { Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, value))) }
+    fn from(value: ScalarType) -> Self {
+        Type::Store(StoreType::LayoutType(LayoutType::Sized(SizedType::Vector(Vector {
+            scalar: value,
+            len: Len::X1,
+        }))))
+    }
 }
 
 impl Type {
@@ -108,10 +218,12 @@ impl Display for Type {
 impl Display for StoreType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StoreType::Sized(x) => write!(f, "{x}"),
+            StoreType::LayoutType(layout_type) => match layout_type {
+                LayoutType::Sized(s) => write!(f, "{s}"),
+                LayoutType::UnsizedStruct(s) => write!(f, "{}", s.name),
+                LayoutType::RuntimeSizedArray(a) => write!(f, "Array<{}>", a.element),
+            },
             StoreType::Handle(x) => write!(f, "{x}"),
-            StoreType::RuntimeSizedArray(x) => write!(f, "Array<{x}>"),
-            StoreType::BufferBlock(x) => write!(f, "{}", x.name()),
             StoreType::BindingArray(x, _) => write!(f, "BindingArray<{}>", x),
         }
     }
@@ -120,13 +232,19 @@ impl Display for StoreType {
 impl Display for SizedType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SizedType::Vector(l, t) => write!(f, "{t}{l}"),
-            SizedType::Matrix(c, r, t) => {
-                write!(f, "mat<{}, {}, {}>", ScalarType::from(*t), Len::from(*c), Len::from(*r))
+            SizedType::Vector(v) => write!(f, "{}{}", v.scalar, v.len),
+            SizedType::Matrix(m) => {
+                write!(
+                    f,
+                    "mat<{}, {}, {}>",
+                    ScalarType::from(m.scalar),
+                    Len::from(m.columns),
+                    Len::from(m.rows)
+                )
             }
-            SizedType::Array(t, n) => write!(f, "array<{t}, {n}>"),
-            SizedType::Atomic(t) => write!(f, "atomic<{}>", ScalarType::from(*t)),
-            SizedType::Structure(s) => write!(f, "{}", s.name()),
+            SizedType::Array(a) => write!(f, "array<{}, {}>", a.element, a.len),
+            SizedType::Atomic(a) => write!(f, "atomic<{}>", ScalarType::from(a.scalar)),
+            SizedType::Struct(s) => write!(f, "{}", s.name),
         }
     }
 }
@@ -141,19 +259,6 @@ impl Display for HandleType {
     }
 }
 
-impl StoreType {
-    pub fn min_byte_size(&self) -> Option<NonZeroU64> {
-        match self {
-            StoreType::Sized(sized_type) => NonZeroU64::new(sized_type.byte_size()),
-            StoreType::Handle(handle_type) => None,
-            StoreType::RuntimeSizedArray(sized_type) => NonZeroU64::new(sized_type.byte_size()),
-            StoreType::BufferBlock(buffer_block) => NonZeroU64::new(buffer_block.min_byte_size()),
-            // TODO(chronicl) check correct
-            StoreType::BindingArray(binding_type, _) => binding_type.min_byte_size(),
-        }
-    }
-}
-
 #[doc(hidden)] // runtime api
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AlignedType {
@@ -164,8 +269,9 @@ pub enum AlignedType {
 impl AlignedType {
     pub fn align(&self) -> u64 {
         match self {
-            AlignedType::Sized(sized) => sized.align(),
-            AlignedType::RuntimeSizedArray(sized) => align_of_array(sized),
+            // TODO(chronicl) repr
+            AlignedType::Sized(sized) => sized.align(Repr::Wgsl).as_u64(),
+            AlignedType::RuntimeSizedArray(sized) => sized.align(Repr::Wgsl).as_u64(),
         }
     }
 }

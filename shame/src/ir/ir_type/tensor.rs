@@ -1,10 +1,10 @@
 use std::{fmt::Display, num::NonZeroU32};
 
 use crate::{
-    any::{U32PowerOf2},
+    any::U32PowerOf2,
     common::floating_point::{f16, f32_eq_where_nans_are_equal, f64_eq_where_nans_are_equal},
-    frontend::rust_types::type_layout::{self, recipe::align_size::PACKED_ALIGN, Repr},
-    ir::Comp4,
+    frontend::rust_types::type_layout::{self, Repr, recipe::align_size::PACKED_ALIGN},
+    ir::{Comp4, ir_type::Vector},
 };
 
 use super::{SizedType, Type};
@@ -533,12 +533,14 @@ impl PackedVector {
     pub fn align(&self, repr: Repr) -> U32PowerOf2 {
         match repr {
             Repr::Packed => PACKED_ALIGN,
+            // WgslUniform is treated as Wgsl. PackedVector can't appear in uniform buffers.
             Repr::Wgsl | Repr::WgslUniform => {
-                let align = match self.byte_size() {
-                    PackedVectorByteSize::_2 => SizedType::Vector(Len::X1, ScalarType::F16).align(),
-                    PackedVectorByteSize::_4 => SizedType::Vector(Len::X1, ScalarType::U32).align(),
-                    PackedVectorByteSize::_8 => SizedType::Vector(Len::X2, ScalarType::U32).align(),
+                let (scalar, len) = match self.byte_size() {
+                    PackedVectorByteSize::_2 => (ScalarType::F16, Len::X1),
+                    PackedVectorByteSize::_4 => (ScalarType::U32, Len::X1),
+                    PackedVectorByteSize::_8 => (ScalarType::U32, Len::X2),
                 };
+                let align = Vector { scalar, len }.align(Repr::Wgsl);
                 U32PowerOf2::try_from(align as u32).expect("the above all have power of 2 align")
             }
         }
@@ -557,6 +559,9 @@ impl PackedScalarType {
 
 impl PackedVector {
     pub fn decompressed_ty(&self) -> SizedType {
-        SizedType::Vector(self.len.into(), self.scalar_type.decompressed_ty())
+        SizedType::Vector(Vector {
+            scalar: self.scalar_type.decompressed_ty(),
+            len: self.len.into(),
+        })
     }
 }

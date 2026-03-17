@@ -6,7 +6,7 @@ use crate::{
     any::U32PowerOf2,
     call_info,
     common::prettify::set_color,
-    ir::{self, ir_type::BufferBlockDefinitionError, recording::Context, StructureFieldNamesMustBeUnique},
+    ir::{self, recording::Context, StructureFieldNamesMustBeUnique},
     GpuSized,
 };
 
@@ -168,30 +168,6 @@ impl From<UnsizedStruct> for TypeLayoutRecipe {
 }
 impl From<RuntimeSizedArray> for TypeLayoutRecipe {
     fn from(a: RuntimeSizedArray) -> Self { TypeLayoutRecipe::RuntimeSizedArray(a) }
-}
-
-impl ScalarTypeInteger {
-    pub const fn as_scalar_type(self) -> ScalarType {
-        match self {
-            ScalarTypeInteger::I32 => ScalarType::I32,
-            ScalarTypeInteger::U32 => ScalarType::U32,
-        }
-    }
-}
-impl From<ScalarTypeInteger> for ScalarType {
-    fn from(int: ScalarTypeInteger) -> Self { int.as_scalar_type() }
-}
-impl ScalarTypeFp {
-    pub const fn as_scalar_type(self) -> ScalarType {
-        match self {
-            ScalarTypeFp::F16 => ScalarType::F16,
-            ScalarTypeFp::F32 => ScalarType::F32,
-            ScalarTypeFp::F64 => ScalarType::F64,
-        }
-    }
-}
-impl From<ScalarTypeFp> for ScalarType {
-    fn from(int: ScalarTypeFp) -> Self { int.as_scalar_type() }
 }
 
 // Display impls

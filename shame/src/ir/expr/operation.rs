@@ -5,8 +5,27 @@ use crate::{
 };
 use ir::Len::*;
 use ir::ScalarType::*;
-use ir::SizedType::*;
-use ir::StoreType::*;
+use ir::StoreType;
+use ir::ir_type::{Vector, SizedType, LayoutType};
+
+macro_rules! vec {
+    ($len:ident, $scalar:ident) => {
+        SizedType::Vector(Vector { scalar: $scalar, len: $len })
+    };
+    ($len:expr, $scalar:expr) => {
+        SizedType::Vector(Vector { scalar: $scalar, len: $len })
+    };
+}
+
+
+macro_rules! mat {
+    ($columns:ident, $rows:ident, $scalar:ident) => {
+        SizedType::Matrix(ir::ir_type::Matrix { scalar: $scalar, columns: $columns, rows: $rows })
+    };
+    ($columns:expr, $rows:expr, $scalar:expr) => {
+        SizedType::Matrix(ir::ir_type::Matrix { scalar: $scalar, columns: $columns, rows: $rows })
+    };
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// the `Operator`s' expressions, as listed in the WGSL spec.
@@ -64,14 +83,14 @@ impl TypeCheck for Logical {
         match self {
             Logical::LogicNot => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Vector(n, Bool)] => Vector(*n, Bool)
+                [vec!(n, Bool)] => vec!(*n, Bool)
             )(self, args),
             Logical::ShortCircuitOr | Logical::ShortCircuitAnd => sig!(
-                [Vector(X1, Bool), Vector(X1, Bool)] => Vector(X1, Bool)
+                [vec!(X1, Bool), vec!(X1, Bool)] => vec!(X1, Bool)
             )(self, args),
             Logical::LogicOr | Logical::LogicAnd => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Vector(n0, Bool), Vector(n1, Bool)] if same!(n0 n1) => Vector(*n1, Bool)
+                [vec!(n0, Bool), vec!(n1, Bool)] if same!(n0 n1) => vec!(*n1, Bool)
             )(self, args),
         }
     }
@@ -93,7 +112,7 @@ impl TypeCheck for Arithmetic {
         match self {
             Arithmetic::Negation => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Vector(n, t)] if t.is_numeric() && t.is_signed() => Vector(*n, *t)
+                [vec!(n, t)] if t.is_numeric() && t.is_signed() => vec!(*n, *t)
             )(self, args),
             Arithmetic::Addition |
             Arithmetic::Subtraction |
@@ -101,7 +120,7 @@ impl TypeCheck for Arithmetic {
             Arithmetic::Division |
             Arithmetic::Remainder => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Vector(n0, t0), Vector(n1, t1)] if t0.is_numeric() && same!(n0 n1; t0 t1) => Vector(*n0, *t0)
+                [vec!(n0, t0), vec!(n1, t1)] if t0.is_numeric() && same!(n0 n1; t0 t1) => vec!(*n0, *t0)
             )(self, args),
         }
     }
@@ -130,8 +149,8 @@ impl TypeCheck for MixedSVArithmetic {
             MixedSVArithmetic::Division |
             MixedSVArithmetic::Remainder => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Vector(n, t0), Vector(X1, t1)] if t0.is_numeric() && same!(t0 t1) => Vector(*n, *t0),
-                [Vector(X1, t0), Vector(n, t1)] if t0.is_numeric() && same!(t0 t1) => Vector(*n, *t0),
+                [vec!(n, t0), vec!(X1, t1)] if t0.is_numeric() && same!(t0 t1) => vec!(*n, *t0),
+                [vec!(X1, t0), vec!(n, t1)] if t0.is_numeric() && same!(t0 t1) => vec!(*n, *t0),
             )(self, args),
         }
     }
@@ -152,24 +171,24 @@ impl TypeCheck for MatrixArithmetic {
     fn infer_type(&self, args: &[ir::Type]) -> Result<ir::Type, NoMatchingSignature> {
         match self {
             MatrixArithmetic::MatrixAddition | MatrixArithmetic::MatrixSubtraction => sig!(
-                [mat0, mat1 @ Matrix(_, _, t)] if mat0 == mat1 && t.is_floating_point() => mat0,
+                [mat0, mat1 @ mat!(c, r, t)] if mat0 == mat1 && t.is_floating_point() => mat0,
             )(self, args),
             MatrixArithmetic::ComponentWiseScaling => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Vector(X1, t0), Matrix(c, r, t1)] if t0 == t1 && t0.is_floating_point() => Matrix(*c, *r, *t1),
-                [Matrix(c, r, t0), Vector(X1, t1)] if t0 == t1 && t0.is_floating_point() => Matrix(*c, *r, *t0),
+                [vec!(X1, t0), mat!(c, r, t1)] if t0 == t1 && t0.is_floating_point() => mat!(*c, *r, *t1),
+                [mat!(c, r, t0), vec!(X1, t1)] if t0 == t1 && t0.is_floating_point() => mat!(*c, *r, *t0),
             )(self, args),
             MatrixArithmetic::LinearAlgebraMatrixColumnVectorProduct => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Matrix(c, r, t0), Vector(c1, t1)] if same!(t0 t1; c c1) && t0.is_floating_point() => Vector((*r).into(), *t1),
+                [mat!(c, r, t0), vec!(c1, t1)] if same!(t0 t1; c c1) && t0.is_floating_point() => vec!((*r).into(), *t1),
             )(self, args),
             MatrixArithmetic::LinearAlgebraRowVectorMatrixProduct => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Vector(r1, t1), Matrix(c, r, t0)] if same!(t0 t1; r r1) && t0.is_floating_point() => Vector((*c).into(), *t1),
+                [vec!(r1, t1), mat!(c, r, t0)] if same!(t0 t1; r r1) && t0.is_floating_point() => vec!((*c).into(), *t1),
             )(self, args),
             MatrixArithmetic::LinearAlgebraMatrixProduct => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Matrix(k0, r, t0), Matrix(c, k1, t1)] if same!(t0 t1; k0 k1) && t0.is_floating_point() => Matrix(*c, *r, *t0),
+                [mat!(k0, r, t0), mat!(c, k1, t1)] if same!(t0 t1; k0 k1) && t0.is_floating_point() => mat!(*c, *r, *t0),
             )(self, args),
         }
     }
@@ -191,14 +210,14 @@ impl TypeCheck for Comparison {
         match self {
             Comparison::Equality | Comparison::Inequality => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Vector(n0, t0), Vector(n1, t1)] if same!(n0 n1; t0 t1) => Vector(*n0, Bool)
+                [vec!(n0, t0), vec!(n1, t1)] if same!(n0 n1; t0 t1) => vec!(*n0, Bool)
             )(self, args),
             Comparison::LessThan |
             Comparison::LessThanOrEqual |
             Comparison::GreaterThan |
             Comparison::GreaterThanOrEqual => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Vector(n0, t0), Vector(n1, t1)] if t0.is_numeric() && same!(n0 n1; t0 t1) => Vector(*n0, Bool)
+                [vec!(n0, t0), vec!(n1, t1)] if t0.is_numeric() && same!(n0 n1; t0 t1) => vec!(*n0, Bool)
             )(self, args),
         }
     }
@@ -220,15 +239,15 @@ impl TypeCheck for Bit {
         match self {
             Bit::BitwiseComplement => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Vector(n, t)] if t.is_integer() => Vector(*n, *t)
+                [vec!(n, t)] if t.is_integer() => vec!(*n, *t)
             )(self, args),
             Bit::BitwiseOr | Bit::BitwiseAnd | Bit::BitwiseExclusiveOr => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Vector(n0, t0), Vector(n1, t1)] if same!(n0 n1; t0 t1) && t0.is_integer() => Vector(*n0, *t0)
+                [vec!(n0, t0), vec!(n1, t1)] if same!(n0 n1; t0 t1) && t0.is_integer() => vec!(*n0, *t0)
             )(self, args),
             Bit::ShiftLeft | Bit::ShiftRight => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Vector(n0, t), Vector(n1, U32)] if n0 == n1 && t.is_integer() => Vector(*n0, *t)
+                [vec!(n0, t), vec!(n1, U32)] if n0 == n1 && t.is_integer() => vec!(*n0, *t)
             )(self, args),
         }
     }

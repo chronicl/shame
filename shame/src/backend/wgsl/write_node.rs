@@ -265,7 +265,7 @@ pub(super) fn write_field_access(
             .at_level(node.call_info, WgslErrorLevel::InternalPleaseReport)
     })?;
 
-    let (ident, field) = def.get_field_by_name(field_name).ok_or_else(|| {
+    let ident = def.get_field_ident(field_name).ok_or_else(|| {
         WgslErrorKind::UnknownFieldForStruct(ty.clone(), field_name.clone())
             .at_level(node.call_info, WgslErrorLevel::InternalPleaseReport)
     })?;

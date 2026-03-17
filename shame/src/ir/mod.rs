@@ -27,12 +27,11 @@ pub use ir_type::PackedFloat;
 pub use ir_type::PackedScalarType;
 pub use ir_type::PackedVector;
 
-pub use ir_type::BufferBlock;
 pub use ir_type::RuntimeSizedArrayField;
 pub use ir_type::SizedField;
 pub use ir_type::SizedStruct;
-pub use ir_type::Struct;
-pub use ir_type::StructKind;
+pub use ir_type::UnsizedStruct;
+pub use ir_type::StructKindVariant;
 pub use ir_type::StructureDefinitionError;
 pub use ir_type::StructureFieldNamesMustBeUnique;
 

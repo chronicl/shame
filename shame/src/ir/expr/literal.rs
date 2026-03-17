@@ -2,10 +2,11 @@ use std::fmt::Display;
 
 use super::{type_check::TypeCheck, BuiltinFn, Constructor};
 use crate::frontend::any::Any;
+use crate::ir::ir_type::Vector;
 use crate::{
     impl_track_caller_fn_any, ir, ir::expr::type_check::NoMatchingSignature, ir::expr::Expr, ir::ir_type, ir::Type, sig,
 };
-use ir_type::{Len::*, SizedType::*, StoreType::*};
+use ir_type::{Len::*, SizedType, StoreType::*};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Literal(pub ir_type::ScalarConstant);
@@ -28,7 +29,7 @@ impl TypeCheck for Literal {
     fn infer_type(&self, args: &[Type]) -> Result<Type, NoMatchingSignature> {
         let t = self.0.ty();
         sig!({name: Literal(t),},
-            [] => Vector(X1, t),
+            [] => SizedType::Vector(Vector { len: X1, scalar: t}),
         )(self, args)
     }
 }

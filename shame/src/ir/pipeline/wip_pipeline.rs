@@ -11,6 +11,7 @@ use thiserror::Error;
 
 use super::{PossibleStages, ShaderStage, StageMask};
 use crate::{
+    BindingIter, DepthLhs, StencilMasking, Test, TypeLayout,
     any::layout::Repr,
     call_info,
     common::{
@@ -20,32 +21,31 @@ use crate::{
     },
     frontend::{
         any::{
-            render_io::{VertexAttributeCooked, ColorTarget, Location, VertexBufferLayout},
+            render_io::{ColorTarget, Location, VertexAttributeCooked, VertexBufferLayout},
             shared_io::{BindPath, BindingType},
         },
         encoding::{
+            EncodingError, EncodingErrorKind, EncodingGuard,
             features::{DrawContext, Indexing},
             fragment_test::{DepthTest, StencilState, StencilTest},
             mask::BitVec64,
             pipeline_info::Dict,
             rasterizer::{Draw, FragmentQuad, FragmentStage, PrimitiveAssembly},
-            EncodingError, EncodingErrorKind, EncodingGuard,
         },
         error::InternalError,
         rust_types::{
             len::x3,
-            type_layout::{self, recipe, StructLayout},
+            type_layout::{self, StructLayout, recipe},
         },
     },
     ir::{
-        self,
-        expr::{BuiltinShaderIo, Interpolator, ShaderIo},
-        recording::{BuiltinTemplateStructs, CallInfo, Context, NodeRecordingError},
-        FragmentShadingRate, Node, SizedField, SizedStruct, SizedType, StoreType, StructureDefinitionError,
+        self, FragmentShadingRate, Node, SizedField, SizedStruct, SizedType, StoreType, StructureDefinitionError,
         StructureFieldNamesMustBeUnique, TextureFormatWrapper, Type,
+        expr::{BuiltinShaderIo, Interpolator, ShaderIo},
+        ir_type::FieldOptions,
+        recording::{BuiltinTemplateStructs, CallInfo, Context, NodeRecordingError},
     },
     results::DepthStencilState,
-    BindingIter, DepthLhs, StencilMasking, Test, TypeLayout,
 };
 
 
@@ -352,7 +352,7 @@ impl WipPushConstantsField {
             [first @ .., last] => Self::fields_as_sized_struct_nonempty(first, last),
         }?;
 
-        let byte_size = sized_struct.byte_size();
+        let (byte_size, _) = sized_struct.byte_size_and_align();
 
         // TODO(release) the `.expect()` calls here can be removed by building a `std::alloc::Layout`-like builder for struct layouts.
         let sized_struct: recipe::SizedStruct = sized_struct
@@ -401,11 +401,15 @@ impl WipPushConstantsField {
         // Create a layout builder similar to `std::alloc::Layout` to replace this instead.
 
         let mut i = 0;
-        let mut to_sized_field = |f: &WipPushConstantsField| SizedField {
-            name: format!("pushc{}", post_inc_usize(&mut i)).into(),
-            custom_min_size: f.custom_min_size,
-            custom_min_align: f.custom_min_align,
-            ty: f.ty.clone(),
+        let mut to_sized_field = |f: &WipPushConstantsField| {
+            SizedField::new(
+                FieldOptions::new(
+                    format!("pushc{}", post_inc_usize(&mut i)),
+                    f.custom_min_align,
+                    f.custom_min_size,
+                ),
+                f.ty.clone(),
+            )
         };
 
         // here we have to allocate unique name strings for each field,
@@ -413,7 +417,9 @@ impl WipPushConstantsField {
         #[allow(clippy::match_single_binding)]
         SizedStruct::new_nonempty("PushConstants".into(),
             fields.iter().map(&mut to_sized_field).collect(),
-            to_sized_field(last)
+            to_sized_field(last),
+            // TODO(chronicl)
+            Repr::Wgsl
         ).map_err(|err| match err {
             StructureFieldNamesMustBeUnique { .. } => {
                 InternalError::new(true, format!("intermediate push constants structure field names are not unique. fields: {fields:?}, last: {last:?}"))

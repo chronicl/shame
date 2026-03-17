@@ -24,9 +24,24 @@ use crate::{
     },
     try_ctx_track_caller,
 };
-use crate::{ir, ir::ir_type::StoreType, ir::Type, ir::Type::*, same, sig};
+use crate::{
+    ir,
+    ir::ir_type::{StoreType, LayoutType, Vector},
+    ir::Type,
+    ir::Type::*,
+    same, sig,
+};
 
 use super::{type_check::SigFormatting, NoMatchingSignature, TypeCheck};
+
+macro_rules! sized {
+    ($a:ident) => {
+        Type::Store(StoreType::LayoutType(LayoutType::Sized($a)))
+    };
+    ($a:expr) => {
+        Type::Store(StoreType::LayoutType(LayoutType::Sized($a)))
+    };
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VarIdent(pub Rc<MemoryRegion>);
@@ -69,7 +84,7 @@ impl Any {
                         None => Ok(()),
                         Some(val) => match val.ty() {
                             None => Err(AllocError::InitWithInvalidAny(ty.clone())),
-                            Some(Store(Sized(val_ty))) if val_ty == ty => Ok(()),
+                            Some(sized!(val_ty)) if val_ty == ty => Ok(()),
                             Some(val_ty) => Err(AllocError::InitWithWrongType(ty.clone(), val_ty)),
                         },
                     };
@@ -88,7 +103,7 @@ impl Any {
                     if initial_value.is_some() {
                         Err(AllocError::AllocationDoesNotSupportInitialValues(address_space))
                     } else {
-                        let ty = Store(Sized(ty.clone())); // this is here in case this function gets refactored to take a non-sized type in the future
+                        let ty = sized!(ty.clone()); // this is here in case this function gets refactored to take a non-sized type in the future
                         if ty.is_plain_and_fixed_footprint() {
                             Ok(())
                         } else {
@@ -104,7 +119,7 @@ impl Any {
             match addr_check.and_then(|()| {
                 MemoryRegion::new(
                     ctx.latest_user_caller(),
-                    StoreType::Sized(ty),
+                    ty.into(),
                     Some(ctx.pool_mut().push(Ident::Chosen(Priority::Auto, "c".into()))),
                     None,
                     access,

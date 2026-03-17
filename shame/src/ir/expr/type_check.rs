@@ -1,13 +1,31 @@
 use crate::{
     common::small_vec_actual::SmallVec,
-    ir::ir_type::{Len, Len2, ScalarType, SizedType, StoreType},
-    ir::{self, Type},
+    ir::{
+        self, Type,
+        ir_type::{LayoutType, Len, Len2, ScalarType, SizedType, StoreType, Vector},
+    },
 };
 use std::fmt::Write;
 use std::{borrow::Cow, fmt::Display};
 
 pub trait TypeCheck {
     fn infer_type(&self, args: &[Type]) -> Result<Type, NoMatchingSignature>;
+}
+
+
+macro_rules! sized {
+    ($p:ident) => {
+        Type::Store(StoreType::LayoutType(LayoutType::Sized($p)))
+    };
+}
+
+macro_rules! vector {
+    ($scalar:ident, $len:path) => {
+        Type::Store(StoreType::LayoutType(LayoutType::Sized(SizedType::Vector(Vector {
+            len: $len,
+            scalar: $scalar,
+        }))))
+    };
 }
 
 /// define type signatures for recording-time type checking
@@ -230,10 +248,8 @@ impl Display for NoMatchingSignature {
             match (&self.shorthand_level, arg) {
                 (Lv::Type, _) => write!(f, "{arg:?}")?,
                 (Lv::StoreType, Type::Store(store_type)) => write!(f, "{store_type:?}")?,
-                (Lv::SizedType, Type::Store(StoreType::Sized(sized_type))) => write!(f, "{sized_type:?}")?,
-                (Lv::ScalarType, Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, scalar_type)))) => {
-                    write!(f, "{scalar_type:?}")?
-                }
+                (Lv::SizedType, sized!(sized_type)) => write!(f, "{sized_type:?}")?,
+                (Lv::ScalarType, vector!(scalar_type, Len::X1)) => write!(f, "{scalar_type:?}")?,
                 (Lv::ScalarType, Type::Store(store_type)) => write!(f, "{store_type:?}")?,
                 _ => write!(f, "{arg:?}")?,
             }
@@ -339,10 +355,10 @@ impl TypeShorthand for StoreType {
 
 impl TypeShorthand for SizedType {
     const SHORT_LEVEL: TypeShorthandLevel = TypeShorthandLevel::SizedType;
-    fn to_type(self) -> Type { Type::Store(StoreType::Sized(self)) }
+    fn to_type(self) -> Type { sized!(self) }
     fn shorthand_for(t: &Type) -> Option<&Self> {
         match t {
-            Type::Store(StoreType::Sized(sized_type)) => Some(sized_type),
+            sized!(sized_type) => Some(sized_type),
             _ => None,
         }
     }
@@ -350,10 +366,10 @@ impl TypeShorthand for SizedType {
 
 impl TypeShorthand for ScalarType {
     const SHORT_LEVEL: TypeShorthandLevel = TypeShorthandLevel::ScalarType;
-    fn to_type(self) -> Type { Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, self))) }
+    fn to_type(self) -> Type { vector!(self, Len::X1) }
     fn shorthand_for(t: &Type) -> Option<&Self> {
         match t {
-            Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, scalar))) => Some(scalar),
+            vector!(scalar, Len::X1) => Some(scalar),
             _ => None,
         }
     }

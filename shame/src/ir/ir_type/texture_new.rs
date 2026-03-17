@@ -3,7 +3,7 @@ use thiserror::Error;
 use super::{Len, ScalarType};
 use crate::{
     frontend::{any::shared_io::SamplingMethod, texture::texture_formats::BuiltinTextureFormatId},
-    ir::SizedType,
+    ir::{SizedType, ir_type::Vector},
 };
 use std::{fmt::Display, hash::Hash, num::NonZeroU32, sync::Arc};
 
@@ -203,9 +203,9 @@ impl TextureSampleUsageType {
     }
 
     pub(crate) fn type_in_wgsl(&self) -> SizedType {
-        let sty = self.shader_scalar_ty();
+        let scalar = self.shader_scalar_ty();
         let len = if self.is_depth() { Len::X1 } else { Len::X4 };
-        SizedType::Vector(len, sty)
+        SizedType::Vector(Vector { scalar, len })
     }
 
     /// whether `self` is equal to `Depth`
@@ -246,7 +246,12 @@ impl TextureSampleUsageType {
 }
 
 impl From<TextureSampleUsageType> for SizedType {
-    fn from(value: TextureSampleUsageType) -> Self { SizedType::Vector(value.len(), value.channel_ty().into()) }
+    fn from(value: TextureSampleUsageType) -> Self {
+        SizedType::Vector(Vector {
+            len: value.len(),
+            scalar: value.channel_ty().into(),
+        })
+    }
 }
 
 /// the returned type per texture channel after being sampled in a shader

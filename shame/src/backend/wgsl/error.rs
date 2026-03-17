@@ -3,20 +3,21 @@ use std::{fmt::Display, rc::Rc};
 use thiserror::Error;
 
 use crate::{
+    MipFn,
+    any::StructKind,
     call_info, f32x2,
     frontend::{
         encoding::{EncodingError, EncodingErrorKind},
         error::InternalError,
     },
     ir::{
-        self,
+        self, AccessMode, AddressSpace, TextureFormatWrapper, TextureSampleUsageType, Type,
         expr::{Expr, ShaderIo},
-        ir_type::{CanonName, Struct},
+        ir_type::CanonName,
         pipeline::ShaderStage,
         recording::{CallInfo, MemoryRegion, Stmt, TemplateStructParams},
-        AccessMode, AddressSpace, TextureFormatWrapper, TextureSampleUsageType, Type,
     },
-    stringify_checked, MipFn,
+    stringify_checked,
 };
 
 use super::WgslContext;
@@ -110,8 +111,9 @@ pub enum WgslErrorKind {
     FieldAccessOnNonStruct(Type, CanonName),
     #[error("trying to generate code for access of unknown field `{1}` on structure `{0:?}`")]
     UnknownFieldForStruct(Type, CanonName),
-    #[error("`{0}` has no identifier deduplication entry")]
-    UnregisteredStruct(Rc<Struct>),
+    // TODO(chronicl) change to display
+    #[error("`{0:?}` has no identifier deduplication entry")]
+    UnregisteredStruct(StructKind),
     #[error("trying to generate code for texture format `{0:?}` which cannot be represented in wgsl code.")]
     UnrepresentableTextureFormat(TextureFormatWrapper),
     #[error("expression `{0}` cannot be turned into a standalone statement or phony assignment")]
@@ -121,8 +123,8 @@ pub enum WgslErrorKind {
     #[error("In WGSL 1D-textures can only be sampled with {} and no offset. Alternatively you can use the non-sampler-based access functions for 1D textures",
     stringify_checked!(expr: MipFn::<T>::Quad).to_string().replace(" ", "").replace("::<T>::", "::"))]
     Texture1DRequiresImplicitGradNoOffset,
-    #[error("In WGSL depth-textures do not support {} and {}", 
-        stringify_checked!(expr: MipFn::<T>::QuadBiased).to_string().replace(" ", "").replace("::<T>::", "::"), 
+    #[error("In WGSL depth-textures do not support {} and {}",
+        stringify_checked!(expr: MipFn::<T>::QuadBiased).to_string().replace(" ", "").replace("::<T>::", "::"),
         stringify_checked!(expr: MipFn::<T>::Grad).to_string().replace(" ", "").replace("::<T>::", "::"))]
     DepthTexturesDontSupportBiasedOrExplicitGradientSampling,
 }

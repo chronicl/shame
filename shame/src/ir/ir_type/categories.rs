@@ -1,4 +1,7 @@
-use crate::{frontend::any::shared_io::BufferBindingType, ir::Type};
+use crate::{
+    frontend::any::shared_io::BufferBindingType,
+    ir::{Type, ir_type::LayoutType},
+};
 
 use super::{ScalarType, SizedType, StoreType};
 
@@ -52,8 +55,7 @@ impl StoreType {
     pub fn is_host_shareable(&self) -> bool {
         use StoreType as T;
         match self {
-            T::Sized(s) | T::RuntimeSizedArray(s) => s.is_host_shareable(),
-            T::BufferBlock(def) => def.is_host_shareable(),
+            StoreType::LayoutType(l) => l.is_host_shareable(),
             T::Handle(_) => false,
             // TODO(chronicl) check if correct
             T::BindingArray(s, _) => false,
@@ -62,44 +64,67 @@ impl StoreType {
 
     #[allow(missing_docs)] // runtime api
     pub fn is_creation_fixed_footprint(&self) -> bool {
-        use StoreType::*;
         match self {
-            Sized(_) => true,
-            RuntimeSizedArray(_) | Handle(_) => false,
-            BufferBlock(block) => block.is_creation_fixed_footprint(),
-            BindingArray(_, _) => false, // TODO(chronicl) check if correct
+            StoreType::LayoutType(LayoutType::Sized(_)) => true,
+            StoreType::LayoutType(LayoutType::UnsizedStruct(_)) |
+            StoreType::LayoutType(LayoutType::RuntimeSizedArray(_)) |
+            StoreType::Handle(_) |
+            StoreType::BindingArray(_, _) => false,
         }
     }
 
     /// see https://www.w3.org/TR/WGSL/#fixed-footprint-types
     pub fn is_plain_and_fixed_footprint(&self) -> bool {
-        use StoreType::*;
         match self {
-            Sized(_) => true,
-            RuntimeSizedArray(_) | Handle(_) => false,
-            BufferBlock(blk) => blk.is_fixed_footprint(),
-            BindingArray(_, _) => false, // TODO(chronicl) check if correct
+            StoreType::LayoutType(LayoutType::Sized(_)) => true,
+            StoreType::LayoutType(LayoutType::UnsizedStruct(_)) |
+            StoreType::LayoutType(LayoutType::RuntimeSizedArray(_)) |
+            StoreType::Handle(_) |
+            StoreType::BindingArray(_, _) => false,
         }
     }
 
     #[allow(missing_docs)] // runtime api
     pub fn contains_atomics(&self) -> bool {
         match self {
-            StoreType::Sized(s) | StoreType::RuntimeSizedArray(s) => s.contains_atomics(),
+            StoreType::LayoutType(l) => l.contains_atomics(),
             StoreType::Handle(_) => false,
-            StoreType::BufferBlock(blk) => blk.contains_atomics(),
             StoreType::BindingArray(s, _) => s.contains_atomics(),
         }
     }
 
     /// see https://www.w3.org/TR/WGSL/#constructible-types
     pub fn is_constructible(&self) -> bool {
-        use StoreType::*;
         match self {
-            Sized(sized) => sized.is_constructible(),
-            RuntimeSizedArray(_) | Handle(_) => false,
-            BufferBlock(blk) => blk.is_constructible(),
-            BindingArray(binding, _) => false, // check if correct
+            StoreType::LayoutType(LayoutType::Sized(s)) => s.is_constructible(),
+            StoreType::LayoutType(LayoutType::UnsizedStruct(_)) |
+            StoreType::LayoutType(LayoutType::RuntimeSizedArray(_)) |
+            StoreType::Handle(_) |
+            StoreType::BindingArray(_, _) => false,
+        }
+    }
+}
+
+impl LayoutType {
+    pub fn is_host_shareable(&self) -> bool {
+        match self {
+            LayoutType::Sized(sized) => sized.is_host_shareable(),
+            LayoutType::UnsizedStruct(s) => {
+                s.sized_fields().iter().all(|t| t.ty.is_host_shareable()) &&
+                    s.last_unsized().element_ty().is_host_shareable()
+            }
+            LayoutType::RuntimeSizedArray(a) => a.element.is_host_shareable(),
+        }
+    }
+
+    pub fn contains_atomics(&self) -> bool {
+        match self {
+            LayoutType::Sized(sized) => sized.contains_atomics(),
+            LayoutType::UnsizedStruct(s) => {
+                s.sized_fields().iter().any(|t| t.ty.contains_atomics()) ||
+                    s.last_unsized().element_ty().contains_atomics()
+            }
+            LayoutType::RuntimeSizedArray(a) => a.element.contains_atomics(),
         }
     }
 }
@@ -109,11 +134,11 @@ impl SizedType {
     pub fn is_host_shareable(&self) -> bool {
         use SizedType as T;
         match self {
-            T::Vector(_, s) => s.is_host_shareable(),
-            T::Matrix(_, _, s) => ScalarType::from(*s).is_host_shareable(),
-            T::Atomic(s) => ScalarType::from(*s).is_host_shareable(),
-            T::Array(e, _) => e.is_host_shareable(),
-            T::Structure(s) => s.fields().all(|t| t.ty().is_host_shareable()),
+            T::Vector(v) => v.scalar.is_host_shareable(),
+            T::Matrix(m) => ScalarType::from(m.scalar).is_host_shareable(),
+            T::Atomic(a) => ScalarType::from(a.scalar).is_host_shareable(),
+            T::Array(a) => a.element.is_host_shareable(),
+            T::Struct(s) => s.fields().iter().all(|t| t.ty.is_host_shareable()),
         }
     }
 
@@ -122,20 +147,20 @@ impl SizedType {
         use SizedType as T;
         match self {
             T::Atomic(_) => true,
-            T::Vector(_, _) | T::Matrix(_, _, _) => false,
-            T::Array(e, _) => e.contains_atomics(),
-            T::Structure(s) => s.contains_atomics(),
+            T::Vector(_) | T::Matrix(_) => false,
+            T::Array(a) => a.element.contains_atomics(),
+            T::Struct(s) => s.fields().iter().any(|t| t.ty.contains_atomics()),
         }
     }
 
     #[allow(missing_docs)] // runtime api
     pub fn is_constructible(&self) -> bool {
         match self {
-            SizedType::Vector(_, _) => true,
-            SizedType::Matrix(_, _, _) => true,
-            SizedType::Array(elem, _) => elem.is_constructible(),
+            SizedType::Vector(_) => true,
+            SizedType::Matrix(_) => true,
+            SizedType::Array(a) => a.element.is_constructible(),
             SizedType::Atomic(_) => false,
-            SizedType::Structure(sized_struct) => sized_struct.fields().all(|f| f.ty.is_constructible()),
+            SizedType::Struct(sized_struct) => sized_struct.fields().iter().all(|f| f.ty.is_constructible()),
         }
     }
 }

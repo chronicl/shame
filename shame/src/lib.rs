@@ -479,12 +479,13 @@ pub mod any {
     pub use crate::ir::ir_type::PackedScalarType;
     pub use crate::ir::ir_type::PackedVector;
 
-    pub use crate::ir::ir_type::BufferBlock;
     pub use crate::ir::ir_type::RuntimeSizedArrayField;
     pub use crate::ir::ir_type::SizedField;
     pub use crate::ir::ir_type::SizedStruct;
-    pub use crate::ir::ir_type::Struct;
+    pub use crate::ir::ir_type::UnsizedStruct;
     pub use crate::ir::ir_type::StructKind;
+    pub use crate::ir::ir_type::StructKindRef;
+    pub use crate::ir::ir_type::StructKindVariant;
     pub use crate::ir::ir_type::StructureDefinitionError;
     pub use crate::ir::ir_type::StructureFieldNamesMustBeUnique;
 

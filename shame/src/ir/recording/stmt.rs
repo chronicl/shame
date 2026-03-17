@@ -11,9 +11,10 @@ use crate::{
     },
     frontend::error::InternalError,
     ir::{
+        Len, ScalarType, SizedType, StoreType, Type,
+        ir_type::{LayoutType, Vector},
         pipeline::{PossibleStages, StageMask},
         recording::{BlockKind, BodyKind, ConditionKind},
-        Len, ScalarType, SizedType, StoreType, Type,
     },
 };
 
@@ -420,7 +421,10 @@ impl Stmt {
             // =================================================================
             // condition related
             (B::Condition(_), Stmt::Expr(ExprStmt::Condition(node))) => match nodes[*node].ty() {
-                Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, ScalarType::Bool))) => Ok(()),
+                Type::Store(StoreType::LayoutType(LayoutType::Sized(SizedType::Vector(Vector {
+                    len: Len::X1,
+                    scalar: ScalarType::Bool,
+                })))) => Ok(()),
                 ty => Err(E::NonBooleanCondition(ty.clone())),
             },
             (_, Stmt::Expr(ExprStmt::Condition(node))) => Err(E::ConditionOutsideOfConditionBlock),
