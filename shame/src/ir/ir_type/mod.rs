@@ -6,6 +6,7 @@ mod align_size;
 mod canon_name;
 mod categories;
 mod memory_view;
+mod recipe;
 mod struct_;
 mod tensor;
 mod texture;
