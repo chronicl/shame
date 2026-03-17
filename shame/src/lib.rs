@@ -477,7 +477,6 @@ pub mod any {
     pub use crate::ir::ir_type::StructureDefinitionError;
     pub use crate::ir::ir_type::StructureFieldNamesMustBeUnique;
 
-
     pub mod layout {
         use crate::frontend::rust_types::type_layout;
 
@@ -528,7 +527,7 @@ pub mod any {
         pub use type_layout::recipe::builder::IsUnsizedStructError;
         pub use type_layout::recipe::builder::StructFromPartsError;
 
-        // helpful cpu layout comparison
+        // helpful cpu layout comparison (TODO should be made a function without args)
         pub use crate::frontend::rust_types::layout_traits::get_layout_compare_with_cpu_push_error;
     }
 
