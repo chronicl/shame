@@ -1,31 +1,16 @@
 use super::{NoMatchingSignature, TypeCheck};
 use crate::{
-    ir::{self, expr::type_check::SigFormatting, AddressSpace},
+    ir::{
+        self,
+        expr::type_check::{vec, mat, SigFormatting},
+        AddressSpace,
+    },
     same, sig,
 };
 use ir::Len::*;
 use ir::ScalarType::*;
 use ir::StoreType;
-use ir::ir_type::{Vector, SizedType, LayoutType};
-
-macro_rules! vec {
-    ($len:ident, $scalar:ident) => {
-        SizedType::Vector(Vector { scalar: $scalar, len: $len })
-    };
-    ($len:expr, $scalar:expr) => {
-        SizedType::Vector(Vector { scalar: $scalar, len: $len })
-    };
-}
-
-
-macro_rules! mat {
-    ($columns:ident, $rows:ident, $scalar:ident) => {
-        SizedType::Matrix(ir::ir_type::Matrix { scalar: $scalar, columns: $columns, rows: $rows })
-    };
-    ($columns:expr, $rows:expr, $scalar:expr) => {
-        SizedType::Matrix(ir::ir_type::Matrix { scalar: $scalar, columns: $columns, rows: $rows })
-    };
-}
+use ir::ir_type::{Vector, Matrix, SizedType, LayoutType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// the `Operator`s' expressions, as listed in the WGSL spec.

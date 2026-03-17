@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 
+use super::type_check::vec;
 use super::{Comp4, Expr, NoMatchingSignature, TypeCheck};
 use crate::frontend::any::render_io::{VertexAttributeCooked, FragmentSampleMethod, Location};
 use crate::frontend::any::shared_io::BindPath;
@@ -11,7 +12,7 @@ use crate::frontend::encoding::EncodingErrorKind;
 use crate::frontend::error::InternalError;
 use crate::frontend::texture::texture_traits::StorageTextureFormat;
 use crate::ir::expr::type_check::SigFormatting;
-use crate::ir::ir_type::{TextureAspect, TextureSampleUsageType};
+use crate::ir::ir_type::{SizedArray, TextureAspect, TextureSampleUsageType, Vector};
 use crate::ir::pipeline::{PipelineError, PossibleStages, ShaderStage, StageMask};
 use crate::ir::recording::{Context, NodeRecordingError};
 use crate::ir::Len::*;
@@ -109,20 +110,20 @@ impl ShaderIo {
                         TST::Nearest {
                             len: num_color_target_components,
                             channel_type: ChannelFormatShaderType::F32,
-                        } => sig!([Vector(n, F32)] if *n == num_color_target_components => Unit)(self, args),
+                        } => sig!([vec!(n, F32)] if *n == num_color_target_components => Unit)(self, args),
                         TST::Nearest {
                             len: num_color_target_components,
                             channel_type: ChannelFormatShaderType::I32,
-                        } => sig!([Vector(n, I32)] if *n == num_color_target_components => Unit)(self, args),
+                        } => sig!([vec!(n, I32)] if *n == num_color_target_components => Unit)(self, args),
                         TST::Nearest {
                             len: num_color_target_components,
                             channel_type: ChannelFormatShaderType::U32,
-                        } => sig!([Vector(n, U32)] if *n == num_color_target_components => Unit)(self, args),
+                        } => sig!([vec!(n, U32)] if *n == num_color_target_components => Unit)(self, args),
                         TST::Nearest {
                             len: num_color_target_components,
                             channel_type: color_target_channel_type,
                         } => {
-                            sig!([Vector(n, t)] if *n == num_color_target_components && *t == ScalarType::from(color_target_channel_type) => Unit)(
+                            sig!([vec!(n, t)] if *n == num_color_target_components && *t == ScalarType::from(color_target_channel_type) => Unit)(
                                 self, args,
                             )
                         }
@@ -284,8 +285,8 @@ impl TypeCheck for BuiltinShaderIn {
     fn infer_type(&self, args: &[ir::Type]) -> Result<ir::Type, NoMatchingSignature> {
         let bool = sig!([] => Bool);
         let u32 = sig!([] => U32);
-        let vec3u = sig!([] => Vector(X3, U32));
-        let vec4f = sig!([] => Vector(X4, F32));
+        let vec3u = sig!([] => vec!(X3, U32));
+        let vec4f = sig!([] => vec!(X4, F32));
         (match self {
             BuiltinShaderIn::VertexIndex | BuiltinShaderIn::InstanceIndex => u32,
             BuiltinShaderIn::Position => vec4f,
@@ -321,12 +322,12 @@ impl From<BuiltinShaderOut> for Expr {
 impl TypeCheck for BuiltinShaderOut {
     fn infer_type(&self, args: &[ir::Type]) -> Result<ir::Type, NoMatchingSignature> {
         (match self {
-            BuiltinShaderOut::Position => sig!([Vector(X4, F32)] => Unit),
+            BuiltinShaderOut::Position => sig!([vec!(X4, F32)] => Unit),
             BuiltinShaderOut::ClipDistances { count } => {
                 let distance_count = count;
                 return sig!(
                     { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                    [Array(f32x1, n)] if n.get() <= 8 && n == distance_count && **f32x1 == Vector(X1, F32) => Unit,
+                    [Array(SizedArray { element: f32x1, len: n })] if n.get() <= 8 && n == distance_count && **f32x1 == vec!(X1, F32).into() => Unit,
                 )(self, args);
             }
             BuiltinShaderOut::FragDepth => sig!([F32] => Unit),
@@ -345,7 +346,7 @@ pub struct Interpolator {
 impl Interpolator {
     fn get_sized_type(&self) -> SizedType {
         let (len, stype) = self.vec_ty;
-        SizedType::Vector(len, stype)
+        Vector::new(stype, len).into()
     }
 }
 

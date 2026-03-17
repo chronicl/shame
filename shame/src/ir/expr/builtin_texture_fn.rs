@@ -24,7 +24,6 @@ use crate::{
             Len2,
             ScalarType::{self, *},
             ScalarTypeFp, SizedStruct,
-            SizedType::*,
             StoreType::*,
             TextureShape,
             Type::Unit,
@@ -40,7 +39,7 @@ use crate::{ir, ir::StoreType, ir::Type, same, sig};
 #[allow(clippy::enum_variant_names)]
 #[rustfmt::skip]
 // functions with an `uv_offset` or `uvw_offset` parameter only support this offset for non-Cube textures
-// 
+//
 // the 3rd component of `uvw_offset` will be ignored for textures with less than 3 dimensions
 pub enum TextureFn {
     TextureDimensions,
@@ -49,7 +48,7 @@ pub enum TextureFn {
     TextureNumSamples,
     TextureGather {
         /// must be None for depth textures and Some for color textures
-        channel: Option<Comp4>, 
+        channel: Option<Comp4>,
         uv_offset: Option<[i4; 2]>,
     },
     TextureGatherCompare { uv_offset: Option<[i4; 2]> },
@@ -397,13 +396,13 @@ impl TypeCheck for TextureFn {
                 sig!(
                     { fmt: SigFormatting::RemoveAsterisksAndClone, },
                     // no miplevel
-                    [Handle(SampledTexture(d, _, _) | StorageTexture(d, _, _))] if *d == _1D => Vector(X1, U32),
-                    [Handle(SampledTexture(d, _, _) | StorageTexture(d, _, _))] if matches!(*d, _2D | _2DArray(_) | Cube | CubeArray(_)) => Vector(X2, U32),
-                    [Handle(SampledTexture(d, _, _) | StorageTexture(d, _, _))] if *d == _3D => Vector(X3, U32),
+                    [Handle(SampledTexture(d, _, _) | StorageTexture(d, _, _))] if *d == _1D => vec!(X1, U32),
+                    [Handle(SampledTexture(d, _, _) | StorageTexture(d, _, _))] if matches!(*d, _2D | _2DArray(_) | Cube | CubeArray(_)) => vec!(X2, U32),
+                    [Handle(SampledTexture(d, _, _) | StorageTexture(d, _, _))] if *d == _3D => vec!(X3, U32),
 
                     // 2nd arg is miplevel
-                    [Handle(SampledTexture(d, _, _)), Sized(Vector(X1, I32 | U32))] if *d == _1D => Vector(X1, U32),
-                    [Handle(SampledTexture(d, _, _)), Sized(Vector(X1, I32 | U32))] if matches!(*d, _2D | _2DArray(_) | Cube | CubeArray(_)) => Vector(X2, U32),
+                    [Handle(SampledTexture(d, _, _)), LayoutType::Sized(SizedType::Vector(Vector{ len: X1, scalar: I32 | U32 }))] if *d == _1D => Vector(X1, U32),
+                    [Handle(SampledTexture(d, _, _)), Vector(X1, I32 | U32)] if matches!(*d, _2D | _2DArray(_) | Cube | CubeArray(_)) => Vector(X2, U32),
                     [Handle(SampledTexture(d, _, _)), Sized(Vector(X1, I32 | U32))] if *d == _3D => Vector(X3, U32),
                 )(self, args)
                 // WGSL spec: If level is outside the range [0, textureNumLevels(t)) then an indeterminate value for the return type may be returned.
@@ -490,15 +489,15 @@ impl TypeCheck for TextureFn {
                         )(self, args),
                         _2D => sig!(
                             [Handle(SampledTexture(_2D, st, Single)), /*uv:*/ Sized(Vector(X2, U32 | I32)), /*level:*/ Sized(Vector(X1, U32 | I32))] => st.type_in_wgsl(),
-                            [Handle(StorageTexture(_2D, fmt, Read | ReadWrite)), /*uv:*/ Sized(Vector(X2, U32 | I32))] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),        
+                            [Handle(StorageTexture(_2D, fmt, Read | ReadWrite)), /*uv:*/ Sized(Vector(X2, U32 | I32))] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),
                         )(self, args),
                         _2DArray(n) => sig!(
                             [Handle(SampledTexture(_2DArray(n), st, Single)), /*uv:*/ Sized(Vector(X2, U32 | I32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*level:*/ Sized(Vector(X1, U32 | I32))] => st.type_in_wgsl(),
-                            [Handle(StorageTexture(_2DArray(n), fmt, Read | ReadWrite)), /*uv:*/ Sized(Vector(X2, U32 | I32)), /*array_index:*/ Sized(Vector(X1, U32 | I32))] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),        
+                            [Handle(StorageTexture(_2DArray(n), fmt, Read | ReadWrite)), /*uv:*/ Sized(Vector(X2, U32 | I32)), /*array_index:*/ Sized(Vector(X1, U32 | I32))] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),
                         )(self, args),
                         _3D => sig!(
                             [Handle(SampledTexture(_3D, st, Single)), /*uv:*/ Sized(Vector(X3, U32 | I32)), /*level:*/ Sized(Vector(X1, U32 | I32))] => st.type_in_wgsl(),
-                            [Handle(StorageTexture(_3D, fmt, Read | ReadWrite)), /*uv:*/ Sized(Vector(X3, U32 | I32))] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),        
+                            [Handle(StorageTexture(_3D, fmt, Read | ReadWrite)), /*uv:*/ Sized(Vector(X3, U32 | I32))] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),
                         )(self, args),
                         Cube | CubeArray(_) => Err(error("unsupported texture shape".into())),
                     },

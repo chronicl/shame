@@ -86,22 +86,19 @@ pub struct Atomic {
 }
 
 //   Conversions to ScalarType, SizedType and LayoutType   //
-macro_rules! impl_into_sized_type {
-    ($($ty:ident -> $variant:path),*) => {
-       $(
-           impl From<$ty> for SizedType {
-               fn from(v: $ty) -> Self { $variant(v) }
-           }
-       )*
-    };
+impl<T> From<T> for Type
+where
+    StoreType: From<T>,
+{
+    fn from(value: T) -> Self { Type::Store(value.into()) }
 }
-impl_into_sized_type!(
-    Vector       -> SizedType::Vector,
-    Matrix       -> SizedType::Matrix,
-    SizedArray   -> SizedType::Array,
-    Atomic       -> SizedType::Atomic,
-    SizedStruct  -> SizedType::Struct
-);
+
+impl<T> From<T> for StoreType
+where
+    LayoutType: From<T>,
+{
+    fn from(value: T) -> Self { StoreType::LayoutType(value.into()) }
+}
 
 impl<T> From<T> for LayoutType
 where
@@ -115,6 +112,42 @@ impl From<UnsizedStruct> for LayoutType {
 }
 impl From<RuntimeSizedArray> for LayoutType {
     fn from(a: RuntimeSizedArray) -> Self { LayoutType::RuntimeSizedArray(a) }
+}
+
+impl<T> From<T> for SizedType
+where
+    Vector: From<T>,
+{
+    fn from(value: T) -> Self { SizedType::Vector(value.into()) }
+}
+
+macro_rules! impl_into_sized_type {
+    ($($ty:ident -> $variant:path),*) => {
+       $(
+           impl From<$ty> for SizedType {
+               fn from(v: $ty) -> Self { $variant(v) }
+           }
+       )*
+    };
+}
+impl_into_sized_type!(
+    Matrix       -> SizedType::Matrix,
+    SizedArray   -> SizedType::Array,
+    Atomic       -> SizedType::Atomic,
+    SizedStruct  -> SizedType::Struct
+);
+
+impl From<ScalarType> for Vector {
+    fn from(value: ScalarType) -> Self {
+        Vector {
+            scalar: value,
+            len: Len::X1,
+        }
+    }
+}
+
+impl From<Atomic> for ScalarType {
+    fn from(value: Atomic) -> Self { value.scalar.as_scalar_type() }
 }
 
 impl ScalarTypeInteger {
@@ -164,22 +197,6 @@ pub enum HandleType {
     SampledTexture(TextureShape, TextureSampleUsageType, SamplesPerPixel),
     StorageTexture(TextureShape, TextureFormatWrapper, AccessMode),
     Sampler(shared_io::SamplingMethod),
-}
-
-// TODO(chronicl) these are somewhat random here
-impl From<SizedType> for StoreType {
-    fn from(value: SizedType) -> Self { StoreType::LayoutType(LayoutType::Sized(value)) }
-}
-impl From<SizedType> for Type {
-    fn from(value: SizedType) -> Self { Type::Store(value.into()) }
-}
-impl From<ScalarType> for Type {
-    fn from(value: ScalarType) -> Self {
-        Type::Store(StoreType::LayoutType(LayoutType::Sized(SizedType::Vector(Vector {
-            scalar: value,
-            len: Len::X1,
-        }))))
-    }
 }
 
 impl Type {

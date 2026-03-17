@@ -1,6 +1,9 @@
 use std::ops::*;
 
-use super::{type_check::SigFormatting, Expr, NoMatchingSignature, TypeCheck};
+use super::{
+    type_check::{SigFormatting, vec_store},
+    Expr, NoMatchingSignature, TypeCheck,
+};
 use crate::frontend::any::Any;
 use crate::ir::ir_type::{LayoutType, Vector};
 use crate::{
@@ -21,12 +24,6 @@ use crate::{
     },
 };
 use crate::{ir, ir::Type, same, sig};
-
-macro_rules! vec {
-    ($len:ident, $scalar:ident) => {
-        StoreType::LayoutType(LayoutType::Sized(SizedType::Vector(Vector{ len: $len, scalar: $scalar })))
-    };
-}
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,7 +98,7 @@ impl TypeCheck for Assign {
             Assign::CompoundAssignment(op) => op.infer_type(args),
             // https://www.w3.org/TR/WGSL/#increment-decrement
             Assign::Increment | Assign::Decrement => sig!(
-                [Type::Ref(_, vec!(X1, t), ReadWrite)] if t.is_integer() => Unit
+                [Type::Ref(_, vec_store!(X1, t), ReadWrite)] if t.is_integer() => Unit
             )(self, args),
         })
     }
@@ -118,24 +115,24 @@ impl TypeCheck for CompoundOp {
             CompoundOp::RemAssign => sig! (
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
                 [
-                    Type::Ref(allocation, vec!(n0, t0), ReadWrite),
-                    Type::Store(vec!(n1, t1))
+                    Type::Ref(allocation, vec_store!(n0, t0), ReadWrite),
+                    Type::Store(vec_store!(n1, t1))
                 ]
                 if allocation.is_writeable() && t0.is_numeric() && same!(n0 n1; t0 t1) => Unit
             )(self, args),
             CompoundOp::AndAssign | CompoundOp::OrAssign | CompoundOp::XorAssign => sig! (
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
                 [
-                    Type::Ref(allocation, vec!(n0, t0), ReadWrite),
-                    Type::Store(vec!(n1, t1))
+                    Type::Ref(allocation, vec_store!(n0, t0), ReadWrite),
+                    Type::Store(vec_store!(n1, t1))
                 ]
                 if allocation.is_writeable() && t0.is_integer() && same!(n0 n1; t0 t1) => Unit
             )(self, args),
             CompoundOp::ShrAssign | CompoundOp::ShlAssign => sig! (
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
                 [
-                    Type::Ref(allocation, vec!(n0, t), ReadWrite),
-                    Type::Store(vec!(n1, U32))
+                    Type::Ref(allocation, vec_store!(n0, t), ReadWrite),
+                    Type::Store(vec_store!(n1, U32))
                 ]
                 if allocation.is_writeable() && t.is_integer() && same!(n0 n1) => Unit
             )(self, args),

@@ -7,7 +7,10 @@ use crate::{
     frontend::encoding::pipeline_info::Dict,
     ir::{
         self,
-        expr::{type_check::SigFormatting, AtomicFn, BuiltinFn, Expr, NoMatchingSignature, NumericFn},
+        expr::{
+            type_check::{SigFormatting, vec},
+            AtomicFn, BuiltinFn, Expr, NoMatchingSignature, NumericFn,
+        },
         recording::Context,
         SizedStruct, SizedType, StoreType, StructureFieldNamesMustBeUnique, Type, ScalarType,
         ir_type::Vector,
@@ -17,15 +20,6 @@ use crate::{
 use std::{path::Display, rc::Rc};
 
 use super::{InteractionKind, MemoryRegion};
-
-macro_rules! vec {
-    ($scalar:ident, $len:ident) => {
-        SizedType::Vector(Vector {
-            scalar: $scalar,
-            len: $len
-        })
-    };
-}
 
 #[derive(Debug, Default)]
 pub struct BuiltinTemplateStructs {
@@ -92,7 +86,7 @@ impl BuiltinTemplateStructs {
                             name: Frexp(len, t),
                             fmt: SigFormatting::RemoveAsterisksAndClone,
                         },
-                        [vec!(t0, l0)] if *l0 == len && *t0 == t => template_struct,
+                        [vec!(l0, t0)] if *l0 == len && *t0 == t => template_struct,
                     )(&params, args)
                 }
                 TemplateStructParams::Modf(ModfGenerics(fp, len)) => {
@@ -103,7 +97,7 @@ impl BuiltinTemplateStructs {
                             name: Modf(len, t),
                             fmt: SigFormatting::RemoveAsterisksAndClone,
                         },
-                        [vec!(t0, l0)] if *l0 == len && *t0 == t => template_struct,
+                        [vec!(l0, t0)] if *l0 == len && *t0 == t => template_struct,
                     )(&params, args)
                 }
                 TemplateStructParams::AtomicCompareExchangeWeak(AtomicCompareExchangeWeakGenerics(
@@ -131,8 +125,8 @@ impl BuiltinTemplateStructs {
                         },
                         [
                             Ptr(region, StoreType::LayoutType(LayoutType::Sized(SizedType::Atomic(Atomic { scalar: t0 }))), ReadWrite),
-                            Store(StoreType::LayoutType(LayoutType::Sized(vec!(t1, X1)))),
-                            Store(StoreType::LayoutType(LayoutType::Sized(vec!(t2, X1)))),
+                            Store(StoreType::LayoutType(LayoutType::Sized(vec!(X1, t1)))),
+                            Store(StoreType::LayoutType(LayoutType::Sized(vec!(X1, t2)))),
                         ]
                         if region.address_space == address_space &&
                             same!(t t0 t1 t2)

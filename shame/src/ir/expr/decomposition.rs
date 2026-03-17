@@ -10,7 +10,7 @@ use crate::{
     ir::{
         self,
         expr::type_check::{SigFormatting, SignatureStrings},
-        ir_type::{CanonName, Field, Len, Len2, ScalarType, SizedType, StoreType},
+        ir_type::{CanonName, Len, Len2, ScalarType, SizedType, StoreType},
         recording::CallInfo,
         Type,
     },

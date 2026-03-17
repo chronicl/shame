@@ -1,6 +1,9 @@
 use std::{fmt::Display, num::NonZeroU32, ops::Not, rc::Rc};
 
-use super::{type_check::*, Comp4, ExponentFn, Expr, NumericFn, TextureFn};
+use super::{
+    type_check::{*, vec, vec_store},
+    Comp4, ExponentFn, Expr, NumericFn, TextureFn,
+};
 use crate::{
     call_info,
     common::integer::i4,
@@ -11,7 +14,7 @@ use crate::{
     impl_track_caller_fn_any,
     ir::{
         ir_type::{
-            AccessMode, AddressSpace, Indirection,
+            LayoutType, AccessMode, AddressSpace, Indirection,
             Len::*,
             Len2,
             ScalarType::{self, *},
@@ -20,6 +23,7 @@ use crate::{
             StoreType::*,
             TextureShape,
             Type::Unit,
+            Vector,
         },
         pipeline::{PossibleStages, ShaderStage, StageMask},
         recording::{
@@ -227,7 +231,7 @@ impl Display for Constructor {
                 len2_to_u32(*rows)
             ),
             Constructor::Array(sized_type, non_zero) => write!(f, "array<{sized_type}, {}>(...)", non_zero.get()),
-            Constructor::Structure(sized_struct) => write!(f, "struct {}(...)", sized_struct.name()),
+            Constructor::Structure(sized_struct) => write!(f, "struct {}(...)", sized_struct.name),
         }
     }
 }
@@ -245,48 +249,48 @@ impl TypeCheck for Constructor {
                 [] if sized_type.is_constructible() => sized_type
             )(self, args),
             Constructor::Scalar(s) => (match s {
-                F16 => sig! { [Vector(X1, _)] => Vector(X1, F16)},
-                F32 => sig! { [Vector(X1, _)] => Vector(X1, F32) },
-                F64 => sig! { [Vector(X1, _)] => Vector(X1, F64) },
-                U32 => sig! { [Vector(X1, _)] => Vector(X1, U32) },
-                I32 => sig! { [Vector(X1, _)] => Vector(X1, I32) },
-                Bool => sig! { [Vector(X1, _)] => Vector(X1, Bool) },
+                F16 => sig! { [vec!(X1, _i)] => vec!(X1, F16)},
+                F32 => sig! { [vec!(X1, _i)] => vec!(X1, F32) },
+                F64 => sig! { [vec!(X1, _i)] => vec!(X1, F64) },
+                U32 => sig! { [vec!(X1, _i)] => vec!(X1, U32) },
+                I32 => sig! { [vec!(X1, _i)] => vec!(X1, I32) },
+                Bool => sig! { [vec!(X1, _i)] => vec!(X1, Bool) },
             })(self, args),
             Constructor::Vector(xn, T) => match xn {
                 Len2::X2 => sig!(
                     {
-                        name: Vector(X2, T),
+                        name: vec!(X2, T),
                         fmt: SigFormatting::RemoveAsterisksAndClone,
                     },
-                    [Vector(X1, t)] if t == T => Vector(X2, *T), // splat
-                    [Vector(X2, s)] => Vector(X2, *T), // conversion
-                    [Vector(X1, t0), Vector(X1, t1)] if same!(t0 t1 T) => Vector(X2, *T), // comp wise
+                    [vec!(X1, t)] if t == T => vec!(X2, *T), // splat
+                    [vec!(X2, s)] => vec!(X2, *T), // conversion
+                        [vec!(X1, t0), vec!(X1, t1)] if same!(t0 t1 T) => vec!(X2, *T), // comp wise
                 )(self, args),
                 Len2::X3 => sig! (
                     {
-                        name: Vector(X3, T),
+                        name: vec!(X3, T),
                         fmt: SigFormatting::RemoveAsterisksAndClone,
                     },
-                    [Vector(X1, t)] if t == T => Vector(X3, *T), // splat
-                    [Vector(X3, s)] => Vector(X3, *T), // conversion
-                    [Vector(X1, t0), Vector(X1, t1), Vector(X1, t2)] if same!(t0 t1 t2 T) => Vector(X3, *T), // comp wise
-                    [Vector(X1, t0), Vector(X2, t1)] if same!(t0 t1 T) => Vector(X3, *T), // concat 1+2
-                    [Vector(X2, t0), Vector(X1, t1)] if same!(t0 t1 T) => Vector(X3, *T), // concat 2+1
+                    [vec!(X1, t)] if t == T => vec!(X3, *T), // splat
+                    [vec!(X3, s)] => vec!(X3, *T), // conversion
+                        [vec!(X1, t0), vec!(X1, t1), vec!(X1, t2)] if same!(t0 t1 t2 T) => vec!(X3, *T), // comp wise
+                            [vec!(X1, t0), vec!(X2, t1)] if same!(t0 t1 T) => vec!(X3, *T), // concat 1+2
+                                [vec!(X2, t0), vec!(X1, t1)] if same!(t0 t1 T) => vec!(X3, *T), // concat 2+1
                 )(self, args),
                 Len2::X4 => sig! (
                     {
-                        name: Vector(X4, T),
+                        name: vec!(X4, T),
                         fmt: SigFormatting::RemoveAsterisksAndClone,
                     },
-                    [Vector(X1, t)] if t == T => Vector(X4, *T), // splat
-                    [Vector(X4, s)] => Vector(X4, *T), // conversion
-                    [Vector(X1, t0), Vector(X1, t1), Vector(X1, t2), Vector(X1, t3)] if same!(t0 t1 t2 t3 T) => Vector(X4, *T), // comp wise
-                    [Vector(X1, t0), Vector(X3, t1)] if same!(t0 t1 T) => Vector(X4, *T), // concat 1+3
-                    [Vector(X3, t0), Vector(X1, t1)] if same!(t0 t1 T) => Vector(X4, *T), // concat 3+1
-                    [Vector(X2, t0), Vector(X2, t1)] if same!(t0 t1 T) => Vector(X4, *T), // concat 2+2
-                    [Vector(X1, t0), Vector(X1, t1), Vector(X2, t2)] if same!(t0 t1 t2 T) => Vector(X4, *T), // concat 1+1+2
-                    [Vector(X1, t0), Vector(X2, t1), Vector(X1, t2)] if same!(t0 t1 t2 T) => Vector(X4, *T), // concat 1+2+1
-                    [Vector(X2, t0), Vector(X1, t1), Vector(X1, t2)] if same!(t0 t1 t2 T) => Vector(X4, *T), // concat 2+1+1
+                    [vec!(X1, t)] if t == T => vec!(X4, *T), // splat
+                    [vec!(X4, s)] => vec!(X4, *T), // conversion
+                    [vec!(X1, t0), vec!(X1, t1), vec!(X1, t2), vec!(X1, t3)] if same!(t0 t1 t2 t3 T) => vec!(X4, *T), // comp wise
+                    [vec!(X1, t0), vec!(X3, t1)] if same!(t0 t1 T) => vec!(X4, *T), // concat 1+3
+                    [vec!(X3, t0), vec!(X1, t1)] if same!(t0 t1 T) => vec!(X4, *T), // concat 3+1
+                    [vec!(X2, t0), vec!(X2, t1)] if same!(t0 t1 T) => vec!(X4, *T), // concat 2+2
+                    [vec!(X1, t0), vec!(X1, t1), vec!(X2, t2)] if same!(t0 t1 t2 T) => vec!(X4, *T), // concat 1+1+2
+                    [vec!(X1, t0), vec!(X2, t1), vec!(X1, t2)] if same!(t0 t1 t2 T) => vec!(X4, *T), // concat 1+2+1
+                    [vec!(X2, t0), vec!(X1, t1), vec!(X1, t2)] if same!(t0 t1 t2 T) => vec!(X4, *T), // concat 2+1+1
                 )(self, args),
             },
             Constructor::Matrix(cols, rows, T) => {
@@ -304,18 +308,21 @@ impl TypeCheck for Constructor {
                         fmt: SigFormatting::RemoveAsterisksAndClone,
                     },
                     // scalar-type conversion constructor
-                    [Matrix(c0, r0, t0)] if same!(rows r0; cols c0) => Matrix(*cols, *rows, *T),
+                    [mat!(c0, r0, t0)] if same!(rows r0; cols c0) => mat!(*cols, *rows, *T),
                     // column vector constructors
-                    [Vector(r0, t0), Vector(r1, t1)]                                 if *cols == X2 && same!(rows_ r0 r1      ; T t0 t1      ) => Matrix(*cols, *rows, *T),
-                    [Vector(r0, t0), Vector(r1, t1), Vector(r2, t2)]                 if *cols == X3 && same!(rows_ r0 r1 r2   ; T t0 t1 t2   ) => Matrix(*cols, *rows, *T),
-                    [Vector(r0, t0), Vector(r1, t1), Vector(r2, t2), Vector(r3, t3)] if *cols == X4 && same!(rows_ r0 r1 r2 r3; T t0 t1 t2 t3) => Matrix(*cols, *rows, *T),
+                    [vec!(r0, t0), vec!(r1, t1)]                                 if *cols == X2 && same!(rows_ r0 r1      ; T t0 t1      ) => mat!(*cols, *rows, *T),
+                    [vec!(r0, t0), vec!(r1, t1), vec!(r2, t2)]                 if *cols == X3 && same!(rows_ r0 r1 r2   ; T t0 t1 t2   ) => mat!(*cols, *rows, *T),
+                    [vec!(r0, t0), vec!(r1, t1), vec!(r2, t2), vec!(r3, t3)] if *cols == X4 && same!(rows_ r0 r1 r2 r3; T t0 t1 t2 t3) => mat!(*cols, *rows, *T),
                     // component constructor
-                    [ref comps @ ..] if comps.iter().all(|c| **c == Vector(X1, T_)) && comps.len() as u32 == u32::from(*cols) * u32::from(*rows)
-                        => Matrix(*cols, *rows, *T),
+                    [ref comps @ ..] if comps.iter().all(|c| **c == vec!(X1, T_)) && comps.len() as u32 == u32::from(*cols) * u32::from(*rows)
+                        => mat!(*cols, *rows, *T),
                 )(self, args)
             }
             Constructor::Array(t, len) => {
-                let return_ty = ir::SizedType::Array(t.clone(), *len);
+                let return_ty = ir::SizedType::Array(ir::ir_type::SizedArray {
+                    element: t.clone(),
+                    len: *len,
+                });
                 let signature_str = || {
                     use std::fmt::Write;
                     let mut sig = String::new();
@@ -329,7 +336,7 @@ impl TypeCheck for Constructor {
                 let no_matching_sig = || NoMatchingSignature {
                     expression_name: std::stringify!(Constructor::Array).into(),
                     arguments: args.into(),
-                    allowed_signatures: SignatureStrings::Dynamic(vec![signature_str()]),
+                    allowed_signatures: SignatureStrings::Dynamic(std::vec![signature_str()]),
                     shorthand_level: TypeShorthandLevel::Type,
                     signature_formatting: None,
                     comment: None,
@@ -337,7 +344,7 @@ impl TypeCheck for Constructor {
                 match len.get() as usize == args.len() {
                     true => {
                         let valid = args.iter().all(|arg| match arg {
-                            Type::Store(StoreType::Sized(arg)) => arg == &**t,
+                            Type::Store(StoreType::LayoutType(LayoutType::Sized(arg))) => arg == &**t,
                             _ => false,
                         });
                         match valid {
@@ -353,28 +360,33 @@ impl TypeCheck for Constructor {
                     use std::fmt::Write;
                     let mut sig = String::new();
                     write!(sig, "[");
-                    for s in s.sized_fields() {
+                    for s in s.fields() {
                         write!(sig, "{}, ", s.ty);
                     }
-                    write!(sig, "] => {}", s.name());
+                    write!(sig, "] => {}", s.name);
                     sig
                 };
                 let no_matching_sig = || NoMatchingSignature {
                     expression_name: std::stringify!(Constructor::Structure).into(),
                     arguments: args.into(),
-                    allowed_signatures: SignatureStrings::Dynamic(vec![signature_str()]),
+                    allowed_signatures: SignatureStrings::Dynamic(std::vec![signature_str()]),
                     shorthand_level: TypeShorthandLevel::Type,
                     signature_formatting: None,
                     comment: None,
                 };
-                match s.len() == args.len() {
+                match s.fields().len() == args.len() {
                     true => {
-                        let valid = s.fields().map(|f| &f.ty).zip(args).all(|(field, arg)| match arg {
-                            Type::Store(StoreType::Sized(arg)) => arg == field,
-                            _ => false,
-                        });
+                        let valid = s
+                            .fields()
+                            .iter()
+                            .map(|f| &f.ty)
+                            .zip(args)
+                            .all(|(field, arg)| match arg {
+                                Type::Store(StoreType::LayoutType(LayoutType::Sized(arg))) => arg == field,
+                                _ => false,
+                            });
                         match valid {
-                            true => Ok(Type::from(SizedType::Structure(s.clone()))),
+                            true => Ok(s.clone().into()),
                             false => Err(no_matching_sig()),
                         }
                     }
@@ -413,7 +425,9 @@ impl Any {
         // arg is not a scalar, this extra typecheck is added
         Context::try_with(call_info!(), |ctx| {
             match self.ty() {
-                Some(Type::Store(StoreType::Sized(SizedType::Vector(X1, t)))) => {
+                Some(Type::Store(StoreType::LayoutType(LayoutType::Sized(
+                    (SizedType::Vector(Vector { len: X1, scalar: t })),
+                )))) => {
                     match ir::Len2::try_from(len_after) {
                         Err(_) => *self, //noop, trying to splat from scalar to scalar,
                         Ok(len2) => {
@@ -440,7 +454,12 @@ impl Any {
     pub fn extend_vec_to_len(&self, len_after: ir::Len2) -> Any {
         let call_info = call_info!();
         Context::try_with(call_info!(), |ctx| match self.ty() {
-            Some(ty @ Type::Store(StoreType::Sized(SizedType::Vector(len_before, t)))) => {
+            Some(
+                ty @ Type::Store(StoreType::LayoutType(LayoutType::Sized(SizedType::Vector(Vector {
+                    len: len_before,
+                    scalar: t,
+                })))),
+            ) => {
                 let zero = || Any::new_scalar(t.constant_from_f64(0.0));
                 let expr = Expr::BuiltinFn(BuiltinFn::Constructor(Constructor::Vector(len_after, t)));
                 let extra_components = u32::from(len_after) as i32 - u32::from(len_before) as i32;
@@ -517,12 +536,12 @@ impl TypeCheck for ReinterpretFn {
                     name: ReinterpretFn::Bitcast(T),
                     fmt: SigFormatting::RemoveAsterisksAndClone,
                 },
-                [Vector(n, t0)] if t0 == T && T.is_numeric()               => Vector(*n, *T),
-                [Vector(n, s)] if T != s && T.is_32_bit() && s.is_32_bit() => Vector(*n, *T),
-                [Vector(X2, F16)] if T.is_32_bit()                         => Vector(X1, *T),
-                [Vector(X4, F16)] if T.is_32_bit()                         => Vector(X2, *T),
-                [Vector(X1, t0)] if t0.is_32_bit() && *T == F16            => Vector(X2, *T),
-                [Vector(X2, t0)] if t0.is_32_bit() && *T == F16            => Vector(X4, *T),
+                [vec!(n, t0)] if t0 == T && T.is_numeric()               => vec!(*n, *T),
+                [vec!(n, s)] if T != s && T.is_32_bit() && s.is_32_bit() => vec!(*n, *T),
+                [vec!(X2, F16)] if T.is_32_bit()                         => vec!(X1, *T),
+                [vec!(X4, F16)] if T.is_32_bit()                         => vec!(X2, *T),
+                [vec!(X1, t0)] if t0.is_32_bit() && *T == F16            => vec!(X2, *T),
+                [vec!(X2, t0)] if t0.is_32_bit() && *T == F16            => vec!(X4, *T),
             )(self, args),
         }
     }
@@ -547,11 +566,11 @@ pub enum LogicalFn {
 impl TypeCheck for LogicalFn {
     fn infer_type(&self, args: &[Type]) -> Result<Type, NoMatchingSignature> {
         (match self {
-            LogicalFn::All => sig! { [Vector(_, Bool)] => Bool },
-            LogicalFn::Any => sig! { [Vector(_, Bool)] => Bool },
+            LogicalFn::All => sig! { [vec!(_l, Bool)] => Bool },
+            LogicalFn::Any => sig! { [vec!(_l, Bool)] => Bool },
             LogicalFn::Select => sig! {
-                [v @ Vector(..), v1 @ Vector(..), Vector(X1, Bool)] if same!(v v1) => v,
-                [v @ Vector(n1, t1), Vector(n2, t2), Vector(n, Bool)] if same!(n n1 n2; t1 t2) => v,
+                [v @ SizedType::Vector(..), v1 @ SizedType::Vector(..), SizedType::Vector(Vector{ len: X1, scalar:  Bool })] if same!(v v1) => v,
+                [v @ vec!(n1, t1), vec!(n2, t2), vec!(n, Bool)] if same!(n n1 n2; t1 t2) => v,
             },
         })(self, args)
     }
@@ -576,7 +595,7 @@ impl TypeCheck for ArrayFn {
         use {AddressSpace::*, Type::*};
         (match self {
             ArrayFn::ArrayLength => sig! {
-               [Ptr(alloc, RuntimeSizedArray(_), _)] if alloc.address_space == Storage => U32
+               [Ptr(alloc, StoreType::LayoutType(LayoutType::RuntimeSizedArray(_)), _)] if alloc.address_space == Storage => U32
             },
         })(self, args)
     }
@@ -613,7 +632,7 @@ impl TypeCheck for DerivativeFn {
             DerivativeFn::Dpdx(_) | DerivativeFn::Dpdy(_) | DerivativeFn::Fwidth(_) => {
                 sig! {
                     { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                    [Vector(n, F32)] => Vector(*n, F32)
+                    [vec!(n, F32)] => vec!(*n, F32)
                 }
             }
         })(self, args)
@@ -672,20 +691,19 @@ impl TypeCheck for AtomicFn {
         use AccessMode::*;
         use AddressSpace::*;
         use SizedType::*;
-        use StoreType::*;
         (match self {
             AtomicFn::AtomicLoad => sig! {
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Type::Ptr(allocation, Sized(Atomic(t)), ReadWrite)]
+                [Type::Ptr(allocation, StoreType::LayoutType(LayoutType::Sized(Atomic(t))), ReadWrite)]
                 if matches!(allocation.address_space, Storage | WorkGroup)
                 => ScalarType::from(*t)
             },
             AtomicFn::AtomicStore => sig! {
-                [Type::Ptr(allocation, Sized(Atomic(t0)), ReadWrite), Type::Store(Sized(Vector(X1, t)))]
-                if t0 == t && matches!(allocation.address_space, Storage | WorkGroup) => Unit
+                [Type::Ptr(allocation, StoreType::LayoutType(LayoutType::Sized(Atomic(t0))), ReadWrite), Type::Store(vec_store!(X1, t))]
+                if t0.scalar.as_scalar_type() == *t && matches!(allocation.address_space, Storage | WorkGroup) => Unit
             },
             AtomicFn::AtomicReadModifyWrite(_) | AtomicFn::AtomicExchange => sig! {
-                [Type::Ptr(allocation, Sized(Atomic(t0)), ReadWrite), Type::Store(Sized(Vector(X1, t)))] if t0 == t => t
+                [Type::Ptr(allocation, StoreType::LayoutType(LayoutType::Sized(Atomic(t0))), ReadWrite), Type::Store(vec_store!(X1, t))] if t0.scalar.as_scalar_type() == *t => t
             },
             AtomicFn::AtomicCompareExchangeWeak(generics) => {
                 return BuiltinTemplateStructs::infer_type(
@@ -795,38 +813,38 @@ impl TypeCheck for DataPackingFn {
     fn infer_type(&self, args: &[Type]) -> Result<Type, NoMatchingSignature> {
         (match self {
             //         fn pack4x8snorm           (e: vec4 <f32>) -> u32
-            DataPackingFn::Pack4x8snorm => sig!([Vector(X4, F32)] => U32),
+            DataPackingFn::Pack4x8snorm => sig!([vec!(X4, F32)] => U32),
             //         fn pack4x8unorm           (e: vec4 <f32>) -> u32
-            DataPackingFn::Pack4x8unorm => sig!([Vector(X4, F32)] => U32),
+            DataPackingFn::Pack4x8unorm => sig!([vec!(X4, F32)] => U32),
             //         fn pack4xI8           (e: vec4 <i32>) -> u32
-            DataPackingFn::Pack4xI8 => sig!([Vector(X4, I32)] => U32),
+            DataPackingFn::Pack4xI8 => sig!([vec!(X4, I32)] => U32),
             //         fn pack4xU8           (e: vec4 <u32>) -> u32
-            DataPackingFn::Pack4xU8 => sig!([Vector(X4, U32)] => U32),
+            DataPackingFn::Pack4xU8 => sig!([vec!(X4, U32)] => U32),
             //         fn pack4xI8Clamp           (e: vec4 <i32>) -> u32
-            DataPackingFn::Pack4xI8Clamp => sig!([Vector(X4, I32)] => U32),
+            DataPackingFn::Pack4xI8Clamp => sig!([vec!(X4, I32)] => U32),
             //         fn pack4xU8Clamp           (e: vec4 <u32>) -> u32
-            DataPackingFn::Pack4xU8Clamp => sig!([Vector(X4, U32)] => U32),
+            DataPackingFn::Pack4xU8Clamp => sig!([vec!(X4, U32)] => U32),
             //         fn pack2x16snorm           (e: vec2 <f32>) -> u32
-            DataPackingFn::Pack2x16snorm => sig!([Vector(X2, F32)] => U32),
+            DataPackingFn::Pack2x16snorm => sig!([vec!(X2, F32)] => U32),
             //         fn pack2x16unorm           (e: vec2 <f32>) -> u32
-            DataPackingFn::Pack2x16unorm => sig!([Vector(X2, F32)] => U32),
+            DataPackingFn::Pack2x16unorm => sig!([vec!(X2, F32)] => U32),
             //         fn pack2x16float           (e: vec2<f32>) -> u32
-            DataPackingFn::Pack2x16float => sig!([Vector(X2, F32)] => U32),
+            DataPackingFn::Pack2x16float => sig!([vec!(X2, F32)] => U32),
 
             //         fn unpack4x8snorm      (e: u32) ->      vec4 <f32>
-            DataPackingFn::Unpack4x8snorm => sig!([U32] => Vector(X4, F32)),
+            DataPackingFn::Unpack4x8snorm => sig!([U32] => vec!(X4, F32)),
             //         fn unpack4x8unorm      (e: u32) ->      vec4 <f32>
-            DataPackingFn::Unpack4x8unorm => sig!([U32] => Vector(X4, F32)),
+            DataPackingFn::Unpack4x8unorm => sig!([U32] => vec!(X4, F32)),
             //         fn unpack4xI8      (e: u32) ->      vec4 <f32>
-            DataPackingFn::Unpack4xI8 => sig!([U32] => Vector(X4, F32)),
+            DataPackingFn::Unpack4xI8 => sig!([U32] => vec!(X4, F32)),
             //         fn unpack4xU8      (e: u32) ->      vec4 <f32>
-            DataPackingFn::Unpack4xU8 => sig!([U32] => Vector(X4, F32)),
+            DataPackingFn::Unpack4xU8 => sig!([U32] => vec!(X4, F32)),
             //         fn unpack2x16snorm      (e: u32) ->      vec4 <f32>
-            DataPackingFn::Unpack2x16snorm => sig!([U32] => Vector(X4, F32)),
+            DataPackingFn::Unpack2x16snorm => sig!([U32] => vec!(X4, F32)),
             //         fn unpack2x16unorm      (e: u32) ->      vec4 <f32>
-            DataPackingFn::Unpack2x16unorm => sig!([U32] => Vector(X4, F32)),
+            DataPackingFn::Unpack2x16unorm => sig!([U32] => vec!(X4, F32)),
             //         fn unpack2x16snorm      (e: u32) ->      vec2 <f32>
-            DataPackingFn::Unpack2x16float => sig!([U32] => Vector(X2, F32)),
+            DataPackingFn::Unpack2x16float => sig!([U32] => vec!(X2, F32)),
         })(self, args)
     }
 }
@@ -901,6 +919,7 @@ impl Any {
 mod tests {
     use super::*;
     use crate::ir::ir_type::Len;
+    use super::super::type_check::vec;
 
     #[test]
     fn type_check_infer() {
@@ -909,18 +928,18 @@ mod tests {
         let select = BuiltinFn::Logical(LogicalFn::Select);
 
         let args = &[
-            Type::from(SizedType::Vector(Len::X2, ScalarType::Bool)),
-            Type::from(SizedType::Vector(Len::X2, ScalarType::F16)),
-            Type::from(SizedType::Vector(Len::X2, ScalarType::F16)),
+            Type::from(vec![Len::X2, ScalarType::Bool]),
+            Type::from(vec![Len::X2, ScalarType::F16]),
+            Type::from(vec![Len::X2, ScalarType::F16]),
         ];
 
         assert!(ctor_vec.infer_type(args).is_err());
         assert!(bitcast.infer_type(args).is_err());
 
         let args = &[
-            Type::from(SizedType::Vector(Len::X2, ScalarType::F16)),
-            Type::from(SizedType::Vector(Len::X2, ScalarType::F16)),
-            Type::from(SizedType::Vector(Len::X2, ScalarType::Bool)),
+            Type::from(vec![Len::X2, ScalarType::F16]),
+            Type::from(vec![Len::X2, ScalarType::F16]),
+            Type::from(vec![Len::X2, ScalarType::Bool]),
         ];
         assert!(select.infer_type(args).is_ok());
 
