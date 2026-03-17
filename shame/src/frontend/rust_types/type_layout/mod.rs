@@ -68,14 +68,6 @@ pub struct VectorLayout {
 
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct PackedVectorLayout {
-    pub byte_size: u64,
-    pub align: IgnoreInEqOrdHash<U32PowerOf2>,
-    pub ty: PackedVector,
-}
-
-#[allow(missing_docs)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MatrixLayout {
     pub byte_size: u64,
     pub align: IgnoreInEqOrdHash<U32PowerOf2>,

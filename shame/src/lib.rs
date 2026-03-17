@@ -499,7 +499,6 @@ pub mod any {
             use crate::frontend::rust_types::type_layout;
         }
         pub use type_layout::VectorLayout;
-        pub use type_layout::PackedVectorLayout;
         pub use type_layout::MatrixLayout;
         pub use type_layout::ArrayLayout;
         pub use type_layout::StructLayout;

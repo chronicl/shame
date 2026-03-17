@@ -1,8 +1,6 @@
 use std::rc::Rc;
 use crate::{
-    frontend::rust_types::type_layout::{
-        ArrayLayout, FieldLayout, MatrixLayout, PackedVectorLayout, Repr, StructLayout, VectorLayout,
-    },
+    frontend::rust_types::type_layout::{ArrayLayout, FieldLayout, MatrixLayout, Repr, StructLayout, VectorLayout},
     ir, TypeLayout,
 };
 use super::{
@@ -110,16 +108,6 @@ impl Atomic {
         let mut layout = vector.layout(parent_repr);
         layout.debug_is_atomic = true;
         layout
-    }
-}
-
-impl PackedVector {
-    pub fn layout(&self, parent_repr: Repr) -> PackedVectorLayout {
-        PackedVectorLayout {
-            byte_size: self.byte_size().as_u64(),
-            align: self.align(parent_repr).into(),
-            ty: *self,
-        }
     }
 }
 
