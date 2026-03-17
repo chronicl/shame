@@ -88,7 +88,7 @@ impl SizedStruct {
     /// fields of this struct. `FieldOffsetsSized::struct_byte_size_and_align` can be
     /// used to efficiently obtain the byte_size and align.
     pub fn field_offsets(&self) -> FieldOffsetsSized<'_> {
-        FieldOffsetsSized(FieldOffsets::new(self.fields(), self.repr))
+        FieldOffsetsSized(FieldOffsets::new(&self.fields, self.repr))
     }
 
     /// Returns (byte_size, align)
@@ -113,6 +113,12 @@ impl UnsizedStruct {
     ///   and the struct's align
     pub fn field_offsets(&self) -> FieldOffsetsUnsized<'_> {
         FieldOffsetsUnsized::new(&self.sized_fields, &self.last_unsized, self.repr)
+    }
+
+    pub fn min_byte_size(&self) -> u64 {
+        FieldOffsetsSized(FieldOffsets::new(&self.sized_fields, self.repr))
+            .struct_byte_size_and_align()
+            .0
     }
 
     /// This is expensive as it calculates the byte align by traversing all fields recursively.
@@ -581,6 +587,7 @@ impl StructLayoutCalculator {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -589,7 +596,6 @@ mod tests {
     use crate::ir::{Len, Len2, ScalarTypeFp, ScalarTypeInteger};
     use std::num::NonZeroU32;
     use std::rc::Rc;
-    use super::super::builder::FieldOptions;
 
     #[test]
     fn test_primitives_layout() {
@@ -1033,17 +1039,12 @@ mod tests {
         // Create a struct with mixed field types
         let sized_struct = SizedStruct::new(
             "TestStruct",
-            "field1",
-            SizedType::Vector(Vector::new(ScalarType::F32, Len::X1)), // 4 bytes, 4-byte aligned
+            vec![
+                SizedField::new("field1", SizedType::Vector(Vector::new(ScalarType::F32, Len::X1))), // 4 bytes, 4-byte aligned,
+                SizedField::new("field2", SizedType::Vector(Vector::new(ScalarType::F32, Len::X2))), // 8 bytes, 8-byte aligned
+                SizedField::new("field3", SizedType::Vector(Vector::new(ScalarType::F32, Len::X1))), // 4 bytes, 4-byte aligned
+            ],
             Repr::Wgsl,
-        )
-        .extend(
-            "field2",
-            SizedType::Vector(Vector::new(ScalarType::F32, Len::X2)), // 8 bytes, 8-byte aligned
-        )
-        .extend(
-            "field3",
-            SizedType::Vector(Vector::new(ScalarType::F32, Len::X1)), // 4 bytes, 4-byte aligned
         );
 
         // Test field offsets
@@ -1068,8 +1069,9 @@ mod tests {
     fn test_uniform_struct_alignment() {
         let sized_struct = SizedStruct::new(
             "TestStruct",
-            "field1",
-            SizedType::Vector(Vector::new(ScalarType::F32, Len::X2)), // 8 bytes, 8-byte aligned
+            vec![
+                SizedField::new("field1", SizedType::Vector(Vector::new(ScalarType::F32, Len::X2))), // 8 bytes, 8-byte aligned
+            ],
             Repr::WgslUniform,
         );
 
@@ -1082,21 +1084,20 @@ mod tests {
     #[test]
     fn test_unsized_struct_layout() {
         // Test UnsizedStruct with sized fields and a runtime sized array
-        let mut unsized_struct = SizedStruct::new(
+        let mut unsized_struct = UnsizedStruct::new(
             "UnsizedStruct",
-            "field1",
-            SizedType::Vector(Vector::new(ScalarType::F32, Len::X2)), // 4 bytes, 4-byte aligned
+            vec![
+                SizedField::new("field1", SizedType::Vector(Vector::new(ScalarType::F32, Len::X2))), // 8 bytes, 8-byte aligned
+                SizedField::new("field2", SizedType::Vector(Vector::new(ScalarType::F32, Len::X1))), // 4 bytes, 4-byte aligned
+            ],
+            RuntimeSizedArrayField::new(
+                "runtime_array",
+                None,
+                SizedType::Vector(Vector::new(ScalarType::F32, Len::X1)), // 4 bytes per element
+            ),
             Repr::Wgsl,
-        )
-        .extend(
-            "field2",
-            SizedType::Vector(Vector::new(ScalarType::F32, Len::X1)), // 8 bytes, 8-byte aligned
-        )
-        .extend_unsized(
-            "runtime_array",
-            None,
-            SizedType::Vector(Vector::new(ScalarType::F32, Len::X1)), // 4 bytes per element
         );
+
 
         // Test field offsets
         let mut field_offsets = unsized_struct.field_offsets();
@@ -1123,14 +1124,13 @@ mod tests {
     fn test_packed_struct_layout() {
         let sized_struct = SizedStruct::new(
             "TestStruct",
-            "field1",
-            SizedType::Vector(Vector::new(ScalarType::F32, Len::X3)), // 8 bytes, 16 align (when not packed)
+            vec![
+                SizedField::new("field1", SizedType::Vector(Vector::new(ScalarType::F32, Len::X3))), // 12 bytes, 16 align (when not packed)
+                SizedField::new("field2", SizedType::Vector(Vector::new(ScalarType::F32, Len::X1))), // 4 bytes
+            ],
             Repr::Packed,
-        )
-        .extend(
-            "field2",
-            SizedType::Vector(Vector::new(ScalarType::F32, Len::X1)), // 4 bytes
         );
+
 
         let mut field_offsets = sized_struct.field_offsets();
 
@@ -1160,14 +1160,16 @@ mod tests {
 
         let s = SizedStruct::new(
             "TestStruct",
-            "field1",
-            SizedType::Vector(Vector::new(ScalarType::F32, Len::X2)), // 8 bytes, 8-byte aligned
+            vec![
+                SizedField::new("field1", SizedType::Vector(Vector::new(ScalarType::F32, Len::X2))), // 8 bytes, 8-byte aligned
+                SizedField::new(
+                    FieldOptions::new("field2", Some(U32PowerOf2::_16), None),
+                    SizedType::Vector(Vector::new(ScalarType::F32, Len::X1)), // 4 bytes, 4-byte aligned
+                ),
+            ],
             Repr::Packed,
-        )
-        .extend(
-            FieldOptions::new("field2", Some(U32PowerOf2::_16), None),
-            SizedType::Vector(Vector::new(ScalarType::F32, Len::X1)), // 4 bytes, 4-byte aligned
         );
+
 
         // The custom min align is ignored in packed structs
         assert_eq!(s.byte_size_and_align().1, U32PowerOf2::_1);

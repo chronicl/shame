@@ -16,7 +16,7 @@ pub(crate) mod align_size;
 pub(crate) mod builder;
 
 pub use align_size::{FieldOffsets, MatrixMajor, StructLayoutCalculator, array_size, array_stride, array_align};
-pub use builder::{SizedOrArray, FieldOptions};
+pub use builder::{FieldOptions};
 
 /// `TypeLayoutRecipe` describes how a type should be laid out in memory.
 ///
@@ -97,8 +97,9 @@ pub enum ScalarType {
 pub struct SizedStruct {
     /// The canonical name of the struct.
     pub name: CanonName,
-    // This is private to ensure a `SizedStruct` always has at least one field.
-    fields: Vec<SizedField>,
+    /// The fields of the sized struct. May be empty, however using an empty sized struct
+    /// for wgsl code generation will lead to an encoding error.
+    pub fields: Vec<SizedField>,
     /// The representation/layout rules for this struct. See [`Repr`] for more details.
     pub repr: Repr,
 }

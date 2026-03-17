@@ -63,7 +63,33 @@ impl LayoutType {
             }
             .into())
         } else {
-            Ok(SizedStruct::from_parts(struct_name, sized_fields, repr).into())
+            Ok(SizedStruct::new(struct_name, sized_fields, repr).into())
+        }
+    }
+}
+
+impl SizedStruct {
+    pub fn new(name: impl Into<CanonName>, fields: Vec<SizedField>, repr: Repr) -> Self {
+        Self {
+            name: name.into(),
+            fields,
+            repr,
+        }
+    }
+}
+
+impl UnsizedStruct {
+    pub fn new(
+        name: impl Into<CanonName>,
+        sized_fields: Vec<SizedField>,
+        last_unsized: RuntimeSizedArrayField,
+        repr: Repr,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            sized_fields,
+            last_unsized,
+            repr,
         }
     }
 }
@@ -77,77 +103,6 @@ pub enum StructFromPartsError {
     OnlyLastFieldMayBeUnsized,
     #[error("A field of the struct is an unsized struct, which isn't allowed.")]
     MustNotHaveUnsizedStructField,
-}
-
-impl SizedStruct {
-    /// Creates a new `SizedStruct` with one field.
-    ///
-    /// To add additional fields to it, use [`SizedStruct::extend`] or [`SizedStruct::extend_unsized`].
-    pub fn new(
-        name: impl Into<CanonName>,
-        field_options: impl Into<FieldOptions>,
-        ty: impl Into<SizedType>,
-        repr: Repr,
-    ) -> Self {
-        Self {
-            name: name.into(),
-            fields: vec![SizedField::new(field_options, ty)],
-            repr,
-        }
-    }
-
-    /// Adds a sized field to the struct.
-    pub fn extend(mut self, field_options: impl Into<FieldOptions>, ty: impl Into<SizedType>) -> Self {
-        self.fields.push(SizedField::new(field_options, ty));
-        self
-    }
-
-    /// Adds a runtime sized array field to the struct. This can only be the last
-    /// field of a struct, which is ensured by transitioning to an UnsizedStruct.
-    pub fn extend_unsized(
-        self,
-        name: impl Into<CanonName>,
-        custom_min_align: Option<U32PowerOf2>,
-        element_ty: impl Into<SizedType>,
-    ) -> UnsizedStruct {
-        UnsizedStruct {
-            name: self.name,
-            sized_fields: self.fields,
-            last_unsized: RuntimeSizedArrayField::new(name, custom_min_align, element_ty),
-            repr: self.repr,
-        }
-    }
-
-    /// Adds either a `SizedType` or a `RuntimeSizedArray` field to the struct.
-    ///
-    /// Returns a `TypeLayoutRecipe`, because the `Self` may either stay
-    /// a `SizedStruct` or become an `UnsizedStruct` depending on the field's type.
-    pub fn extend_sized_or_array(self, field_options: impl Into<FieldOptions>, field: SizedOrArray) -> LayoutType {
-        let options = field_options.into();
-        match field {
-            SizedOrArray::Sized(ty) => self.extend(options, ty).into(),
-            SizedOrArray::RuntimeSizedArray(a) => self
-                .extend_unsized(options.name, options.custom_min_align, a.element)
-                .into(),
-        }
-    }
-
-    /// The fields of this struct.
-    pub fn fields(&self) -> &[SizedField] { &self.fields }
-
-    pub(crate) fn from_parts(name: impl Into<CanonName>, fields: Vec<SizedField>, repr: Repr) -> Self {
-        Self {
-            name: name.into(),
-            fields,
-            repr,
-        }
-    }
-}
-
-#[allow(missing_docs)]
-pub enum SizedOrArray {
-    Sized(SizedType),
-    RuntimeSizedArray(RuntimeSizedArray),
 }
 
 #[allow(missing_docs)]

@@ -1,5 +1,6 @@
 use self::struct_::SizedStruct;
 use crate::{
+    any::layout::Repr,
     frontend::any::shared_io,
     ir::{ir_type::recipe::LayoutType, recording::MemoryRegion},
 };
@@ -87,10 +88,12 @@ impl Display for Type {
 impl Display for StoreType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StoreType::Sized(x) => write!(f, "{x}"),
+            StoreType::Layout(layout_type) => match layout_type {
+                LayoutType::Sized(s) => write!(f, "{s}"),
+                LayoutType::UnsizedStruct(s) => write!(f, "{}", s.name),
+                LayoutType::RuntimeSizedArray(a) => write!(f, "Array<{}>", a.element),
+            },
             StoreType::Handle(x) => write!(f, "{x}"),
-            StoreType::RuntimeSizedArray(x) => write!(f, "Array<{x}>"),
-            StoreType::BufferBlock(x) => write!(f, "{}", x.name()),
             StoreType::BindingArray(x, _) => write!(f, "BindingArray<{}>", x),
         }
     }
@@ -123,10 +126,13 @@ impl Display for HandleType {
 impl StoreType {
     pub fn min_byte_size(&self) -> Option<NonZeroU64> {
         match self {
-            StoreType::Sized(sized_type) => NonZeroU64::new(sized_type.byte_size()),
+            // TODO(chronicl) repr
+            StoreType::Layout(layout_type) => match layout_type {
+                LayoutType::Sized(s) => NonZeroU64::new(s.byte_size(Repr::Wgsl)),
+                LayoutType::UnsizedStruct(s) => todo!(),
+                LayoutType::RuntimeSizedArray(a) => NonZeroU64::new(a.byte_stride(Repr::Wgsl)),
+            },
             StoreType::Handle(handle_type) => None,
-            StoreType::RuntimeSizedArray(sized_type) => NonZeroU64::new(sized_type.byte_size()),
-            StoreType::BufferBlock(buffer_block) => NonZeroU64::new(buffer_block.min_byte_size()),
             // TODO(chronicl) check correct
             StoreType::BindingArray(binding_type, _) => binding_type.min_byte_size(),
         }
