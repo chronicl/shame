@@ -1,7 +1,7 @@
 use self::struct_::SizedStruct;
 use crate::{
-    frontend::{any::shared_io},
-    ir::recording::MemoryRegion,
+    frontend::any::shared_io,
+    ir::{ir_type::recipe::LayoutType, recording::MemoryRegion},
 };
 
 use super::*;
@@ -29,26 +29,17 @@ pub enum Type {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StoreType {
     /// WGSL "creation-fixed-footprint"
-    Sized(SizedType),
+    Layout(LayoutType),
     Handle(HandleType),
-    RuntimeSizedArray(SizedType),
-    BufferBlock(BufferBlock),
     BindingArray(Rc<StoreType>, Option<NonZeroU32>),
 }
 
-/// types that have a size which is known at shader creation time.
-/// WGSL "creation-fixed-footprint"
-#[doc(hidden)] // runtime api
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum SizedType {
-    /// Scalar or Vector
-    ///
-    /// A Scalar is represented as `Vector(Len::X1, _)`
-    Vector(Len, ScalarType),
-    Matrix(Len2, Len2, ScalarTypeFp),
-    Array(Rc<SizedType>, NonZeroU32),
-    Atomic(ScalarTypeInteger),
-    Structure(SizedStruct),
+impl<T: Into<LayoutType>> From<T> for StoreType {
+    fn from(value: T) -> Self { StoreType::Layout(value.into()) }
+}
+
+impl<T: Into<StoreType>> From<T> for Type {
+    fn from(value: T) -> Self { Type::Store(value.into()) }
 }
 
 /// types that represent handles to resources (Textures and Samplers).
@@ -58,18 +49,6 @@ pub enum HandleType {
     SampledTexture(TextureShape, TextureSampleUsageType, SamplesPerPixel),
     StorageTexture(TextureShape, TextureFormatWrapper, AccessMode),
     Sampler(shared_io::SamplingMethod),
-}
-
-impl From<SizedType> for StoreType {
-    fn from(value: SizedType) -> Self { StoreType::Sized(value) }
-}
-
-impl From<SizedType> for Type {
-    fn from(value: SizedType) -> Self { Type::Store(StoreType::Sized(value)) }
-}
-
-impl From<ScalarType> for Type {
-    fn from(value: ScalarType) -> Self { Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, value))) }
 }
 
 impl Type {
