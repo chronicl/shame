@@ -43,7 +43,6 @@ pub enum SizedType {
     Matrix(Matrix),
     Array(SizedArray),
     Atomic(Atomic),
-    PackedVec(PackedVector),
     Struct(SizedStruct),
 }
 
@@ -154,8 +153,7 @@ impl_into_sized_type!(
     Matrix       -> SizedType::Matrix,
     SizedArray   -> SizedType::Array,
     Atomic       -> SizedType::Atomic,
-    SizedStruct  -> SizedType::Struct,
-    PackedVector -> SizedType::PackedVec
+    SizedStruct  -> SizedType::Struct
 );
 
 impl<T> From<T> for TypeLayoutRecipe
@@ -215,7 +213,6 @@ impl std::fmt::Display for SizedType {
             SizedType::Matrix(m) => m.fmt(f),
             SizedType::Array(a) => a.fmt(f),
             SizedType::Atomic(a) => a.fmt(f),
-            SizedType::PackedVec(p) => p.fmt(f),
             SizedType::Struct(s) => s.fmt(f),
         }
     }

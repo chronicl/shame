@@ -107,7 +107,6 @@ impl TryFrom<SizedType> for ir::SizedType {
                 ir::SizedType::Array(Rc::new(converted_element), a.len)
             }
             SizedType::Atomic(i) => ir::SizedType::Atomic(i.scalar),
-            SizedType::PackedVec(_) => return Err(IRConversionError::ContainsPackedVector),
             SizedType::Struct(s) => ir::SizedType::Structure(s.try_into()?),
         })
     }
@@ -390,8 +389,4 @@ fn test_ir_conversion_error() {
             ..
         }))
     ));
-
-    let ty: TypeLayoutRecipe = SizedStruct::new("A", "a", unorm8x2::layout_recipe_sized(), Repr::Wgsl).into();
-    let result: Result<ir::StoreType, _> = ty.try_into();
-    assert!(matches!(result, Err(IRConversionError::ContainsPackedVector)));
 }

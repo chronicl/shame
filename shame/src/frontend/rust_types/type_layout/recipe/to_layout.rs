@@ -60,7 +60,6 @@ impl SizedType {
             SizedType::Atomic(a) => a.layout(parent_repr).into(),
             SizedType::Matrix(m) => m.layout(parent_repr).into(),
             SizedType::Array(a) => a.layout(parent_repr).into(),
-            SizedType::PackedVec(v) => v.layout(parent_repr).into(),
             SizedType::Struct(s) => s.layout().into(),
         }
     }
@@ -73,7 +72,6 @@ impl SizedType {
                     SizedType::Atomic(_) => false,
                     SizedType::Matrix(_) => false,
                     SizedType::Array(a) => a.contains(c),
-                    SizedType::PackedVec(_) => c == RecipeContains::PackedVector,
                     SizedType::Struct(s) => s.contains(c),
                 }
             }

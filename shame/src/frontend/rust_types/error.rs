@@ -15,13 +15,15 @@ pub enum FrontendError {
     InvalidCompositeDowncastAmount { expected: usize, actual: usize },
     #[error("invalid downcast from `{0}` to type `{1}` which is not available inside the shader typesystem")]
     InvalidDowncastToNonShaderType(Type, TypeLayout),
+    #[error("invalid downcast of a packed vector to `{0}` which is not available inside the shader typesystem")]
+    InvalidDowncastOfPackedVec(Type),
     #[error("internal u32 unpacking in packed vectors not supported yet")]
     PackedVecU32UnpackingNotSupportedYet,
     #[error("trying to initialize a single value from {amount} values")]
     InvalidDowncastAmount { amount: usize },
     //TODO(release) depending on the interpretation of "unchecked" in `from_anys_unchecked` which can provoke this error, this might be considered an internal error or not.
-    #[error("vertex buffer layouts may only contain non-bool vector or scalar types. The layout is: {0}")]
-    MalformedVertexBufferLayout(TypeLayout),
+    #[error("Vertex buffer layouts may only contain non-bool vector or scalar types.")]
+    MalformedVertexBufferLayout,
     #[error(
         "cannot downcast a value whose dynamic type has address space {dynamic_as} to a rust type with address space {rust_as}"
     )]

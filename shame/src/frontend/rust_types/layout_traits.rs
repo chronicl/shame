@@ -3,10 +3,11 @@ use crate::call_info;
 use crate::common::po2::U32PowerOf2;
 use crate::common::proc_macro_utils::{self, repr_c_struct_layout, ReprCError, ReprCField};
 use crate::frontend::any::render_io::{
-    Attrib, VertexBufferLookupIndex, Location, VertexAttribFormat, VertexBufferLayout, VertexLayoutError,
+    VertexAttributeCooked, VertexBufferLookupIndex, Location, VertexAttribFormat, VertexBufferLayout, VertexLayoutError,
 };
 use crate::frontend::any::{Any, InvalidReason};
 use crate::frontend::encoding::buffer::{BufferAddressSpace};
+use crate::frontend::encoding::io_iter::LocationCounter;
 use crate::frontend::encoding::{EncodingError, EncodingErrorKind};
 use crate::frontend::error::InternalError;
 use crate::frontend::rust_types::len::*;
@@ -33,7 +34,7 @@ use super::{len::Len, vec::vec};
 use super::{AsAny, GpuType, ToGpuType};
 use crate::frontend::any::{shared_io::BindPath, shared_io::BindingType};
 use crate::frontend::rust_types::reference::Ref;
-use crate::ir::{self, AlignedType, ScalarType as ST, SizedStruct, StoreType};
+use crate::ir::{self, AlignedType, PackedVector, ScalarType as ST, SizedStruct, StoreType};
 use std::borrow::{Borrow, Cow};
 use std::iter::Empty;
 use std::mem::size_of;
@@ -158,7 +159,7 @@ pub trait GpuLayout {
     ///
     /// If this association exists, this function returns the name and layout of
     /// that Cpu type, otherwise `None` is returned.
-    /// examples: 
+    /// examples:
     /// - vec: has no association like that
     /// - PackedVec: has no association like that
     /// - mat: has no association like that
@@ -411,8 +412,80 @@ pub(crate) fn from_single_any(mut anys: impl Iterator<Item = Any>) -> Any {
 /// * `sm::vec`s of non-boolean type (e.g. `sm::f32x4`)
 /// * `sm::packed::PackedVec`s (e.g. `sm::packed::unorm8x4`)
 /// * `#[derive(sm::GpuLayout)]` structs that contains only elements of the above mentioned types
-pub trait VertexLayout: GpuLayout + FromAnys {}
-impl<T: VertexAttribute> VertexLayout for T {}
+pub trait VertexLayout: FromAnys {
+    /// Whether Self is a struct
+    const IS_STRUCT: bool;
+    /// Whether Self's fields should be packed
+    const IS_PACKED: bool = false;
+    /// Get the vertex attributes in their raw, not yet, calculated form.
+    fn get_vertex_attributes() -> Vec<VertexAttributeRecipe>;
+    /// Get the vertex attributes in their final form with offsets and locations calculated and the vertex buffer stride.
+    fn get_attributes_and_stride(location_counter: &LocationCounter) -> Option<(Box<[VertexAttributeCooked]>, u64)> {
+        VertexAttributeCooked::get_attributes_and_stride(
+            &Self::get_vertex_attributes(),
+            Self::IS_PACKED,
+            location_counter,
+        )
+    }
+}
+
+impl VertexAttributeCooked {
+    fn get_attributes_and_stride(
+        attributes: &[VertexAttributeRecipe],
+        is_packed: bool,
+        location_counter: &LocationCounter,
+    ) -> Option<(Box<[VertexAttributeCooked]>, u64)> {
+        // TODO(chronicl) cpu type comparison and error pushing for it?
+        let repr = match is_packed {
+            true => Repr::Packed,
+            false => Repr::Wgsl,
+        };
+        let mut next_min_offset = 0u64;
+        let mut attribs = Vec::with_capacity(attributes.len());
+        for (i, attribute) in attributes.into_iter().enumerate() {
+            let (size, align) = match attribute.format {
+                VertexAttribFormat::Fine(len, scalar) => {
+                    let v = Vector::new(scalar, len);
+                    (v.byte_size(repr), v.align(repr))
+                }
+                VertexAttribFormat::Coarse(packed_vec) => (packed_vec.byte_size().as_u64(), packed_vec.align(repr)),
+            };
+            let offset = next_min_offset.next_multiple_of(align.as_u64());
+            attribs.push(VertexAttributeCooked {
+                offset,
+                location: location_counter.next(),
+                format: attribute.format,
+            });
+
+            next_min_offset = offset + size;
+        }
+
+        Some((attribs.into_boxed_slice(), next_min_offset))
+    }
+}
+
+impl<T: VertexAttribute> VertexLayout for T {
+    const IS_STRUCT: bool = false;
+
+    fn get_vertex_attributes() -> Vec<VertexAttributeRecipe> {
+        vec![VertexAttributeRecipe {
+            format: T::vertex_attrib_format(),
+            custom_offset: None,
+            // custom_location: None,
+        }]
+    }
+}
+
+/// The recipe for a vertex attribute. This is the raw information that a vertex attribute consists of,
+/// without calculated offset or location.
+pub struct VertexAttributeRecipe {
+    /// Format of the attribute
+    pub format: VertexAttribFormat,
+    /// Custom offset of the attribute
+    pub custom_offset: Option<u32>,
+    // TODO(chronicl) maybe implement this
+    // pub custom_location: Option<u32>,
+}
 
 // #[derive(GpuLayout)]
 // TODO(release) remove this type. This is an example impl for figuring out how the derive macro should work
@@ -429,14 +502,6 @@ pub struct GpuTypeRef<AS: AddressSpace, AM: AccessMode> {
     a: Ref<vec<f32, x1>, AS, AM>,
     b: Ref<vec<u32, x1>, AS, AM>,
     c: Ref<Array<vec<i32, x1>, Size<4>>, AS, AM>,
-}
-
-impl VertexLayout for GpuT
-where
-    vec<f32, x1>: for<'trivial_bound> VertexAttribute,
-    vec<u32, x1>: for<'trivial_bound> VertexAttribute,
-    Array<vec<i32, x1>, Size<4>>: for<'trivial_bound> VertexAttribute,
-{
 }
 
 impl<AS: AddressSpace, AM: AccessMode> FromAnys for GpuTypeRef<AS, AM> {

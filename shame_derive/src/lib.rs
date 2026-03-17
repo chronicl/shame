@@ -12,6 +12,8 @@ use syn::token::Semi;
 use syn::Data;
 use syn::Fields;
 
+use crate::derive_layout::impl_vertex_layout;
+
 /// implements [`GpuLayout`] and other traits for user defined structs
 /// if all fields of the struct themselves implement [`GpuLayout`].
 ///
@@ -119,5 +121,15 @@ fn derive_impl(which_derive: WhichDerive, input: TokenStream) -> TokenStream {
         Data::Union(_) | Data::Enum(_) => Err(syn::Error::new(span, "Must be used on a struct")),
     }
     .unwrap_or_else(|err| err.to_compile_error())
+    .into()
+}
+
+#[proc_macro_derive(VertexLayout, attributes(gpu_repr))]
+pub fn derive_vertex_layout(input: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+    match impl_vertex_layout(input) {
+        Ok(tokens) => tokens,
+        Err(e) => e.to_compile_error(),
+    }
     .into()
 }

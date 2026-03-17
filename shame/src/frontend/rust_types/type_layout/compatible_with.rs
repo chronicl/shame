@@ -1,12 +1,24 @@
 use std::fmt::Write;
 
 use crate::{
-    BufferAddressSpace, Language, TypeLayout, any::layout::StructLayout, call_info, common::{format::display, prettify::{UnwrapDisplayOr, set_color}}, frontend::{
+    BufferAddressSpace, Language, TypeLayout,
+    any::layout::StructLayout,
+    call_info,
+    common::{
+        format::display,
+        prettify::{UnwrapDisplayOr, set_color},
+    },
+    frontend::{
         encoding::buffer::BufferAddressSpaceEnum,
         rust_types::type_layout::{
-            ArrayLayout, display::{self, LayoutInfoFlags}, eq::{LayoutMismatch, StructMismatch, TopLevelMismatch, try_find_mismatch}, recipe::to_layout::RecipeContains
+            ArrayLayout,
+            display::{self, LayoutInfoFlags},
+            eq::{LayoutMismatch, StructMismatch, TopLevelMismatch, try_find_mismatch},
+            recipe::to_layout::RecipeContains,
         },
-    }, ir::{ir_type::max_u64_po2_dividing, recording::Context}, mem
+    },
+    ir::{ir_type::max_u64_po2_dividing, recording::Context},
+    mem,
 };
 
 use super::{recipe::TypeLayoutRecipe, Repr};
@@ -294,7 +306,7 @@ fn write_top_level_mismatch(
             let left_name = left.short_name();
             let within_layout_left = display(|f| match outer_most_array_has_mismatch {
                 true => Ok(()), // don't mention nesting
-                false => write!(f, " within `{}`", layout_left.short_name())
+                false => write!(f, " within `{}`", layout_left.short_name()),
             });
             let requires_a_byte_size_of_right_size = display(|f| match right.byte_size() {
                 Some(size) => write!(f, "requires a byte size of {size}"),
@@ -703,29 +715,5 @@ mod tests {
 
         // Storage address space should allow unsized types
         assert!(TypeLayoutCompatibleWith::<Storage>::try_from(Language::Wgsl, A::layout_recipe()).is_ok());
-    }
-
-    #[test]
-    fn wgsl_storage_may_not_contain_packed_vec() {
-        let _guard = enable_color();
-
-        #[derive(sm::GpuLayout)]
-        #[gpu_repr(packed)]
-        struct A {
-            a: sm::packed::snorm16x2,
-        }
-        let e = TypeLayoutCompatibleWith::<Storage>::try_from(Language::Wgsl, A::layout_recipe()).unwrap_err();
-        if PRINT {
-            println!("{e}");
-        }
-        assert!(matches!(
-            e,
-            AddressSpaceError::NotRepresentable(NotRepresentable::MayNotContain(
-                _,
-                Language::Wgsl,
-                BufferAddressSpaceEnum::Storage,
-                RecipeContains::PackedVector
-            ))
-        ));
     }
 }

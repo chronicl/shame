@@ -323,10 +323,12 @@ pub use frontend::texture::texture_formats as tf;
 // # derive macros
 pub use shame_derive::CpuLayout;
 pub use shame_derive::GpuLayout;
+pub use shame_derive::VertexLayout;
 pub use frontend::rust_types::layout_traits::GpuLayout;
 pub use frontend::rust_types::layout_traits::gpu_layout;
 pub use frontend::rust_types::layout_traits::CpuLayout;
 pub use frontend::rust_types::layout_traits::cpu_layout;
+pub use frontend::rust_types::layout_traits::VertexLayout;
 pub use frontend::rust_types::type_layout::TypeLayout;
 pub use common::po2::U32PowerOf2;
 pub use common::po2::NotAU32PowerOf2;
@@ -343,8 +345,6 @@ pub use frontend::rust_types::type_traits::NoBools;
 pub use frontend::rust_types::type_traits::NoAtomics;
 pub use frontend::rust_types::type_traits::NoHandles;
 pub use frontend::rust_types::type_traits::VertexAttribute;
-
-pub use frontend::rust_types::layout_traits::VertexLayout;
 
 /// vector types [`PackedVec`] and scalar types ([`unorm8`], [`snorm8`], ...),
 /// with a smaller memory footprint than regular [`vec`] vectors,
@@ -564,7 +564,7 @@ pub mod any {
     pub use crate::ir::ir_type::TextureSampleUsageType;
 
     // runtime pipeline recording api
-    pub use any::render_io::Attrib;
+    pub use any::render_io::VertexAttributeCooked;
     pub use any::render_io::ColorTarget;
     pub use any::render_io::ChannelWrites;
     pub use any::render_io::FragmentSampleMethod;

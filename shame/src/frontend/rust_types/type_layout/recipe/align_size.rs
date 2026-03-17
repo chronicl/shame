@@ -68,7 +68,6 @@ impl SizedType {
             SizedType::Vector(v) => (v.byte_size(parent_repr), v.align(parent_repr)),
             SizedType::Matrix(m) => (m.byte_size(parent_repr), m.align(parent_repr)),
             SizedType::Atomic(a) => (a.byte_size(), a.align(parent_repr)),
-            SizedType::PackedVec(v) => (u8::from(v.byte_size()) as u64, v.align(parent_repr)),
             SizedType::Struct(s) => s.byte_size_and_align(),
         }
     }
@@ -78,7 +77,7 @@ impl SizedType {
         match self {
             SizedType::Struct(s) => s.change_all_repr(repr),
             SizedType::Array(s) => s.change_all_repr(repr),
-            SizedType::Atomic(_) | SizedType::PackedVec(_) | SizedType::Vector(_) | SizedType::Matrix(_) => {
+            SizedType::Atomic(_) | SizedType::Vector(_) | SizedType::Matrix(_) => {
                 // No repr to change for these types.
             }
         }

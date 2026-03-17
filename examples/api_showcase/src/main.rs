@@ -62,7 +62,7 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     //
     // note: vertex layouts support #[gpu_repr(packed)] to prevent padding
     // between fields of a struct, which often happens with 3 dimensional vectors
-    #[derive(sm::GpuLayout)]
+    #[derive(sm::VertexLayout)]
     struct MyVertexFormat {
         nor: sm::packed::snorm16x2,
         uv: sm::packed::unorm8x2,

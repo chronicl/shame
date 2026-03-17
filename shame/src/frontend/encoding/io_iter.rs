@@ -11,7 +11,7 @@ use crate::{
     frontend::{
         any::{
             Any, InvalidReason,
-            render_io::{Attrib, Location, VertexAttribFormat, VertexBufferLayout},
+            render_io::{VertexAttributeCooked, Location, VertexAttribFormat, VertexBufferLayout},
             shared_io::{BindPath, BindingType},
         },
         error::InternalError,
@@ -101,7 +101,7 @@ impl VertexBufferIter {
 /// be looked up once by a [`VertexIndex`] of a render pipeline.
 pub struct VertexBuffer<'a, T: VertexLayout> {
     slot: u32,
-    attribs_and_stride: Result<(Box<[Attrib]>, u64), InvalidReason>,
+    attribs_and_stride: Result<(Box<[VertexAttributeCooked]>, u64), InvalidReason>,
     phantom: PhantomData<&'a [T]>,
 }
 
@@ -117,12 +117,13 @@ impl<T: VertexLayout> VertexBuffer<'_, T> {
             // identical to what it would be in an `array<T>`. If the `T` itself is a struct that
             // uses #[gpu_repr(packed)], that makes `T`s alignment equal to 1 and therefore the
             // chosen repr here doesn't matter.
-            let stride_repr = Repr::default();
+            // let stride_repr = Repr::default();
 
-            let gpu_layout = get_layout_compare_with_cpu_push_error::<T>(ctx, Some(stride_repr));
+            // TODO(chronicl) implement something like this for VertexLayout
+            // let gpu_layout = get_layout_compare_with_cpu_push_error::<T>(ctx, Some(stride_repr));
 
-            let attribs_and_stride = Attrib::get_attribs_and_stride(&gpu_layout, &location_counter, stride_repr).ok_or_else(|| {
-                ctx.push_error(FrontendError::MalformedVertexBufferLayout(gpu_layout).into());
+            let attribs_and_stride = T::get_attributes_and_stride(&location_counter).ok_or_else(|| {
+                ctx.push_error(FrontendError::MalformedVertexBufferLayout.into());
                 InvalidReason::ErrorThatWasPushed
             });
 
@@ -150,7 +151,7 @@ fn ensure_locations_are_unique(
     slot: u32,
     ctx: &Context,
     rp: &ir::pipeline::WipRenderPipelineDescriptor,
-    new_attribs: &[Attrib],
+    new_attribs: &[VertexAttributeCooked],
 ) -> Result<(), PipelineError> {
     for vbuf in &rp.vertex_buffers {
         if vbuf.index == slot {

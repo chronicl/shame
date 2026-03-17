@@ -35,7 +35,6 @@ fn assert_derived_traits() {
 
             impl (sm::GpuStore    ) for T; // no packed vec, or gpu_repr(packed)
 
-            impl (sm::VertexLayout) for T; // only vecs
             impl (sm::BufferFields) for T; // support buffer bindings
             impl (sm::SizedFields ) for T; // BufferFields + all fields are sized
 
@@ -57,7 +56,23 @@ fn assert_derived_traits() {
             c: i32x1,
         }
 
-        #[derive(sm::GpuLayout)]
+        assert_impls!(
+            impl  (sm::GpuLayout   ) for T;
+
+            impl !(sm::GpuStore    ) for T;
+
+            impl !(sm::BufferFields) for T;
+            impl !(sm::SizedFields ) for T;
+
+            impl  (sm::GpuSized    ) for T;
+            impl  (sm::GpuAligned  ) for T;
+
+            impl  (sm::NoBools     ) for T;
+            impl  (sm::NoAtomics   ) for T;
+            impl  (sm::NoHandles   ) for T;
+        );
+
+        #[derive(sm::VertexLayout)]
         #[gpu_repr(packed)]
         struct R {
             a: sm::packed::unorm8x4,
@@ -66,32 +81,20 @@ fn assert_derived_traits() {
         }
 
         assert_impls!(
-            impl  (sm::GpuLayout   ) for T, R;
-
-            impl !(sm::GpuStore    ) for T, R;
-
-            impl  (sm::VertexLayout) for T, R;
-            impl !(sm::BufferFields) for T, R;
-            impl !(sm::SizedFields ) for T, R;
-
-            impl  (sm::GpuSized    ) for T, R;
-            impl  (sm::GpuAligned  ) for T, R;
-
-            impl  (sm::NoBools     ) for T, R;
-            impl  (sm::NoAtomics   ) for T, R;
-            impl  (sm::NoHandles   ) for T, R;
+            impl  (sm::VertexLayout) for R;
+            impl  (sm::any::FromAnys) for R;
         );
     }
 
     {
-        #[derive(sm::GpuLayout)]
+        #[derive(sm::VertexLayout)]
         struct T {
             a: sm::packed::unorm8x4,
             b: u32x1,
             c: i32x1,
         }
 
-        #[derive(sm::GpuLayout)]
+        #[derive(sm::VertexLayout)]
         struct R {
             b: u32x1,
             c: i32x1,
@@ -99,20 +102,8 @@ fn assert_derived_traits() {
         }
 
         assert_impls!(
-            impl  (sm::GpuLayout   ) for T, R;
-
-            impl !(sm::GpuStore    ) for T, R;
-
-            impl  (sm::VertexLayout) for T, R;
-            impl !(sm::BufferFields) for T, R;
-            impl !(sm::SizedFields ) for T, R;
-
-            impl  (sm::GpuSized    ) for T, R;
-            impl  (sm::GpuAligned  ) for T, R;
-
-            impl  (sm::NoBools     ) for T, R;
-            impl  (sm::NoAtomics   ) for T, R;
-            impl  (sm::NoHandles   ) for T, R;
+            impl  (sm::VertexLayout) for R;
+            impl  (sm::any::FromAnys) for R;
         );
     }
 

@@ -20,7 +20,7 @@ use crate::{
     },
     frontend::{
         any::{
-            render_io::{Attrib, ColorTarget, Location, VertexBufferLayout},
+            render_io::{VertexAttributeCooked, ColorTarget, Location, VertexBufferLayout},
             shared_io::{BindPath, BindingType},
         },
         encoding::{
@@ -679,7 +679,7 @@ impl<T> std::ops::DerefMut for RecordedWithIndex<T> {
 }
 
 impl WipRenderPipelineDescriptor {
-    pub fn find_vertex_attrib(&self, location: Location) -> Result<&Attrib, PipelineError> {
+    pub fn find_vertex_attrib(&self, location: Location) -> Result<&VertexAttributeCooked, PipelineError> {
         self.vertex_buffers
             .iter()
             .find_map(|vb| vb.attribs.iter().find(|attrib| attrib.location == location))

@@ -31,9 +31,7 @@ use crate::{
 pub struct EmptyRefFields;
 
 impl FromAnys for EmptyRefFields {
-    fn expected_num_anys() -> usize {
-        0
-    }
+    fn expected_num_anys() -> usize { 0 }
 
     #[track_caller]
     fn from_anys(anys: impl Iterator<Item = Any>) -> Self {
@@ -213,7 +211,7 @@ pub trait NoHandles {}
 /// * `sm::packed::PackedVec`s (e.g. `sm::packed::unorm8x4`)
 // Is at most 16 bytes according to https://www.w3.org/TR/WGSL/#input-output-locations
 // and thus GpuSized.
-pub trait VertexAttribute: GpuLayout + FromAnys + GpuSized {
+pub trait VertexAttribute: FromAnys {
     #[doc(hidden)] // runtime api
     fn vertex_attrib_format() -> VertexAttribFormat;
 }
@@ -238,7 +236,5 @@ pub trait GpuLayoutField {
 }
 
 impl<T: From<Any>> GpuLayoutField for T {
-    fn from_any(any: Any) -> Self {
-        T::from(any)
-    }
+    fn from_any(any: Any) -> Self { T::from(any) }
 }

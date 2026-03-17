@@ -131,21 +131,6 @@ impl<T: PackedScalarType, L: LenEven> NoBools for PackedVec<T, L> {}
 impl<T: PackedScalarType, L: LenEven> NoHandles for PackedVec<T, L> {}
 impl<T: PackedScalarType, L: LenEven> NoAtomics for PackedVec<T, L> {}
 
-impl<T: PackedScalarType, L: LenEven> GpuLayout for PackedVec<T, L> {
-    fn layout_recipe() -> recipe::TypeLayoutRecipe {
-        recipe::PackedVector {
-            scalar_type: T::SCALAR_TYPE,
-            bits_per_component: T::BITS_PER_COMPONENT,
-            len: L::LEN_EVEN,
-        }
-        .into()
-    }
-
-    fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
-        None
-    }
-}
-
 impl<T: PackedScalarType, L: LenEven> FromAnys for PackedVec<T, L> {
     fn expected_num_anys() -> usize { 1 }
 
@@ -157,11 +142,7 @@ impl<T: PackedScalarType, L: LenEven> From<Any> for PackedVec<T, L> {
     #[track_caller]
     fn from(any: Any) -> Self {
         let inner = Context::try_with(call_info!(), |ctx| {
-            let err = |ty| {
-                ctx.push_error_get_invalid_any(
-                    FrontendError::InvalidDowncastToNonShaderType(ty, gpu_layout::<Self>()).into(),
-                )
-            };
+            let err = |ty| ctx.push_error_get_invalid_any(FrontendError::InvalidDowncastOfPackedVec(ty).into());
             match any.ty() {
                 None => Unpackable::Unpacked(any.into()),
                 Some(ty) => match ty {

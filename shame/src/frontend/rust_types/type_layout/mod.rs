@@ -10,7 +10,7 @@ use crate::{
     any::U32PowerOf2,
     call_info,
     common::{ignore_eq::IgnoreInEqOrdHash, prettify::set_color},
-        ir::{self, ir_type::CanonName, recording::Context},
+    ir::{self, ir_type::CanonName, recording::Context},
 };
 use recipe::{Matrix, Vector, PackedVector};
 
@@ -39,10 +39,6 @@ pub(crate) mod recipe;
 pub enum TypeLayout {
     /// `vec<T, L>`
     Vector(VectorLayout),
-    /// special compressed vectors for vertex attribute types
-    ///
-    /// see the [`crate::packed`] module
-    PackedVector(PackedVectorLayout),
     /// `mat<T, Cols, Rows>`, first `Len2` is cols, 2nd `Len2` is rows
     Matrix(MatrixLayout),
     /// `Array<T>` and `Array<T, Size<N>>`
@@ -53,7 +49,7 @@ pub enum TypeLayout {
 
 impl Debug for TypeLayout {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // debug assertions should display the proper presentation of diffs, 
+        // debug assertions should display the proper presentation of diffs,
         // so we us the Display trait here, too
         write!(f, "{}", self)
     }
@@ -159,7 +155,6 @@ impl TypeLayout {
     pub fn byte_size(&self) -> Option<u64> {
         match self {
             TypeLayout::Vector(v) => Some(v.byte_size),
-            TypeLayout::PackedVector(p) => Some(p.byte_size),
             TypeLayout::Matrix(m) => Some(m.byte_size),
             TypeLayout::Array(a) => a.byte_size,
             TypeLayout::Struct(s) => s.byte_size,
@@ -170,7 +165,6 @@ impl TypeLayout {
     pub fn align(&self) -> U32PowerOf2 {
         match self {
             TypeLayout::Vector(v) => *v.align,
-            TypeLayout::PackedVector(p) => *p.align,
             TypeLayout::Matrix(m) => *m.align,
             TypeLayout::Array(a) => *a.align,
             TypeLayout::Struct(s) => *s.align,
@@ -184,7 +178,6 @@ impl TypeLayout {
         match self {
             TypeLayout::Vector(v) => &mut v.align,
             TypeLayout::Matrix(m) => &mut m.align,
-            TypeLayout::PackedVector(v) => &mut v.align,
             TypeLayout::Array(a) => &mut Rc::make_mut(a).align,
             TypeLayout::Struct(s) => &mut Rc::make_mut(s).align,
         }
@@ -217,7 +210,6 @@ impl TypeLayout {
         match self {
             TypeLayout::Vector(v) => Err(&mut v.byte_size),
             TypeLayout::Matrix(m) => Err(&mut m.byte_size),
-            TypeLayout::PackedVector(v) => Err(&mut v.byte_size),
             TypeLayout::Array(a) => Ok(&mut Rc::make_mut(a).byte_size),
             TypeLayout::Struct(s) => Ok(&mut Rc::make_mut(s).byte_size),
         }
@@ -232,10 +224,6 @@ impl TypeLayout {
 
 impl From<VectorLayout> for TypeLayout {
     fn from(layout: VectorLayout) -> Self { TypeLayout::Vector(layout) }
-}
-
-impl From<PackedVectorLayout> for TypeLayout {
-    fn from(layout: PackedVectorLayout) -> Self { TypeLayout::PackedVector(layout) }
 }
 
 impl From<MatrixLayout> for TypeLayout {

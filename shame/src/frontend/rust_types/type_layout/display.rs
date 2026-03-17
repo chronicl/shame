@@ -30,7 +30,6 @@ impl TypeLayout {
                     v.ty.to_string()
                 }
             }
-            PackedVector(v) => v.ty.to_string(),
             Matrix(m) => m.ty.to_string(),
             Array(a) => a.short_name(),
             Struct(s) => s.short_name(),
@@ -41,12 +40,12 @@ impl TypeLayout {
         use TypeLayout::*;
 
         match self {
-            Vector(_) | PackedVector(_) | Matrix(_) | Array(_) => {
+            Vector(_) | Matrix(_) | Array(_) => {
                 let plain = self.short_name();
 
                 let stride = match self {
                     Array(a) => Some(a.byte_stride),
-                    Vector(_) | PackedVector(_) | Matrix(_) | Struct(_) => None,
+                    Vector(_) | Matrix(_) | Struct(_) => None,
                 };
                 let info_offset = plain.len() + 1;
 
@@ -70,7 +69,9 @@ impl StructLayout {
     /// a short name for this `StructLayout`, useful for printing inline
     pub fn short_name(&self) -> String { self.name.to_string() }
 
-    pub(crate) fn writer(&self, layout_info: LayoutInfoFlags) -> StructWriter<'_> { StructWriter::new(self, layout_info) }
+    pub(crate) fn writer(&self, layout_info: LayoutInfoFlags) -> StructWriter<'_> {
+        StructWriter::new(self, layout_info)
+    }
 
     pub(crate) fn write<W: Write>(&self, f: &mut W, layout_info: LayoutInfoFlags) -> std::fmt::Result {
         use TypeLayout::*;
@@ -225,7 +226,7 @@ impl<'a> StructWriter<'a> {
                     field.ty.byte_size(),
                     match &field.ty {
                         Array(array) => Some(array.byte_stride),
-                        Vector(_) | PackedVector(_) | Matrix(_) | Struct(_) => None,
+                        Vector(_) | Matrix(_) | Struct(_) => None,
                     },
                 );
                 let info_offset = self.layout_info_offset();

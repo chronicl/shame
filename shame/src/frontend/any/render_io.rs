@@ -54,7 +54,7 @@ pub enum VertexLayoutError {
 /// location and format of a vertex attribute
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Attrib {
+pub struct VertexAttributeCooked {
     /// the byte-offset of the first occurence of this vertex attribute within the vertex buffer
     pub offset: u64,
     /// the vertex attribute location, which is used to associate the information of this struct
@@ -64,7 +64,7 @@ pub struct Attrib {
     pub format: VertexAttribFormat,
 }
 
-impl Attrib {
+impl VertexAttributeCooked {
     #[allow(missing_docs)]
     pub fn new(offset: u64, location: Location, format: VertexAttribFormat) -> Self {
         Self {
@@ -136,7 +136,7 @@ pub struct VertexBufferLayout {
     /// the buffer and the next occurence of that same attribute in the buffer.
     pub stride: u64,
     /// Location and layout information of each vertex attribute
-    pub attribs: Box<[Attrib]>,
+    pub attribs: Box<[VertexAttributeCooked]>,
 }
 
 /// a mask that specifies which color components should be written to and which
@@ -241,49 +241,6 @@ impl VertexAttribFormat {
             VertexAttribFormat::Fine(l, t) => SizedType::Vector(l, t.into()),
             VertexAttribFormat::Coarse(coarse) => coarse.decompressed_ty(),
         }
-    }
-}
-
-impl Attrib {
-    pub(crate) fn get_attribs_and_stride(
-        layout: &TypeLayout,
-        mut location_counter: &LocationCounter,
-        stride_repr: Repr,
-    ) -> Option<(Box<[Attrib]>, u64)> {
-        let stride = {
-            let size = layout.byte_size()?;
-            recipe::array_stride(layout.align(), size, stride_repr)
-        };
-        use TypeLayout::*;
-
-        let attribs: Box<[Attrib]> = match &layout {
-            Matrix(..) | Array(..) => return None,
-            Vector(v) => [Attrib {
-                offset: 0,
-                location: location_counter.next(),
-                format: VertexAttribFormat::Fine(v.ty.len, v.ty.scalar),
-            }]
-            .into(),
-            PackedVector(v) => [Attrib {
-                offset: 0,
-                location: location_counter.next(),
-                format: VertexAttribFormat::Coarse(v.ty),
-            }]
-            .into(),
-            Struct(rc) => try_collect(rc.fields.iter().map(|f| {
-                Some(Attrib {
-                    offset: f.rel_byte_offset,
-                    location: location_counter.next(),
-                    format: match &f.ty {
-                        Vector(v) => Some(VertexAttribFormat::Fine(v.ty.len, v.ty.scalar)),
-                        PackedVector(v) => Some(VertexAttribFormat::Coarse(v.ty)),
-                        Matrix(..) | Array(..) | Struct(..) => None,
-                    }?,
-                })
-            }))?,
-        };
-
-        Some((attribs, stride))
     }
 }
 

@@ -2,6 +2,8 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::format_ident;
 use quote::{quote, quote_spanned};
+use syn::Data;
+use syn::Fields;
 use syn::spanned::Spanned;
 use syn::Field;
 use syn::LitInt;
@@ -260,14 +262,6 @@ pub fn impl_for_struct(
                 }
             };
 
-            let impl_vertex_buffer_layout = quote! {
-                impl<#generics_decl> #re::VertexLayout for #derive_struct_ident<#(#idents_of_generics),*>
-                where
-                    #(#triv #field_type: #re::VertexAttribute,)*
-                    #where_clause_predicates
-                { }
-            };
-
             let impl_from_anys = quote! {
                 impl<#generics_decl> #re::FromAnys for #derive_struct_ident<#(#idents_of_generics),*>
                 where #where_clause_predicates {
@@ -348,7 +342,6 @@ pub fn impl_for_struct(
                 {
                     Ok(quote! {
                         #impl_gpu_layout
-                        #impl_vertex_buffer_layout
                         #impl_fake_auto_traits
                         #impl_from_anys
                     })
@@ -363,7 +356,6 @@ pub fn impl_for_struct(
 
                     Ok(quote! {
                         #impl_gpu_layout
-                        #impl_vertex_buffer_layout
                         #impl_fake_auto_traits
                         #impl_from_anys
 
@@ -605,4 +597,132 @@ pub fn impl_for_struct(
                         })
         }
     }
+}
+
+
+pub fn impl_vertex_layout(input: DeriveInput) -> Result<TokenStream2, syn::Error> {
+    let span = input.span();
+
+    let fields = match &input.data {
+        Data::Struct(data_struct) => match &data_struct.fields {
+            Fields::Named(named_fields) => named_fields,
+            Fields::Unnamed(_) | Fields::Unit => {
+                return Err(syn::Error::new(span, "Must be used on a struct with named fields"));
+            }
+        },
+        Data::Union(_) | Data::Enum(_) => return Err(syn::Error::new(span, "Must be used on a struct")),
+    };
+
+    let derive_struct_ident = &input.ident;
+    let vis = &input.vis;
+    let derive_struct_ref_ident = format_ident!("{derive_struct_ident}_ref");
+
+    let re: TokenStream2 = quote!(shame::__private::proc_macro_reexports);
+
+    if fields.named.is_empty() {
+        return Err(syn::Error::new_spanned(
+            fields,
+            format!("`derive(VertexLayout)` does not support empty structs"),
+        ));
+    }
+    let num_fields = fields.named.len();
+
+    // TODO(release) test all the different cases of generics and bounds
+    let util::Generics {
+        decl: generics_decl,
+        where_clause_predicates,
+        idents: idents_of_generics,
+    } = util::Generics::from_input(&input);
+
+    if let Some(first) = idents_of_generics.first() {
+        bail!(
+            first.span(),
+            format!("`derive(VertexLayout)` currently does not support generics")
+        )
+    }
+
+    if let Some(where_) = where_clause_predicates {
+        bail!(
+            where_.span(),
+            format!("`derive(VertexLayout)` currently does not support where clauses")
+        )
+    }
+
+    // we do lots of `Vec<_>` collection here, because `&Vec<_>` is copy and supports `quote` repetition,
+    // if we find another way of getting this without requiring `collect` replace all the vecs in here.
+    let field_vec = |f: fn(&Field) -> _| fields.named.iter().map(f).collect::<Vec<_>>();
+
+    // &vecs for repetitions
+    let field_vis = &field_vec(|f @ Field { vis, .. }| quote_spanned!(f.span() => #vis));
+    let field_ident = &field_vec(|f @ Field { ident, .. }| quote_spanned!(f.span() => #ident));
+    let field_type = &field_vec(|f @ Field { ty, .. }| quote_spanned!(f.span() => #ty   ));
+
+    // parse/validate attributes
+    // #[cpu(T)]
+    let cpu_attr = util::find_literal_list_attr::<syn::Type>("cpu", &input.attrs)?;
+    let cpu_equivalent_type = cpu_attr
+        .clone()
+        .map(|(span, ty)| quote_spanned! { span => #ty })
+        .into_iter();
+    let none_if_no_cpu_equivalent_type = cpu_attr.is_none().then_some(quote! { None }).into_iter();
+
+    let gpu_repr = util::try_find_gpu_repr(&input.attrs)?;
+    // if no `#[gpu_repr(_)]` attribute was explicitly specified, we default to `Repr::Wgsl`
+    let gpu_repr = gpu_repr.map(|(_, repr)| repr).unwrap_or(util::Repr::Wgsl);
+    let is_packed = match gpu_repr {
+        Repr::Packed => quote!(true),
+        Repr::Wgsl => quote!(false),
+    };
+
+    let impl_from_anys = quote! {
+        impl<#generics_decl> #re::FromAnys for #derive_struct_ident<#(#idents_of_generics),*>
+        where #where_clause_predicates {
+            fn expected_num_anys() -> usize {#num_fields}
+
+            #[track_caller]
+            fn from_anys(mut anys: impl Iterator<Item = #re::Any>) -> Self {
+                use #re::{
+                    collect_into_array_exact,
+                    push_wrong_amount_of_args_error
+                };
+
+                const EXPECTED_LEN: usize = #num_fields;
+                let [#(#field_ident),*] = match collect_into_array_exact::<#re::Any, EXPECTED_LEN>(anys) {
+                    Ok(t) => t,
+                    Err(actual_len) => {
+                        let any = push_wrong_amount_of_args_error(actual_len, EXPECTED_LEN, #re::call_info!());
+                        [any; EXPECTED_LEN]
+                    }
+                };
+
+                Self {
+                    #(#field_ident: <#field_type as #re::GpuLayoutField>::from_any(#field_ident)),*
+                }
+            }
+        }
+    };
+
+    Ok(quote! {
+        impl<#generics_decl> #re::VertexLayout for #derive_struct_ident<#(#idents_of_generics),*>
+        where
+            #(#field_type: #re::VertexAttribute,)*
+            #where_clause_predicates
+        {
+            const IS_STRUCT: bool = true;
+            const IS_PACKED: bool = #is_packed;
+            fn get_vertex_attributes() -> Vec<#re::VertexAttributeRecipe> {
+                vec![
+                    #(
+                        #re::VertexAttributeRecipe {
+                            format: <#field_type as #re::VertexAttribute>::vertex_attrib_format(),
+                            // TODO(chronicl) allow custom offset
+                            custom_offset: None
+                        }
+                    ),*
+                ]
+            }
+        }
+
+        #impl_from_anys
+    })
 }

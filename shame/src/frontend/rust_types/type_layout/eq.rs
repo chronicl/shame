@@ -98,11 +98,6 @@ pub(crate) fn try_find_mismatch(layout1: &TypeLayout, layout2: &TypeLayout) -> O
                 return Some(make_mismatch(TopLevelMismatch::Type));
             }
         }
-        (PackedVector(p1), PackedVector(p2)) => {
-            if p1.ty != p2.ty {
-                return Some(make_mismatch(TopLevelMismatch::Type));
-            }
-        }
         (Matrix(m1), Matrix(m2)) => {
             if m1.ty != m2.ty {
                 return Some(make_mismatch(TopLevelMismatch::Type));
@@ -137,7 +132,7 @@ pub(crate) fn try_find_mismatch(layout1: &TypeLayout, layout2: &TypeLayout) -> O
             return try_find_struct_mismatch(s1, s2);
         }
         // Different kinds entirely. Matching exhaustively, so that changes to TypeLayout lead us here.
-        (Vector(_) | PackedVector(_) | Matrix(_) | Array(_) | Struct(_), _) => {
+        (Vector(_) | Matrix(_) | Array(_) | Struct(_), _) => {
             return Some(make_mismatch(TopLevelMismatch::Type));
         }
     }
@@ -220,9 +215,7 @@ pub struct CheckEqLayoutMismatch {
 }
 
 impl std::fmt::Debug for CheckEqLayoutMismatch {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self}")
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{self}") }
 }
 
 impl Display for CheckEqLayoutMismatch {
@@ -254,9 +247,7 @@ pub(crate) enum DisplayMismatchError {
     FmtError(std::fmt::Error),
 }
 impl From<std::fmt::Error> for DisplayMismatchError {
-    fn from(err: std::fmt::Error) -> Self {
-        DisplayMismatchError::FmtError(err)
-    }
+    fn from(err: std::fmt::Error) -> Self { DisplayMismatchError::FmtError(err) }
 }
 
 impl CheckEqLayoutMismatch {
@@ -493,9 +484,9 @@ impl CheckEqLayoutMismatch {
                 }
 
                 match mismatch {
-                    StructMismatch::FieldName { field_index, .. }
-                    | StructMismatch::FieldLayout { field_index, .. }
-                    | StructMismatch::FieldOffset { field_index, .. } => {
+                    StructMismatch::FieldName { field_index, .. } |
+                    StructMismatch::FieldLayout { field_index, .. } |
+                    StructMismatch::FieldOffset { field_index, .. } => {
                         // Write mismatching field
                         enable_color(f, hex_left)?;
                         writer_left.write_field(f, field_index)?;

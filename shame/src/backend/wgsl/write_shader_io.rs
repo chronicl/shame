@@ -4,7 +4,7 @@ use super::{
     write_node::get_single_arg,
     WgslContext,
 };
-use crate::{frontend::any::render_io::Attrib, ir::pipeline::LateRecorded};
+use crate::{frontend::any::render_io::VertexAttributeCooked, ir::pipeline::LateRecorded};
 use crate::frontend::any::render_io::FragmentSampleMethod;
 use crate::frontend::any::render_io::FragmentSamplePosition;
 use crate::frontend::any::render_io::Location;
@@ -476,7 +476,7 @@ pub(super) fn prepare_io_definitions(stage: ShaderStage, ctx: &WgslContext) -> R
         ShaderStage::Vert => {
             let render_pipeline = ctx.ctx.render_pipeline();
             for vertex_buffer in &render_pipeline.vertex_buffers {
-                for Attrib {
+                for VertexAttributeCooked {
                     location,
                     offset,
                     format,

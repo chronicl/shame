@@ -3,7 +3,7 @@ use std::num::NonZeroU32;
 use std::rc::Rc;
 
 use super::{Comp4, Expr, NoMatchingSignature, TypeCheck};
-use crate::frontend::any::render_io::{Attrib, FragmentSampleMethod, Location};
+use crate::frontend::any::render_io::{VertexAttributeCooked, FragmentSampleMethod, Location};
 use crate::frontend::any::shared_io::BindPath;
 use crate::frontend::any::Any;
 use crate::frontend::encoding::fill::{Fill, PickVertex};
@@ -92,7 +92,7 @@ impl ShaderIo {
             }
             ShaderIo::GetVertexInput(loc) => {
                 let render_pipeline = ctx.render_pipeline();
-                let Attrib { format, .. } = render_pipeline.find_vertex_attrib(*loc)?;
+                let VertexAttributeCooked { format, .. } = render_pipeline.find_vertex_attrib(*loc)?;
                 Ok(sig!(
                     [] => format.type_in_shader()
                 )(self, args))
