@@ -11,7 +11,7 @@ use crate::{
         },
         error::InternalError,
     },
-    ir::{self, pipeline::StageMask, recording::Context, SizedStruct, StructureDefinitionError},
+    ir::{self, pipeline::StageMask, recording::Context, SizedStruct},
 };
 
 use std::{

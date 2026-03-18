@@ -34,6 +34,7 @@ pub mod pipeline_kind {
     pub use crate::frontend::encoding::pipeline_kind::Compute;
 }
 pub use frontend::encoding::EncodingError;
+pub use frontend::encoding::EncodingErrorKind;
 pub use frontend::encoding::EncodingErrors;
 pub use frontend::encoding::ThreadIsAlreadyEncoding;
 pub use frontend::encoding::features::DrawContext;
@@ -508,7 +509,7 @@ pub mod any {
     // address space and language compatibility checks
     pub use ir::type_layout::compatible_with::TypeLayoutCompatibleWith;
 
-    pub use crate::ir::ir_type::StructureDefinitionError;
+    pub use crate::ir::ir_type::StructDefinitionError;
     pub use crate::ir::ir_type::StructureFieldNamesMustBeUnique;
 
     // helpful cpu layout comparison (TODO should be made a function without args)

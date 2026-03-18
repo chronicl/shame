@@ -61,6 +61,10 @@ impl StructRegistry {
         call_info: CallInfo,
     ) -> bool {
         if !self.contains(s) {
+            if let Err(e) = check_struct_definition(s) {
+                Context::try_with(call_info, |ctx| ctx.push_error(e.into()));
+            }
+
             self.defs
                 .push((s.to_owned(), StructDef::new_for_struct(s, idents, call_info)));
             true
@@ -148,37 +152,6 @@ impl StructRegistry {
     pub fn definitions(&self) -> &[(StructKind, StructDef)] { &self.defs }
 }
 
-fn check_for_duplicate_field_names(
-    sized_fields: &[SizedField],
-    last_unsized: Option<&RuntimeSizedArrayField>,
-) -> Result<(), StructureFieldNamesMustBeUnique> {
-    // Brute force search > HashMap for the amount of fields
-    // we'd usually deal with.
-    let mut duplicate_fields = None;
-    for (i, field1) in sized_fields.iter().enumerate() {
-        for (j, field2) in sized_fields.iter().enumerate().skip(i + 1) {
-            if field1.name == field2.name {
-                duplicate_fields = Some((i, j));
-                break;
-            }
-        }
-        if let Some(last_unsized) = last_unsized {
-            if field1.name == last_unsized.name {
-                duplicate_fields = Some((i, sized_fields.len()));
-                break;
-            }
-        }
-    }
-    match duplicate_fields {
-        Some((first_occurence, second_occurence)) => Err(StructureFieldNamesMustBeUnique {
-            first_occurence,
-            second_occurence,
-        }),
-        None => Ok(()),
-    }
-}
-
-
 /// the precise definition of a struct type wrt. actual `Ident`s rather than just
 /// canonical names of fields etc.
 pub struct StructDef {
@@ -258,25 +231,123 @@ impl StructDef {
 
 #[allow(missing_docs)]
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum StructureDefinitionError {
+pub enum StructDefinitionError {
     #[error("{0} definitions require at least one field")]
     /// required by https://www.w3.org/TR/WGSL/#struct-types
-    MustHaveAtLeastOneField(StructKindVariant),
+    MustHaveAtLeastOneField(StructKind),
     #[error(transparent)]
     FieldNamesMustBeUnique(#[from] StructureFieldNamesMustBeUnique),
+}
+
+fn check_struct_definition(s: StructKindRef<'_>) -> Result<(), StructDefinitionError> {
+    if s.sized_fields().is_empty() && s.last_unsized().is_none() {
+        Err(StructDefinitionError::MustHaveAtLeastOneField(s.to_owned()))
+    } else {
+        check_for_duplicate_field_names(s).map_err(StructDefinitionError::FieldNamesMustBeUnique)
+    }
 }
 
 /// an error created if a struct contains two or more fields of the same name
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("{} and {} struct field have the same name. Field names must be unique within a structure definition",
-    numeral_suffix(self.first_occurence + 1),
-    numeral_suffix(self.second_occurence + 1)
+#[error("Field {} appears more than once in {}. Duplicate field names are not allowed in struct definitions.",
+    self.field_name,
+    self.s
 )]
 pub struct StructureFieldNamesMustBeUnique {
     pub first_occurence: usize,
     pub second_occurence: usize,
+    pub s: StructKind,
+    pub field_name: CanonName,
 }
 
-// TODO(chronicl) check every registered struct for duplicate field names
-// and having at least one field
+fn check_for_duplicate_field_names(s: StructKindRef<'_>) -> Result<(), StructureFieldNamesMustBeUnique> {
+    // Brute force search > HashMap for the amount of fields
+    // we'd usually deal with.
+    let mut duplicate_fields = None;
+    let sized_fields = s.sized_fields();
+    'a: for (i, field1) in sized_fields.iter().enumerate() {
+        for (j, field2) in sized_fields.iter().enumerate().skip(i + 1) {
+            if field1.name == field2.name {
+                duplicate_fields = Some((field1.name.clone(), i, j));
+                break 'a;
+            }
+        }
+        if let Some(last_unsized) = s.last_unsized() {
+            if field1.name == last_unsized.name {
+                duplicate_fields = Some((field1.name.clone(), i, sized_fields.len()));
+                break 'a;
+            }
+        }
+    }
+    match duplicate_fields {
+        Some((field_name, first_occurence, second_occurence)) => Err(StructureFieldNamesMustBeUnique {
+            first_occurence,
+            second_occurence,
+            field_name,
+            s: s.to_owned(),
+        }),
+        None => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{self as sm};
+    use sm::{ToGpuType, EncodingErrorKind};
+    use sm::any::{AsAny, Repr, SizedStruct, StructDefinitionError, SizedField, Vector, ScalarType, Len, Any};
+
+    macro_rules! assert_error_is_present {
+        ($errors:expr, $error:pat) => {
+            match $errors {
+                Ok(_) => panic!("Expected an error due to duplicate field names"),
+                Err(es) => {
+                    let mut found = false;
+                    for e in es.into_iter() {
+                        match e.error {
+                            $error => {
+                                found = true;
+                                break;
+                            }
+                            _ => {}
+                        }
+                    }
+                    assert!(found, "Expected error {}", stringify!($error));
+                }
+            }
+        };
+    }
+
+    #[test]
+    fn test_struct_duplicate_field_name_error() {
+        let mut encoder = sm::start_encoding(Default::default()).unwrap();
+        let pipeline = encoder.new_compute_pipeline([1]);
+        let s = SizedStruct::new(
+            "DuplicateFieldStruct",
+            vec![
+                SizedField::new("a", Vector::new(ScalarType::F32, Len::X1)),
+                SizedField::new("a", Vector::new(ScalarType::F32, Len::X1)),
+            ],
+            Repr::Wgsl,
+        );
+        let a = Any::new_struct(s, &[1.0f32.to_gpu().as_any(), 2.0f32.to_gpu().as_any()]);
+
+        assert_error_is_present!(
+            encoder.finish(),
+            EncodingErrorKind::StructDefinitionError(StructDefinitionError::FieldNamesMustBeUnique(_))
+        );
+    }
+
+    #[test]
+    fn test_struct_empty_error() {
+        let mut encoder = sm::start_encoding(Default::default()).unwrap();
+        let pipeline = encoder.new_compute_pipeline([1]);
+        let s = SizedStruct::new("A", vec![], Repr::Wgsl);
+        let a = Any::new_struct(s, &[]);
+
+        assert_error_is_present!(
+            encoder.finish(),
+            EncodingErrorKind::StructDefinitionError(StructDefinitionError::MustHaveAtLeastOneField(_))
+        );
+    }
+}

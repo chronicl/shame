@@ -22,7 +22,7 @@ pub use ir_type::PackedVector;
 
 pub use ir_type::StructRegistry;
 pub use ir_type::StructDef;
-pub use ir_type::StructureDefinitionError;
+pub use ir_type::StructDefinitionError;
 pub use ir_type::StructureFieldNamesMustBeUnique;
 
 pub use expr::AtomicModify;

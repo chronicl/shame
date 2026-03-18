@@ -19,15 +19,16 @@ use crate::{
             io_iter::{BindGroupIter, VertexBufferIter},
             rasterizer::{PrimitiveAssembly, VertexStage},
         },
-        rust_types::{layout_traits::CpuLayoutCompareError},
+        rust_types::layout_traits::CpuLayoutCompareError,
     },
     ir::{
+        ir_type::StructDefinitionError,
         pipeline::{PipelineError, PipelineKind, StageSolverErrorKind},
         recording::{
             AllocError, BlockError, CallInfo, Context, FnError, NodeRecordingError, StmtError, ThreadContextGuard,
             next_thread_generation,
         },
-        type_layout::{compatible_with::AddressSpaceError},
+        type_layout::compatible_with::AddressSpaceError,
     },
     try_ctx_track_caller,
 };
@@ -270,6 +271,7 @@ impl std::fmt::Display for EncodingErrors {
     }
 }
 
+#[allow(missing_docs)] // errors are self documenting via the message above
 #[derive(thiserror::Error, Debug)]
 pub enum EncodingErrorKind {
     #[error("{0}")]
@@ -289,6 +291,8 @@ pub enum EncodingErrorKind {
     },
     #[error("{0}")]
     LayoutError(#[from] CpuLayoutImplMismatch),
+    #[error("{0}")]
+    StructDefinitionError(#[from] StructDefinitionError),
     #[error("`shame::any::Any` instance is not available. reason: {0}")]
     ValueUnavailable(InvalidReason),
     #[error("{0}")]
@@ -322,6 +326,7 @@ pub enum EncodingErrorKind {
 }
 
 impl EncodingErrorKind {
+    /// (no documentation yet)
     pub fn is_because_of_previous_error(&self) -> bool {
         match self {
             EncodingErrorKind::ValueUnavailable(reason) => matches!(reason, InvalidReason::ErrorThatWasPushed),

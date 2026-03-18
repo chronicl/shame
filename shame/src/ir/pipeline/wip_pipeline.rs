@@ -36,7 +36,7 @@ use crate::{
         rust_types::{len::x3},
     },
     ir::{
-        self, FragmentShadingRate, Node, SizedField, SizedStruct, SizedType, StoreType, StructureDefinitionError,
+        self, FragmentShadingRate, Node, SizedField, SizedStruct, SizedType, StoreType, StructDefinitionError,
         StructureFieldNamesMustBeUnique, TextureFormatWrapper, Type,
         expr::{BuiltinShaderIo, Interpolator, ShaderIo},
         recording::{BuiltinTemplateStructs, CallInfo, Context, NodeRecordingError},

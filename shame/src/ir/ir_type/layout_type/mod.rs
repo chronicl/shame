@@ -227,9 +227,8 @@ impl From<RuntimeSizedArray> for LayoutType {
 
 // Struct helpers
 
-
 /// Enum of sized or unsized struct
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StructKind {
     /// Sized struct
     Sized(SizedStruct),
@@ -256,6 +255,15 @@ impl StructKind {
         match self {
             StructKind::Sized(s) => StructKindRef::Sized(s),
             StructKind::Unsized(s) => StructKindRef::Unsized(s),
+        }
+    }
+}
+
+impl std::fmt::Display for StructKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StructKind::Sized(s) => s.fmt(f),
+            StructKind::Unsized(s) => s.fmt(f),
         }
     }
 }
@@ -300,9 +308,7 @@ impl StructKindRef<'_> {
             StructKindRef::Unsized(s) => StructKind::Unsized((*s).clone()),
         }
     }
-}
 
-impl StructKindRef<'_> {
     /// (no documentation yet)
     pub fn name(&self) -> &CanonName {
         match self {
@@ -365,6 +371,15 @@ impl StructKindRef<'_> {
             .iter()
             .map(|f| &f.name)
             .chain(self.last_unsized().as_ref().map(|f| &f.name))
+    }
+}
+
+impl std::fmt::Display for StructKindRef<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StructKindRef::Sized(s) => s.fmt(f),
+            StructKindRef::Unsized(s) => s.fmt(f),
+        }
     }
 }
 
