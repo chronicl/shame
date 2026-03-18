@@ -1,6 +1,6 @@
-use layout::Repr;
+use any::Repr;
 use shame::{
-    any::{self, layout},
+    any::{self},
     ArrayLen, GpuSized, GpuType, Len, Len2, NoBools, ScalarType, ScalarTypeFp, ScalarTypeInteger, SizedFields,
 };
 
@@ -61,13 +61,13 @@ where
     shame::vec<T, L>: NoBools,
 {
     const LAYOUT: Layout = {
-        let v = layout::Vector::new(
+        let v = any::Vector::new(
             match T::SCALAR_TYPE {
-                any::ScalarType::F16 => layout::ScalarType::F16,
-                any::ScalarType::F32 => layout::ScalarType::F32,
-                any::ScalarType::F64 => layout::ScalarType::F64,
-                any::ScalarType::I32 => layout::ScalarType::I32,
-                any::ScalarType::U32 => layout::ScalarType::U32,
+                any::ScalarType::F16 => any::ScalarType::F16,
+                any::ScalarType::F32 => any::ScalarType::F32,
+                any::ScalarType::F64 => any::ScalarType::F64,
+                any::ScalarType::I32 => any::ScalarType::I32,
+                any::ScalarType::U32 => any::ScalarType::U32,
                 any::ScalarType::Bool => panic!("NoBools checked above"),
             },
             L::LEN,
@@ -81,7 +81,7 @@ where
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> NoPadding for shame::mat<T, C, R> {
     const LAYOUT: Layout = {
-        let m = layout::Matrix {
+        let m = any::Matrix {
             columns: C::LEN2,
             rows: R::LEN2,
             scalar: T::SCALAR_TYPE_FP,
@@ -95,7 +95,7 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> NoPadding for shame::mat<T, C, R> {
 
 impl<T: ScalarTypeInteger> NoPadding for shame::Atomic<T> {
     const LAYOUT: Layout = {
-        let a = layout::Atomic {
+        let a = any::Atomic {
             scalar: T::SCALAR_TYPE_INTEGER,
         };
         Layout::from_align_size(a.align(Repr::Wgsl).as_u32() as usize, Some(a.byte_size() as usize))

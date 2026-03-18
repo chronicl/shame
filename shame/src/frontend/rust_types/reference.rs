@@ -387,6 +387,8 @@ impl_ref_binop!(Shr, shr);
 
 #[test]
 fn test_ref_ops() {
+    let mut enc = crate::start_encoding(Default::default()).unwrap();
+    enc.new_render_pipeline(Default::default());
     macro_rules! test_ops {
         ($a:expr, $ax2:expr) => {
             let a = $a;

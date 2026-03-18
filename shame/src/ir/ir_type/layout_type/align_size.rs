@@ -116,6 +116,7 @@ impl UnsizedStruct {
         FieldOffsetsUnsized::new(&self.sized_fields, &self.last_unsized, self.repr)
     }
 
+    /// Size of the struct ignoring the last unsized field
     pub fn min_byte_size(&self) -> u64 {
         FieldOffsetsSized(FieldOffsets::new(&self.sized_fields, self.repr))
             .struct_byte_size_and_align()

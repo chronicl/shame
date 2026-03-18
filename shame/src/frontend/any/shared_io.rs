@@ -153,26 +153,6 @@ pub enum BindingError {
     NonRefBufferRequiresReadOnlyAndConstructible,
 }
 
-fn layout_to_store_type(recipe: &LayoutType, binding_ty: &BindingType) -> Result<StoreType, EncodingErrorKind> {
-    let store_type: ir::StoreType = recipe
-        .clone()
-        .try_into()
-        .map_err(|e| BindingError::TypeNotStoreable(recipe.clone(), binding_ty.clone(), e))?;
-
-    // https://www.w3.org/TR/WGSL/#host-shareable-types
-    if !store_type.is_host_shareable() {
-        return Err(InternalError::new(
-            true,
-            format!(
-                "TypeLayoutRecipe to StoreType conversion did not result in a host-shareable type. TypeLayoutRecipe:\n{recipe}",
-            ),
-        )
-        .into());
-    }
-
-    Ok(store_type)
-}
-
 fn record_and_register_binding(
     ctx: &Context,
     path: BindPath,
@@ -239,7 +219,7 @@ impl Any {
                 },
                 has_dynamic_offset,
             };
-            let store_type = layout_to_store_type(layout.recipe(), &binding_type)?;
+            let store_type: StoreType = layout.recipe().clone().into();
             let store_type = StoreType::BindingArray(Rc::new(store_type), binding_array_len);
 
             let ty = Type::Ref(
@@ -287,7 +267,7 @@ impl Any {
                 },
                 has_dynamic_offset,
             };
-            let store_type = layout_to_store_type(layout.recipe(), &binding_type)?;
+            let store_type: StoreType = layout.recipe().clone().into();
 
             let ty = Type::Ref(
                 MemoryRegion::new(
@@ -395,7 +375,7 @@ impl Any {
     /// > struct being visible or invisible in a given shader stage.
     #[track_caller]
     pub fn next_push_constants_field_sized(
-        recipe_ty: SizedType,
+        ty: SizedType,
         custom_min_size: Option<u64>,
         custom_min_align: Option<U32PowerOf2>,
     ) -> Any {
@@ -403,15 +383,8 @@ impl Any {
             let mut push_constants = &mut ctx.pipeline_layout_mut().push_constants;
             let field_index = push_constants.len();
 
-            let ty = match ir::SizedType::try_from(recipe_ty.clone()) {
-                Ok(s) => s,
-                Err(e) => {
-                    ctx.push_error(e.into());
-                    return Any::new_invalid(InvalidReason::ErrorThatWasPushed);
-                }
-            };
-            let store_ty = StoreType::Sized(ty.clone());
-            if let Err(e) = TypeLayoutCompatibleWith::<mem::Storage>::try_from(Language::Wgsl, recipe_ty.into()) {
+            let store_ty: StoreType = ty.clone().into();
+            if let Err(e) = TypeLayoutCompatibleWith::<mem::Storage>::try_from(Language::Wgsl, ty.clone().into()) {
                 ctx.push_error(e.into());
             }
 
@@ -471,7 +444,7 @@ impl Any {
                     .collect()
                 }
                 LayoutType::Sized(SizedType::Struct(s)) => s
-                    .fields()
+                    .fields
                     .iter()
                     .map(|f| Any::next_push_constants_field_sized(f.ty.clone(), f.custom_min_size, f.custom_min_align))
                     .collect(),

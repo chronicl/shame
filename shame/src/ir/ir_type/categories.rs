@@ -106,6 +106,7 @@ impl StoreType {
 }
 
 impl LayoutType {
+    /// Whether LayoutType is host shareable (wgsl spec)
     pub fn is_host_shareable(&self) -> bool {
         match self {
             LayoutType::Sized(sized) => sized.is_host_shareable(),
@@ -117,6 +118,7 @@ impl LayoutType {
         }
     }
 
+    /// Whether LayoutType contains atomics
     pub fn contains_atomics(&self) -> bool {
         match self {
             LayoutType::Sized(sized) => sized.contains_atomics(),

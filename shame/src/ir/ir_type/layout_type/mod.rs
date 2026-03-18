@@ -91,6 +91,7 @@ pub struct Atomic {
 }
 
 impl Atomic {
+    /// Creates a new atomic with the provided scalar type.
     pub fn new(scalar: ScalarTypeInteger) -> Self { Self { scalar } }
 }
 
@@ -183,6 +184,7 @@ impl RuntimeSizedArrayField {
         }
     }
 
+    /// [`SizedType`] of the elements of the array
     pub fn element_ty(&self) -> &SizedType { &self.array.element }
 }
 
@@ -226,13 +228,30 @@ impl From<RuntimeSizedArray> for LayoutType {
 // Struct helpers
 
 
+/// Enum of sized or unsized struct
 #[derive(Debug, Clone)]
 pub enum StructKind {
+    /// Sized struct
     Sized(SizedStruct),
+    /// Unsized struct
     Unsized(UnsizedStruct),
 }
 
 impl StructKind {
+    /// New Self
+    pub fn new(
+        name: impl Into<CanonName>,
+        sized_fields: Vec<SizedField>,
+        last_unsized: Option<RuntimeSizedArrayField>,
+        repr: Repr,
+    ) -> Self {
+        match last_unsized {
+            Some(last_unsized) => UnsizedStruct::new(name, sized_fields, last_unsized, repr).into(),
+            None => SizedStruct::new(name, sized_fields, repr).into(),
+        }
+    }
+
+    /// Makes Self an enum over a reference of a sized or a reference of an unsized strucct
     pub fn as_ref(&self) -> StructKindRef<'_> {
         match self {
             StructKind::Sized(s) => StructKindRef::Sized(s),
@@ -256,9 +275,12 @@ impl From<UnsizedStruct> for StructKind {
     fn from(value: UnsizedStruct) -> Self { StructKind::Unsized(value) }
 }
 
+/// Ref equivalent of [`StructKind`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StructKindRef<'a> {
+    /// Sized struct
     Sized(&'a SizedStruct),
+    /// Unsized struct
     Unsized(&'a UnsizedStruct),
 }
 
@@ -271,6 +293,7 @@ impl<'a> From<&'a UnsizedStruct> for StructKindRef<'a> {
 }
 
 impl StructKindRef<'_> {
+    /// Clones the inner reference and returns a [`StructKind`]
     pub fn to_owned(&self) -> StructKind {
         match self {
             StructKindRef::Sized(s) => StructKind::Sized((*s).clone()),
@@ -280,6 +303,7 @@ impl StructKindRef<'_> {
 }
 
 impl StructKindRef<'_> {
+    /// (no documentation yet)
     pub fn name(&self) -> &CanonName {
         match self {
             StructKindRef::Sized(s) => &s.name,
@@ -287,6 +311,7 @@ impl StructKindRef<'_> {
         }
     }
 
+    /// (no documentation yet)
     pub fn sized_fields(&self) -> &[SizedField] {
         match self {
             StructKindRef::Sized(s) => &s.fields,
@@ -294,6 +319,7 @@ impl StructKindRef<'_> {
         }
     }
 
+    /// (no documentation yet)
     pub fn last_unsized(&self) -> Option<&RuntimeSizedArrayField> {
         match self {
             StructKindRef::Sized(_) => None,
@@ -301,6 +327,7 @@ impl StructKindRef<'_> {
         }
     }
 
+    /// (no documentation yet)
     pub fn repr(&self) -> Repr {
         match self {
             StructKindRef::Sized(s) => s.repr,
@@ -308,6 +335,7 @@ impl StructKindRef<'_> {
         }
     }
 
+    /// Copy enum of the struct kind
     pub fn kind(&self) -> StructKindVariant {
         match self {
             StructKindRef::Sized(_) => StructKindVariant::Sized,
@@ -315,6 +343,7 @@ impl StructKindRef<'_> {
         }
     }
 
+    /// (no documentation yet)
     pub fn find_field(&self, name: &CanonName) -> Option<LayoutType> {
         self.sized_fields()
             .iter()
@@ -327,8 +356,10 @@ impl StructKindRef<'_> {
             })
     }
 
+    /// (no documentation yet)
     pub fn is_empty(&self) -> bool { self.sized_fields().is_empty() && self.last_unsized().is_none() }
 
+    /// (no documentation yet)
     pub fn field_names(&self) -> impl Iterator<Item = &CanonName> {
         self.sized_fields()
             .iter()

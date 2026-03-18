@@ -69,6 +69,7 @@ impl LayoutType {
 }
 
 impl SizedStruct {
+    /// New Self
     pub fn new(name: impl Into<CanonName>, fields: Vec<SizedField>, repr: Repr) -> Self {
         Self {
             name: name.into(),
@@ -79,6 +80,7 @@ impl SizedStruct {
 }
 
 impl UnsizedStruct {
+    /// New Self
     pub fn new(
         name: impl Into<CanonName>,
         sized_fields: Vec<SizedField>,

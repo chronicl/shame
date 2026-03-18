@@ -25,6 +25,7 @@ use crate::{
     ir::recording::{CallInfo, Priority},
 };
 
+#[doc(hidden)]
 #[derive(Default)]
 pub struct StructRegistry {
     /// "topologically sorted" list of structure definitions
@@ -35,6 +36,7 @@ pub struct StructRegistry {
 }
 
 impl StructRegistry {
+    /// (no documentation yet)
     pub fn get(&self, s: StructKindRef<'_>) -> Option<&StructDef> {
         //TODO(release) this is quite inefficient because of the struct equals check on _every_ registered struct
         // consider using a different datastructure + representing the topological sort differently
@@ -86,6 +88,7 @@ impl StructRegistry {
         self.register_single_struct(s, idents, call_info);
     }
 
+    /// (no documentation yet)
     pub fn find_and_register_new_structs_used_in_type(
         &mut self,
         t: &Type,
@@ -100,6 +103,7 @@ impl StructRegistry {
         }
     }
 
+    /// (no documentation yet)
     pub fn find_and_register_new_structs_used_in_store_type(
         &mut self,
         t: &StoreType,
@@ -123,6 +127,7 @@ impl StructRegistry {
         }
     }
 
+    /// (no documentation yet)
     pub fn find_and_register_new_structs_used_in_sized_type(
         &mut self,
         t: &SizedType,
@@ -136,8 +141,10 @@ impl StructRegistry {
         }
     }
 
+    /// (no documentation yet)
     pub fn contains(&mut self, s: StructKindRef<'_>) -> bool { self.defs.iter().any(|(x, _)| x.as_ref() == s) }
 
+    /// (no documentation yet)
     pub fn definitions(&self) -> &[(StructKind, StructDef)] { &self.defs }
 }
 
@@ -184,6 +191,7 @@ pub struct StructDef {
 }
 
 impl StructDef {
+    /// (no documentation yet)
     pub fn new_for_struct(s: StructKindRef<'_>, idents: &mut PoolRefMut<Ident>, call_info: CallInfo) -> Self {
         StructDef {
             call_info,
@@ -202,12 +210,16 @@ impl StructDef {
         }
     }
 
+    /// (no documentation yet)
     pub fn call_info(&self) -> CallInfo { self.call_info }
 
+    /// (no documentation yet)
     pub fn canonical_name(&self) -> &CanonName { &self.name }
 
+    /// (no documentation yet)
     pub fn ident(&self) -> Key<Ident> { self.ident }
 
+    /// (no documentation yet)
     pub fn get_field_ident(&self, canonical_name: &CanonName) -> Option<&Key<Ident>> {
         self.sized_fields
             .iter()
@@ -220,6 +232,8 @@ impl StructDef {
             })
     }
 
+    /// Iterator over (ident, align, size, ty).
+    /// Clones each LayoutType, so this is relatively expensive.
     pub fn fields(&self) -> impl Iterator<Item = (&Key<Ident>, Option<U32PowerOf2>, Option<u64>, LayoutType)> + '_ {
         self.sized_fields
             .iter()

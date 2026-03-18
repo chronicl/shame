@@ -221,8 +221,8 @@ pub fn impl_for_struct(
                     #last_field_type: #re::NoBools + #re::NoHandles + #re::GpuLayout,
                     #where_clause_predicates
                 {
-                    fn layout_recipe() -> #re::TypeLayoutRecipe {
-                        let result = #re::TypeLayoutRecipe::struct_from_parts(
+                    fn layout_recipe() -> #re::LayoutType {
+                        let result = #re::LayoutType::struct_from_parts(
                             std::stringify!(#derive_struct_ident),
                             [
                                 #((
@@ -394,7 +394,7 @@ pub fn impl_for_struct(
                                 }
                             }
 
-                            fn get_bufferblock_type() -> #re::ir::BufferBlock {
+                            fn get_struct_kind() -> #re::ir::StructKind {
                                 let mut fields = std::vec::Vec::from([
                                     #(
                                         #re::ir::SizedField {
@@ -428,23 +428,17 @@ pub fn impl_for_struct(
                                             last_unsized = Some(#re::ir::RuntimeSizedArrayField {
                                                 name: std::stringify!(#last_field_ident).into(),
                                                 custom_min_align: #last_field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")),
-                                                element_ty
+                                                array: #re::RuntimeSizedArray::new(element_ty)
                                             }),
                                     }
                                 }
 
-                                use #re::BufferBlockDefinitionError as E;
-                                match #re::ir::BufferBlock::new(
-                                    std::stringify!(#derive_struct_ident).into(),
+                                #re::StructKind::new(
+                                    std::stringify!(#derive_struct_ident),
                                     fields,
-                                    last_unsized
-                                ) {
-                                    Ok(t) => t,
-                                    Err(e) => match e {
-                                        E::MustHaveAtLeastOneField => unreachable!(">= 1 field is ensured by derive macro"),
-                                        E::FieldNamesMustBeUnique(_) => unreachable!("unique field idents are ensured by rust struct definition"),
-                                    }
-                                }
+                                    last_unsized,
+                                    #gpu_repr_shame
+                                )
                             }
                         }
 
@@ -461,7 +455,7 @@ pub fn impl_for_struct(
                             }
 
                             fn impl_category() -> #re::GpuStoreImplCategory {
-                                #re::GpuStoreImplCategory::Fields(<Self as #re::BufferFields>::get_bufferblock_type())
+                                #re::GpuStoreImplCategory::Fields(<Self as #re::BufferFields>::get_struct_kind())
                             }
                         }
 
@@ -471,29 +465,20 @@ pub fn impl_for_struct(
                             #where_clause_predicates
                         {
                             fn get_sizedstruct_type() -> #re::ir::SizedStruct {
-                                let struct_ = #re::ir::SizedStruct::new_nonempty(
-                                    std::stringify!(#derive_struct_ident).into(),
+                                #re::ir::SizedStruct::new(
+                                    std::stringify!(#derive_struct_ident),
                                     std::vec::Vec::from([
                                         #(
                                             #re::ir::SizedField {
-                                                name: std::stringify!(#first_fields_ident).into(),
-                                                custom_min_size: #first_fields_size,
-                                                custom_min_align: #first_fields_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")),
+                                                name: std::stringify!(#field_ident).into(),
+                                                custom_min_size: #field_size,
+                                                custom_min_align: #field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")),
                                                 ty: <#first_fields_type as #re::GpuSized>::sized_ty(),
                                             }
                                         ),*
                                     ]),
-                                    #re::ir::SizedField {
-                                        name: std::stringify!(#last_field_ident).into(),
-                                        custom_min_size: #last_field_size,
-                                        custom_min_align: #last_field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")),
-                                        ty: <#last_field_type as #re::GpuSized>::sized_ty(),
-                                    }
-                                );
-                                match struct_ {
-                                    Ok(s) => s,
-                                    Err(#re::ir::StructureFieldNamesMustBeUnique { .. }) => unreachable!("field name uniqueness is checked by rust"),
-                                }
+                                    #gpu_repr_shame
+                                )
                             }
                         }
 
