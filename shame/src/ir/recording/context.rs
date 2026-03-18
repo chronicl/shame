@@ -136,6 +136,15 @@ impl Context {
         })
     }
 
+    /// fallible version of `with`. Returns an invalid Any created with `InvalidReason::CreatedWithNoActiveEncoding`
+    #[allow(clippy::manual_map)] //map would make the callstack deeper, bad for debugging experience
+    pub fn try_with_or_invalid_any<R>(call_info: CallInfo, f: impl FnOnce(&Context) -> R) -> Result<R, Any> {
+        CONTEXT.with(|ctx| match ctx.borrow().as_ref() {
+            Some(ctx) => Ok(with_updated_latest_user_caller!(call_info, ctx, f(ctx))),
+            None => Err(Any::new_invalid(InvalidReason::CreatedWithNoActiveEncoding)),
+        })
+    }
+
     /// returns the latest user caller info, appropriate for display in
     /// error messages or "shader code <-> rust" mapping
     pub(crate) fn latest_user_caller(&self) -> CallInfo {
