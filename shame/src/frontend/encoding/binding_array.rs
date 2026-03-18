@@ -2,26 +2,21 @@
 use std::{rc::Rc, sync::atomic::AtomicU64};
 
 use crate::{
-    any::{
-        layout::{Repr, RuntimeSizedArrayField, SizedStruct, SizedType, TypeLayoutRecipe, UnsizedStruct},
-        Any, BindingType,
-    },
+    AccessModeReadable, ArrayLen, Binding, Buffer, BufferAddressSpace, BufferContent, GpuIndex, GpuLayout, GpuStore,
+    NoAtomics, NoBools, NoHandles, RuntimeSize,
+    any::{Any, BindingType},
     call_info,
     common::proc_macro_reexports::BindingArgs,
     frontend::{
         any::InvalidReason,
         encoding::{binding::TextureHandle, buffer::BufferAddressSpaceEnum},
-        rust_types::{
-            layout_traits::get_layout_compare_with_cpu_push_error,
-            mem,
-            type_layout::{compatible_with::TypeLayoutCompatibleWith, recipe},
-            vec::ToInteger,
-        },
+        rust_types::{layout_traits::get_layout_compare_with_cpu_push_error, mem, vec::ToInteger},
     },
-    ir::{recording::Context, StoreType},
+    ir::{
+        self, LayoutType, Repr, RuntimeSizedArrayField, SizedField, SizedStruct, SizedType, StoreType, UnsizedStruct,
+        recording::Context, type_layout::compatible_with::TypeLayoutCompatibleWith,
+    },
     mem::Storage,
-    AccessModeReadable, ArrayLen, Binding, Buffer, BufferAddressSpace, BufferContent, GpuIndex, GpuLayout, GpuStore,
-    NoAtomics, NoBools, NoHandles, RuntimeSize,
 };
 
 // struct registration handles deduplication of struct names,
@@ -77,12 +72,17 @@ where
             let recipe = T::layout_recipe();
             let (recipe, is_generated_struct) = match recipe {
                 // already structs
-                TypeLayoutRecipe::Sized(SizedType::Struct(_)) | TypeLayoutRecipe::UnsizedStruct(_) => (recipe, false),
-                TypeLayoutRecipe::Sized(s) => (
-                    SizedStruct::new(GENERATED_STRUCT_NAME, GENERATED_STRUCT_FIELD_NAME, s, Repr::Wgsl).into(),
+                LayoutType::Sized(SizedType::Struct(_)) | LayoutType::UnsizedStruct(_) => (recipe, false),
+                LayoutType::Sized(s) => (
+                    SizedStruct::new(
+                        GENERATED_STRUCT_NAME,
+                        vec![SizedField::new(GENERATED_STRUCT_FIELD_NAME, s)],
+                        Repr::Wgsl,
+                    )
+                    .into(),
                     true,
                 ),
-                TypeLayoutRecipe::RuntimeSizedArray(a) => (
+                LayoutType::RuntimeSizedArray(a) => (
                     UnsizedStruct {
                         name: GENERATED_STRUCT_NAME.into(),
                         sized_fields: Vec::new(),

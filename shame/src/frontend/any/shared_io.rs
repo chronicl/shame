@@ -2,9 +2,7 @@ use std::fmt::Display;
 use std::num::{NonZeroU32, NonZeroU64};
 use std::rc::Rc;
 
-use crate::any::layout::TypeLayoutRecipe;
 use crate::backend::language::Language;
-use crate::frontend::rust_types::type_layout::recipe;
 use crate::{call_info, mem, BufferAddressSpace};
 use crate::common::po2::U32PowerOf2;
 use crate::frontend::any::Any;
@@ -12,15 +10,13 @@ use crate::frontend::any::{record_node, InvalidReason};
 use crate::frontend::encoding::buffer::BufferAddressSpaceEnum;
 use crate::frontend::encoding::{EncodingErrorKind, EncodingGuard};
 use crate::frontend::error::InternalError;
-use crate::frontend::rust_types::type_layout::compatible_with::{
-    self, AddressSpaceError, RequirementsNotSatisfied, TypeLayoutCompatibleWith,
-};
+use crate::ir::type_layout::compatible_with::{self, AddressSpaceError, RequirementsNotSatisfied, TypeLayoutCompatibleWith};
 use crate::ir::expr::Binding;
 use crate::ir::expr::Expr;
 use crate::ir::ir_type::{AccessModeReadable, HandleType, SamplesPerPixel};
 use crate::ir::pipeline::{PipelineError, StageMask, WipBinding, WipPushConstantsField};
 use crate::ir::recording::{Context, MemoryRegion};
-use crate::ir::{self, AddressSpace, StoreType, TextureFormatWrapper, TextureSampleUsageType, Type};
+use crate::ir::{self, AddressSpace, LayoutType, SizedType, StoreType, TextureFormatWrapper, TextureSampleUsageType, Type};
 use crate::ir::{ir_type::TextureShape, AccessMode};
 use std::collections::btree_map::Entry;
 use thiserror::Error;
@@ -153,13 +149,11 @@ impl Display for SamplingMethod {
 pub enum BindingError {
     #[error("invalid type `{0:?}` for binding of kind `{1:?}`")]
     InvalidTypeForBinding(ir::StoreType, BindingType),
-    #[error("the type `{0:?}` cannot be used for a binding of kind `{1:?}` because of it's not storeable.\n{2}")]
-    TypeNotStoreable(TypeLayoutRecipe, BindingType, IRConversionError),
     #[error("a non-reference buffer (non `BufferRef`) must be both read-only and constructible")]
     NonRefBufferRequiresReadOnlyAndConstructible,
 }
 
-fn layout_to_store_type(recipe: &TypeLayoutRecipe, binding_ty: &BindingType) -> Result<StoreType, EncodingErrorKind> {
+fn layout_to_store_type(recipe: &LayoutType, binding_ty: &BindingType) -> Result<StoreType, EncodingErrorKind> {
     let store_type: ir::StoreType = recipe
         .clone()
         .try_into()
@@ -401,7 +395,7 @@ impl Any {
     /// > struct being visible or invisible in a given shader stage.
     #[track_caller]
     pub fn next_push_constants_field_sized(
-        recipe_ty: recipe::SizedType,
+        recipe_ty: SizedType,
         custom_min_size: Option<u64>,
         custom_min_align: Option<U32PowerOf2>,
     ) -> Any {
@@ -451,7 +445,7 @@ impl Any {
     /// (no documentation yet)
     #[track_caller]
     pub fn get_immediates(
-        recipe_ty: recipe::TypeLayoutRecipe,
+        recipe_ty: LayoutType,
         expected_anys: usize,
         custom_min_size: Option<u64>,
         custom_min_align: Option<U32PowerOf2>,
@@ -460,7 +454,7 @@ impl Any {
         let skip_stride_check = true;
         Context::try_with(call_info!(), |ctx| {
             let anys: Vec<_> = match recipe_ty {
-                TypeLayoutRecipe::UnsizedStruct(s) => {
+                LayoutType::UnsizedStruct(s) => {
                     let msg = format!("Push constant type `{}` contains unsized last field", s.name);
                     std::iter::repeat_n(
                         ctx.push_error_get_invalid_any(InternalError::new(true, msg).into()),
@@ -468,7 +462,7 @@ impl Any {
                     )
                     .collect()
                 }
-                TypeLayoutRecipe::RuntimeSizedArray(a) => {
+                LayoutType::RuntimeSizedArray(a) => {
                     let msg = format!("Push constant type `{}` is a runtime-sized array", a);
                     std::iter::repeat_n(
                         ctx.push_error_get_invalid_any(InternalError::new(true, msg).into()),
@@ -476,12 +470,12 @@ impl Any {
                     )
                     .collect()
                 }
-                TypeLayoutRecipe::Sized(recipe::SizedType::Struct(s)) => s
+                LayoutType::Sized(SizedType::Struct(s)) => s
                     .fields()
                     .iter()
                     .map(|f| Any::next_push_constants_field_sized(f.ty.clone(), f.custom_min_size, f.custom_min_align))
                     .collect(),
-                TypeLayoutRecipe::Sized(sized_type) => {
+                LayoutType::Sized(sized_type) => {
                     vec![Any::next_push_constants_field_sized(sized_type, None, None)]
                 }
             };

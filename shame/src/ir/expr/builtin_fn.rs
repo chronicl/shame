@@ -10,17 +10,12 @@ use crate::{
     },
     impl_track_caller_fn_any,
     ir::{
-        HandleType, SamplesPerPixel, SizedType, StructureFieldNamesMustBeUnique,
-        ir_type::{
-            self, AccessMode, AddressSpace, Indirection, LayoutType,
-            Len::*,
-            Len2,
-            ScalarType::{self, *},
-            ScalarTypeFp, SizedArray, SizedStruct,
-            StoreType::*,
-            TextureShape,
-            Type::Unit,
-        },
+        HandleType, SamplesPerPixel, SizedType, StructureFieldNamesMustBeUnique, LayoutType,
+        Len::*,
+        Len2,
+        ScalarType::{self, *},
+        ScalarTypeFp, SizedArray, SizedStruct,
+        ir_type::{self, AccessMode, AddressSpace, Indirection, StoreType::*, TextureShape, Type::Unit},
         pipeline::{PossibleStages, ShaderStage, StageMask},
         recording::{
             AtomicCompareExchangeWeakGenerics, BuiltinTemplateStructs, Context, InteractionKind, MemoryRegion,
@@ -412,7 +407,7 @@ impl Any {
         // arg is not a scalar, this extra typecheck is added
         Context::try_with(call_info!(), |ctx| {
             match self.ty() {
-                Some(Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Vector(ir_type::Vector {
+                Some(Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Vector(ir::Vector {
                     len: X1,
                     scalar: t,
                 }))))) => {
@@ -443,7 +438,7 @@ impl Any {
         let call_info = call_info!();
         Context::try_with(call_info!(), |ctx| match self.ty() {
             Some(
-                ty @ Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Vector(ir_type::Vector {
+                ty @ Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Vector(ir::Vector {
                     len: len_before,
                     scalar: t,
                 })))),
@@ -689,12 +684,12 @@ impl TypeCheck for AtomicFn {
             },
             AtomicFn::AtomicStore => sig! {
                 [Type::Ptr(allocation, StoreType::Layout(LayoutType::Sized(Atomic(a))), ReadWrite),
-                 Type::Store(Layout(LayoutType::Sized(SizedType::Vector(ir_type::Vector{ len: X1,scalar:  t}))))]
+                 Type::Store(Layout(LayoutType::Sized(SizedType::Vector(ir::Vector{ len: X1,scalar:  t}))))]
                 if a.scalar.as_scalar_type2() == *t && matches!(allocation.address_space, Storage | WorkGroup) => Unit
             },
             AtomicFn::AtomicReadModifyWrite(_) | AtomicFn::AtomicExchange => sig! {
                 [Type::Ptr(allocation,  StoreType::Layout(LayoutType::Sized(Atomic(a))), ReadWrite),
-                 Type::Store(Layout(LayoutType::Sized(SizedType::Vector(ir_type::Vector{ len: X1,scalar:  t}))))] if a.scalar.as_scalar_type2() == *t => t
+                 Type::Store(Layout(LayoutType::Sized(SizedType::Vector(ir::Vector{ len: X1,scalar:  t}))))] if a.scalar.as_scalar_type2() == *t => t
             },
             AtomicFn::AtomicCompareExchangeWeak(generics) => {
                 return BuiltinTemplateStructs::infer_type(
@@ -909,7 +904,7 @@ impl Any {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::ir_type::Len;
+    use crate::ir::Len;
 
     #[test]
     fn type_check_infer() {
@@ -918,18 +913,18 @@ mod tests {
         let select = BuiltinFn::Logical(LogicalFn::Select);
 
         let args: &[Type] = &[
-            ir_type::Vector::new(ScalarType::Bool, Len::X2).into(),
-            ir_type::Vector::new(ScalarType::F16, Len::X2).into(),
-            ir_type::Vector::new(ScalarType::F16, Len::X2).into(),
+            ir::Vector::new(ScalarType::Bool, Len::X2).into(),
+            ir::Vector::new(ScalarType::F16, Len::X2).into(),
+            ir::Vector::new(ScalarType::F16, Len::X2).into(),
         ];
 
         assert!(ctor_vec.infer_type(args).is_err());
         assert!(bitcast.infer_type(args).is_err());
 
         let args: &[Type] = &[
-            ir_type::Vector::new(ScalarType::F16, Len::X2).into(),
-            ir_type::Vector::new(ScalarType::F16, Len::X2).into(),
-            ir_type::Vector::new(ScalarType::Bool, Len::X2).into(),
+            ir::Vector::new(ScalarType::F16, Len::X2).into(),
+            ir::Vector::new(ScalarType::F16, Len::X2).into(),
+            ir::Vector::new(ScalarType::Bool, Len::X2).into(),
         ];
         assert!(select.infer_type(args).is_ok());
 

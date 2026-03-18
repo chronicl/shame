@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     frontend::any::render_io::VertexAttributeCooked,
-    ir::{ir_type::Vector, pipeline::LateRecorded},
+    ir::{Vector, pipeline::LateRecorded},
 };
 use crate::frontend::any::render_io::FragmentSampleMethod;
 use crate::frontend::any::render_io::FragmentSamplePosition;

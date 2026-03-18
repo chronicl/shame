@@ -19,10 +19,7 @@ use crate::{
             io_iter::{BindGroupIter, VertexBufferIter},
             rasterizer::{PrimitiveAssembly, VertexStage},
         },
-        rust_types::{
-            layout_traits::CpuLayoutCompareError,
-            type_layout::{compatible_with::AddressSpaceError},
-        },
+        rust_types::{layout_traits::CpuLayoutCompareError},
     },
     ir::{
         pipeline::{PipelineError, PipelineKind, StageSolverErrorKind},
@@ -30,6 +27,7 @@ use crate::{
             AllocError, BlockError, CallInfo, Context, FnError, NodeRecordingError, StmtError, ThreadContextGuard,
             next_thread_generation,
         },
+        type_layout::{compatible_with::AddressSpaceError},
     },
     try_ctx_track_caller,
 };

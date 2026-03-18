@@ -9,9 +9,8 @@ use crate::{
         error::InternalError,
     },
     ir::{
-        self, AccessMode, AddressSpace, StructKind, TextureFormatWrapper, TextureSampleUsageType, Type,
+        self, AccessMode, CanonName, AddressSpace, StructKind, TextureFormatWrapper, TextureSampleUsageType, Type,
         expr::{Expr, ShaderIo},
-        ir_type::CanonName,
         pipeline::ShaderStage,
         recording::{CallInfo, MemoryRegion, Stmt, TemplateStructParams},
     },

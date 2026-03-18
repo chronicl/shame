@@ -5,7 +5,7 @@ use super::len::x1;
 use super::mem::AddressSpace;
 use super::reference::{AccessMode, AccessModeReadable, AccessModeWritable, Read};
 use super::scalar_type::ScalarTypeInteger;
-use super::type_layout::{self, recipe, TypeLayout, ArrayLayout};
+use super::ir::type_layout::{self, TypeLayout, ArrayLayout};
 use super::type_traits::{
     BindingArgs, EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles,
 };
@@ -146,10 +146,10 @@ impl<T: GpuType + GpuStore + GpuSized, N: ArrayLen> ToGpuType for Array<T, N> {
 }
 
 impl<T: GpuType + GpuSized + GpuLayout, N: ArrayLen> GpuLayout for Array<T, N> {
-    fn layout_recipe() -> recipe::TypeLayoutRecipe {
+    fn layout_recipe() -> ir::LayoutType {
         match N::LEN {
-            Some(n) => recipe::SizedArray::new(Rc::new(T::layout_recipe_sized()), n).into(),
-            None => recipe::RuntimeSizedArray::new(T::layout_recipe_sized()).into(),
+            Some(n) => ir::SizedArray::new(Rc::new(T::layout_recipe_sized()), n).into(),
+            None => ir::RuntimeSizedArray::new(T::layout_recipe_sized()).into(),
         }
     }
 

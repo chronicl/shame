@@ -4,13 +4,11 @@ use crate::{
     call_info,
     frontend::{
         any::{Any, InvalidReason},
-        rust_types::{
-            error::FrontendError,
-            type_layout::{FieldLayout, StructLayout, TypeLayout},
-        },
+        rust_types::{error::FrontendError},
     },
     ir::{
-        ir_type::{CanonName},
+        CanonName,
+        type_layout::{FieldLayout, StructLayout, TypeLayout},
         recording::{CallInfo, CallInfoScope, Context},
         AlignedType, SizedType,
     },

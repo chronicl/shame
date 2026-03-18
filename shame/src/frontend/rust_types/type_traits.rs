@@ -3,7 +3,7 @@ use super::{
     layout_traits::{FromAnys, GetAllFields, GpuLayout},
     mem::{self, AddressSpace},
     reference::{AccessMode, AccessModeReadable},
-    type_layout::{self},
+    ir::type_layout,
     AsAny, GpuType, ToGpuType,
 };
 use crate::{

@@ -1,7 +1,6 @@
 use crate::{
-    any::layout::Repr,
     frontend::any::shared_io,
-    ir::{ir_type::recipe::LayoutType, recording::MemoryRegion},
+    ir::{LayoutType, Repr, SizedType, recording::MemoryRegion},
 };
 
 use super::*;
@@ -34,11 +33,17 @@ pub enum StoreType {
     BindingArray(Rc<StoreType>, Option<NonZeroU32>),
 }
 
-impl<T: Into<LayoutType>> From<T> for StoreType {
+impl<T> From<T> for StoreType
+where
+    LayoutType: From<T>,
+{
     fn from(value: T) -> Self { StoreType::Layout(value.into()) }
 }
 
-impl<T: Into<StoreType>> From<T> for Type {
+impl<T> From<T> for Type
+where
+    StoreType: From<T>,
+{
     fn from(value: T) -> Self { Type::Store(value.into()) }
 }
 

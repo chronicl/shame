@@ -2,11 +2,10 @@ use std::{fmt::Display, rc::Rc};
 
 use thiserror::Error;
 
-use crate::any::layout::{Repr};
 use crate::frontend::any::Any;
-use crate::frontend::rust_types::type_layout::{recipe, TypeLayout};
-use crate::ir::{self, Vector};
-use crate::ir::ir_type::LayoutType;
+use crate::ir::type_layout::{TypeLayout};
+use crate::ir::{self, Vector, Repr};
+use crate::ir::LayoutType;
 use crate::{
     call_info,
     common::iterator_ext::try_collect,
@@ -18,8 +17,9 @@ use crate::{
         },
     },
     ir::{
+        CanonName, LenEven,
         expr::{BuiltinShaderIn, BuiltinShaderIo, Expr, Interpolator, ShaderIo},
-        ir_type::{CanonName, LenEven, TextureFormatId},
+        ir_type::{TextureFormatId},
         pipeline::{PipelineError, RecordedWithIndex},
         recording::Context,
         Len, PackedVector, ScalarType, SizedType, StoreType, TextureFormatWrapper, Type,

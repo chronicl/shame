@@ -8,10 +8,10 @@ use crate::frontend::any::Any;
 use crate::{
     impl_track_caller_fn_any, ir, ir::expr::type_check::NoMatchingSignature, ir::expr::Expr, ir::ir_type, ir::Type, sig,
 };
-use ir_type::{Len::*, StoreType::*};
+use ir::{Len::*, StoreType::*};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Literal(pub ir_type::ScalarConstant);
+pub struct Literal(pub ir::ScalarConstant);
 
 impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

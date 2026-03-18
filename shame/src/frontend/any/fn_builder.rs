@@ -8,7 +8,7 @@ use crate::{
     ir::{
         self, AccessMode, Node, SizedType, Type,
         expr::{ArgViewKind, Expr, FnRelated},
-        ir_type::LayoutType,
+        LayoutType,
         recording::{
             AllocError, BlockKind, BlockSeriesRecorder, BodyKind, CallInfo, Context, Dependence, FlowStmt, FnError,
             FunctionDef, Ident, Jump, MemoryRegion, Priority, Stmt, TimeInstant,

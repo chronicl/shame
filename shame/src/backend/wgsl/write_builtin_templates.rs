@@ -11,8 +11,7 @@ use crate::{
     },
     call_info,
     ir::{
-        self, SizedType,
-        ir_type::{Atomic, Vector},
+        self, SizedType, Atomic, Vector,
         recording::{AtomicCompareExchangeWeakGenerics, FrexpGenerics, ModfGenerics, TemplateStructParams},
     },
 };

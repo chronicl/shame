@@ -11,7 +11,6 @@ use super::{
     AsAny, GpuType, To, ToGpuType,
 };
 use crate::{
-    any::layout::{self},
     call_info,
     common::{
         proc_macro_utils::{collect_into_array_exact, push_wrong_amount_of_args_error},
@@ -19,15 +18,15 @@ use crate::{
     },
     frontend::encoding::{buffer::BufferAddressSpace, rasterizer::Gradient},
     ir::{
-        Comp4, GradPrecision, Vector, VectorAccess,
+        Comp4, GradPrecision, LayoutType, Vector, VectorAccess,
         pipeline::StageMask,
         recording::{CallInfoScope, Context, NodeRecordingError},
+        type_layout::TypeLayout,
     },
 };
 
 use super::{
     layout_traits::{CpuLayout, FromAnys, GetAllFields, GpuLayout},
-    type_layout::TypeLayout,
     type_traits::{GpuSized, GpuStore, NoBools},
 };
 use crate::frontend::any::shared_io::{BindPath, BindingType};
@@ -554,8 +553,8 @@ impl<T: ScalarType, L: Len> GpuLayout for vec<T, L>
 where
     vec<T, L>: NoBools,
 {
-    fn layout_recipe() -> layout::TypeLayoutRecipe {
-        layout::Vector::new(
+    fn layout_recipe() -> LayoutType {
+        ir::Vector::new(
             T::SCALAR_TYPE
                 .try_into()
                 .expect("guaranteed via `NoBools` trait bound above"),

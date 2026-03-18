@@ -1,10 +1,9 @@
 //! Texture formats, largely copied or modified from the `wgpu` crate
 
 use crate::backend::language::Language;
-use crate::ir::SizedType;
-use crate::ir::ir_type::Vector;
+use crate::ir::{Len, ScalarType, SizedType, Vector};
 
-use super::{AccessMode, Len, ScalarType, StoreType};
+use super::{AccessMode, StoreType};
 use std::any::Any;
 use std::borrow::Cow;
 use std::cmp::PartialEq;
@@ -587,8 +586,8 @@ impl BuiltinTextureFormatId {
     }
 
     pub(crate) fn color_type_in_shader(self) -> Option<SizedType> {
-        use super::Len::*;
-        use super::ScalarType::*;
+        use crate::ir::Len::*;
+        use crate::ir::ScalarType::*;
         self.sample_type(None).map(|sample_type| {
             Vector::new(
                 match sample_type {

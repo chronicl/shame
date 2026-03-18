@@ -11,8 +11,7 @@ use crate::{
     },
     frontend::error::InternalError,
     ir::{
-        Len, ScalarType, SizedType, StoreType, Type,
-        ir_type::{LayoutType, Vector},
+        LayoutType, Len, ScalarType, SizedType, StoreType, Type, Vector,
         pipeline::{PossibleStages, StageMask},
         recording::{BlockKind, BodyKind, ConditionKind},
     },

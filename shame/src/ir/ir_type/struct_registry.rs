@@ -7,15 +7,15 @@ use std::{
 
 use thiserror::Error;
 
-use super::{canon_name::CanonName, StoreType, Type};
+use super::{StoreType, Type};
 use crate::{
-    any::layout::Repr,
     call_info,
     common::{format::numeral_suffix, iterator_ext::IteratorExt, po2::U32PowerOf2, pool::Key},
     ir::{
-        RuntimeSizedArrayField,
-        ir_type::recipe::{
-            FieldOptions, LayoutType, RuntimeSizedArray, SizedField, SizedStruct, SizedType, UnsizedStruct,
+        CanonName, Repr, RuntimeSizedArrayField, StructKind, StructKindRef,
+        ir_type::layout_type::{
+            FieldOptions, LayoutType, RuntimeSizedArray, SizedField, SizedStruct, SizedType, StructKindVariant,
+            UnsizedStruct,
         },
         recording::{Context, Ident},
     },
@@ -24,210 +24,6 @@ use crate::{
     common::pool::PoolRefMut,
     ir::recording::{CallInfo, Priority},
 };
-
-#[derive(Debug, Clone)]
-pub enum StructKind {
-    Sized(SizedStruct),
-    Unsized(UnsizedStruct),
-}
-
-impl StructKind {
-    pub fn as_ref(&self) -> StructKindRef<'_> {
-        match self {
-            StructKind::Sized(s) => StructKindRef::Sized(s),
-            StructKind::Unsized(s) => StructKindRef::Unsized(s),
-        }
-    }
-}
-
-impl From<StructKind> for LayoutType {
-    fn from(s: StructKind) -> Self {
-        match s {
-            StructKind::Sized(s) => LayoutType::Sized(SizedType::Struct(s)),
-            StructKind::Unsized(s) => LayoutType::UnsizedStruct(s),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum StructKindRef<'a> {
-    Sized(&'a SizedStruct),
-    Unsized(&'a UnsizedStruct),
-}
-
-impl<'a> From<&'a SizedStruct> for StructKindRef<'a> {
-    fn from(s: &'a SizedStruct) -> Self { StructKindRef::Sized(s) }
-}
-
-impl<'a> From<&'a UnsizedStruct> for StructKindRef<'a> {
-    fn from(s: &'a UnsizedStruct) -> Self { StructKindRef::Unsized(s) }
-}
-
-impl StructKindRef<'_> {
-    pub fn to_owned(&self) -> StructKind {
-        match self {
-            StructKindRef::Sized(s) => StructKind::Sized((*s).clone()),
-            StructKindRef::Unsized(s) => StructKind::Unsized((*s).clone()),
-        }
-    }
-}
-
-impl StructKindRef<'_> {
-    pub fn name(&self) -> &CanonName {
-        match self {
-            StructKindRef::Sized(s) => &s.name,
-            StructKindRef::Unsized(s) => &s.name,
-        }
-    }
-
-    pub fn sized_fields(&self) -> &[SizedField] {
-        match self {
-            StructKindRef::Sized(s) => &s.fields,
-            StructKindRef::Unsized(s) => &s.sized_fields,
-        }
-    }
-
-    pub fn last_unsized(&self) -> Option<&RuntimeSizedArrayField> {
-        match self {
-            StructKindRef::Sized(_) => None,
-            StructKindRef::Unsized(s) => Some(&s.last_unsized),
-        }
-    }
-
-    pub fn repr(&self) -> Repr {
-        match self {
-            StructKindRef::Sized(s) => s.repr,
-            StructKindRef::Unsized(s) => s.repr,
-        }
-    }
-
-    pub fn kind(&self) -> StructKindVariant {
-        match self {
-            StructKindRef::Sized(_) => StructKindVariant::Sized,
-            StructKindRef::Unsized(_) => StructKindVariant::Unsized,
-        }
-    }
-
-    pub fn find_field(&self, name: &CanonName) -> Option<LayoutType> {
-        self.sized_fields()
-            .iter()
-            .find(|f| &f.name == name)
-            .map(|f| LayoutType::Sized(f.ty.clone()))
-            .or_else(|| {
-                self.last_unsized()
-                    .filter(|f| &f.name == name)
-                    .map(|f| LayoutType::RuntimeSizedArray(f.array.clone()))
-            })
-    }
-
-    pub fn is_empty(&self) -> bool { self.sized_fields().is_empty() && self.last_unsized().is_none() }
-
-    pub fn field_names(&self) -> impl Iterator<Item = &CanonName> {
-        self.sized_fields()
-            .iter()
-            .map(|f| &f.name)
-            .chain(self.last_unsized().as_ref().map(|f| &f.name))
-    }
-}
-
-/// try register `struct_` if we're currently in a pipeline encoding,
-/// otherwise the registration will happen later with a less useful `call_info`
-fn try_register_struct(call_info: CallInfo, struct_: StructKindRef<'_>) {
-    Context::try_with(call_info, |ctx| {
-        ctx.struct_registry_mut().register_mentioned_structs_recursively(
-            struct_,
-            &mut ctx.pool_mut(),
-            ctx.latest_user_caller(),
-        );
-    });
-}
-
-
-#[doc(hidden)] // internal
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum StructKindVariant {
-    Sized,
-    Unsized,
-}
-
-impl Display for StructKindVariant {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            StructKindVariant::Sized => "struct",
-            StructKindVariant::Unsized => "unsized struct",
-        })
-    }
-}
-
-/// the precise definition of a struct type wrt. actual `Ident`s rather than just
-/// canonical names of fields etc.
-pub struct StructDef {
-    call_info: CallInfo,
-    kind: StructKindVariant,
-    name: CanonName,
-    ident: Key<Ident>,
-    sized_fields: Vec<(Key<Ident>, SizedField)>,
-    last_unsized: Option<(Key<Ident>, RuntimeSizedArrayField)>,
-}
-
-impl StructDef {
-    pub fn new_for_struct(s: StructKindRef<'_>, idents: &mut PoolRefMut<Ident>, call_info: CallInfo) -> Self {
-        StructDef {
-            call_info,
-            kind: s.kind(),
-            name: s.name().clone(),
-            ident: Ident::auto_in_pool(s.name().to_string(), idents),
-            sized_fields: s
-                .sized_fields()
-                .iter()
-                .map(|f| (Ident::auto_in_pool(f.name.to_string(), idents), f.clone()))
-                .collect(),
-            last_unsized: s
-                .last_unsized()
-                .as_ref()
-                .map(|f| (Ident::auto_in_pool(f.name.to_string(), idents), (*f).clone())),
-        }
-    }
-
-    pub fn call_info(&self) -> CallInfo { self.call_info }
-
-    pub fn canonical_name(&self) -> &CanonName { &self.name }
-
-    pub fn ident(&self) -> Key<Ident> { self.ident }
-
-    pub fn get_field_ident(&self, canonical_name: &CanonName) -> Option<&Key<Ident>> {
-        self.sized_fields
-            .iter()
-            .find_map(|(ident, field)| (&field.name == canonical_name).then_some(ident))
-            .or_else(|| {
-                self.last_unsized
-                    .as_ref()
-                    .filter(|(_, field)| &field.name == canonical_name)
-                    .map(|(ident, _)| ident)
-            })
-    }
-
-    pub fn fields(&self) -> impl Iterator<Item = (&Key<Ident>, Option<U32PowerOf2>, Option<u64>, LayoutType)> + '_ {
-        self.sized_fields
-            .iter()
-            .map(|(ident, field)| {
-                (
-                    ident,
-                    field.custom_min_align,
-                    field.custom_min_size,
-                    LayoutType::Sized(field.ty.clone()),
-                )
-            })
-            .chain(self.last_unsized.iter().map(|(ident, field)| {
-                (
-                    ident,
-                    field.custom_min_align,
-                    None,
-                    LayoutType::RuntimeSizedArray(field.array.clone()),
-                )
-            }))
-    }
-}
 
 #[derive(Default)]
 pub struct StructRegistry {
@@ -375,6 +171,77 @@ fn check_for_duplicate_field_names(
     }
 }
 
+
+/// the precise definition of a struct type wrt. actual `Ident`s rather than just
+/// canonical names of fields etc.
+pub struct StructDef {
+    call_info: CallInfo,
+    kind: StructKindVariant,
+    name: CanonName,
+    ident: Key<Ident>,
+    sized_fields: Vec<(Key<Ident>, SizedField)>,
+    last_unsized: Option<(Key<Ident>, RuntimeSizedArrayField)>,
+}
+
+impl StructDef {
+    pub fn new_for_struct(s: StructKindRef<'_>, idents: &mut PoolRefMut<Ident>, call_info: CallInfo) -> Self {
+        StructDef {
+            call_info,
+            kind: s.kind(),
+            name: s.name().clone(),
+            ident: Ident::auto_in_pool(s.name().to_string(), idents),
+            sized_fields: s
+                .sized_fields()
+                .iter()
+                .map(|f| (Ident::auto_in_pool(f.name.to_string(), idents), f.clone()))
+                .collect(),
+            last_unsized: s
+                .last_unsized()
+                .as_ref()
+                .map(|f| (Ident::auto_in_pool(f.name.to_string(), idents), (*f).clone())),
+        }
+    }
+
+    pub fn call_info(&self) -> CallInfo { self.call_info }
+
+    pub fn canonical_name(&self) -> &CanonName { &self.name }
+
+    pub fn ident(&self) -> Key<Ident> { self.ident }
+
+    pub fn get_field_ident(&self, canonical_name: &CanonName) -> Option<&Key<Ident>> {
+        self.sized_fields
+            .iter()
+            .find_map(|(ident, field)| (&field.name == canonical_name).then_some(ident))
+            .or_else(|| {
+                self.last_unsized
+                    .as_ref()
+                    .filter(|(_, field)| &field.name == canonical_name)
+                    .map(|(ident, _)| ident)
+            })
+    }
+
+    pub fn fields(&self) -> impl Iterator<Item = (&Key<Ident>, Option<U32PowerOf2>, Option<u64>, LayoutType)> + '_ {
+        self.sized_fields
+            .iter()
+            .map(|(ident, field)| {
+                (
+                    ident,
+                    field.custom_min_align,
+                    field.custom_min_size,
+                    LayoutType::Sized(field.ty.clone()),
+                )
+            })
+            .chain(self.last_unsized.iter().map(|(ident, field)| {
+                (
+                    ident,
+                    field.custom_min_align,
+                    None,
+                    LayoutType::RuntimeSizedArray(field.array.clone()),
+                )
+            }))
+    }
+}
+
 #[allow(missing_docs)]
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum StructureDefinitionError {
@@ -396,3 +263,6 @@ pub struct StructureFieldNamesMustBeUnique {
     pub first_occurence: usize,
     pub second_occurence: usize,
 }
+
+// TODO(chronicl) check every registered struct for duplicate field names
+// and having at least one field

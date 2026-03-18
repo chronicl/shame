@@ -2,7 +2,6 @@
 use std::{cell::Cell, iter, marker::PhantomData, rc::Rc};
 
 use crate::{
-    any::layout::{Repr, TypeLayoutRecipe},
     call_info,
     common::{
         integer::post_inc_u32,
@@ -24,7 +23,6 @@ use crate::{
             },
             reference::AccessMode,
             struct_::SizedFields,
-            type_layout::recipe,
             type_traits::{BindingArgs, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools},
         },
         texture::{

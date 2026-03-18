@@ -10,14 +10,14 @@ use crate::{
     any::U32PowerOf2,
     call_info,
     common::{ignore_eq::IgnoreInEqOrdHash, prettify::set_color},
-    ir::{self, ir_type::CanonName, recording::Context},
+    ir::{self, CanonName, recording::Context},
 };
-use recipe::{Matrix, Vector, PackedVector};
+use super::{Matrix, Vector, Repr};
 
 pub(crate) mod compatible_with;
 pub(crate) mod display;
 pub(crate) mod eq;
-pub(crate) mod recipe;
+pub(crate) mod from_ir;
 
 /// The memory layout of a type.
 ///
@@ -106,39 +106,6 @@ pub struct FieldLayout {
     pub ty: TypeLayout,
 }
 
-/// Enum of layout algorithms.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Repr {
-    /// WGSL's layout algorithm
-    /// https://www.w3.org/TR/WGSL/#alignment-and-size
-    #[default]
-    Wgsl,
-    /// Modified layout algorithm based on [`Repr::Wgsl`], but with different type
-    /// alignments and array strides that make the resulting Layout match wgsl's
-    /// uniform address space requirements.
-    ///
-    /// https://www.w3.org/TR/WGSL/#address-space-layout-constraints
-    ///
-    /// (matrix strides remain unchanged however, which makes this different from the std140 layout for mat2x2)
-    ///
-    /// Internally used for checking whether a type can be used in the wgsl's
-    /// uniform address space
-    WgslUniform,
-    /// byte-alignment of everything is 1. Custom alignment attributes
-    /// in [`TypeLayoutRecipe`] are unsupported.
-    Packed,
-}
-
-impl std::fmt::Display for Repr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Repr::Wgsl => write!(f, "wgsl"),
-            Repr::WgslUniform => write!(f, "wgsl uniform"),
-            Repr::Packed => write!(f, "packed"),
-        }
-    }
-}
-
 impl TypeLayout {
     /// Returns the byte size of the represented type.
     ///
@@ -206,12 +173,6 @@ impl TypeLayout {
             TypeLayout::Struct(s) => Ok(&mut Rc::make_mut(s).byte_size),
         }
     }
-
-    // TODO(chronicl) this should be removed with improved any api for storage/uniform bindings
-    pub(crate) fn from_store_ty(store_type: ir::StoreType) -> Result<Self, recipe::ir_compat::RecipeConversionError> {
-        let t: recipe::TypeLayoutRecipe = store_type.try_into()?;
-        Ok(t.layout())
-    }
 }
 
 impl From<VectorLayout> for TypeLayout {
@@ -235,16 +196,13 @@ mod tests {
     use super::*;
     use crate::{
         any::U32PowerOf2,
-        frontend::rust_types::type_layout::{
-            recipe::{*},
-            Repr, *,
-        },
+        ir::{LayoutType, *},
     };
     use std::{rc::Rc, num::NonZeroU32};
 
     #[test]
     fn test_array_alignment() {
-        let array: TypeLayoutRecipe = SizedArray::new(
+        let array: LayoutType = SizedArray::new(
             Rc::new(Vector::new(ScalarType::F32, Len::X1).into()),
             NonZeroU32::new(1).unwrap(),
         )
@@ -279,8 +237,13 @@ mod tests {
 
     #[test]
     fn test_struct_alignment() {
-        let s = |repr| -> TypeLayoutRecipe {
-            SizedStruct::new("A", "a", Vector::new(ScalarType::F32, Len::X1), repr).into()
+        let s = |repr| -> LayoutType {
+            SizedStruct::new(
+                "A",
+                vec![SizedField::new("a", Vector::new(ScalarType::F32, Len::X1))],
+                repr,
+            )
+            .into()
         };
 
         let storage = s(Repr::Wgsl).layout();
@@ -298,11 +261,21 @@ mod tests {
 
     #[test]
     fn test_nested_struct_field_offset() {
-        let s = |repr| -> TypeLayoutRecipe {
-            let a = SizedStruct::new("A", "a", Vector::new(ScalarType::F32, Len::X1), repr);
-            SizedStruct::new("B", "a", Vector::new(ScalarType::F32, Len::X1), repr)
-                .extend("b", a) // offset 4 for storage and packed, offset 16 for uniform
-                .into()
+        let s = |repr| -> LayoutType {
+            let a = SizedStruct::new(
+                "A",
+                vec![SizedField::new("a", Vector::new(ScalarType::F32, Len::X1))],
+                repr,
+            );
+            SizedStruct::new(
+                "B",
+                vec![
+                    SizedField::new("a", Vector::new(ScalarType::F32, Len::X1)),
+                    SizedField::new("b", a),
+                ],
+                repr,
+            )
+            .into()
         };
 
         let storage = s(Repr::Wgsl).layout();
@@ -330,16 +303,23 @@ mod tests {
 
     #[test]
     fn test_array_in_struct_field_offset() {
-        let s = |repr| -> TypeLayoutRecipe {
-            SizedStruct::new("B", "a", Vector::new(ScalarType::F32, Len::X1), repr)
-                .extend(
-                    "b",
-                    SizedArray::new(
-                        Rc::new(Vector::new(ScalarType::F32, Len::X1).into()),
-                        NonZeroU32::new(1).unwrap(),
+        let s = |repr| -> LayoutType {
+            SizedStruct::new(
+                "B",
+                vec![
+                    SizedField::new("a", Vector::new(ScalarType::F32, Len::X1)),
+                    SizedField::new(
+                        "b",
+                        SizedArray::new(
+                            Rc::new(Vector::new(ScalarType::F32, Len::X1).into()),
+                            NonZeroU32::new(1).unwrap(),
+                        ),
                     ),
-                ) // offset 4 for storage and packed, offset 16 for uniform
-                .into()
+                ],
+                repr,
+            )
+            // offset 4 for storage and packed, offset 16 for uniform
+            .into()
         };
 
         let storage = s(Repr::Wgsl).layout();
@@ -392,7 +372,7 @@ mod tests {
                 },
             },
         };
-        let recipe: TypeLayoutRecipe = unsized_struct.clone().into();
+        let recipe: LayoutType = unsized_struct.clone().into();
 
         let layout = recipe.layout();
         assert_eq!(layout.byte_size(), None);
@@ -421,7 +401,7 @@ mod tests {
 
         // Testing uniform representation
         unsized_struct.repr = Repr::WgslUniform;
-        let recipe: TypeLayoutRecipe = unsized_struct.into();
+        let recipe: LayoutType = unsized_struct.into();
         println!("{recipe:#?}");
         let layout = recipe.layout();
         assert_eq!(layout.byte_size(), None);

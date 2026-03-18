@@ -329,7 +329,7 @@ pub use frontend::rust_types::layout_traits::gpu_layout;
 pub use frontend::rust_types::layout_traits::CpuLayout;
 pub use frontend::rust_types::layout_traits::cpu_layout;
 pub use frontend::rust_types::layout_traits::VertexLayout;
-pub use frontend::rust_types::type_layout::TypeLayout;
+pub use ir::type_layout::TypeLayout;
 pub use common::po2::U32PowerOf2;
 pub use common::po2::NotAU32PowerOf2;
 
@@ -428,11 +428,6 @@ pub mod results {
     pub type Dict<K, V> = std::collections::BTreeMap<K, V>;
 }
 
-/// everything related to type layouts
-pub mod layout {
-    pub use crate::frontend::rust_types::type_layout::recipe::ScalarType;
-}
-
 // #[doc(hidden)] interface starts here
 // (not part of the public api)
 
@@ -461,14 +456,6 @@ pub mod any {
     pub use crate::ir::ir_type::AddressSpace;
     pub use crate::ir::ir_type::AlignedType;
     pub use crate::ir::ir_type::HandleType;
-    pub use crate::ir::ir_type::Len;
-    pub use crate::ir::ir_type::Len2;
-    pub use crate::ir::ir_type::LenEven;
-    pub use crate::ir::ir_type::ScalarConstant;
-    pub use crate::ir::ir_type::ScalarType;
-    pub use crate::ir::ir_type::ScalarTypeFp;
-    pub use crate::ir::ir_type::ScalarTypeInteger;
-    pub use crate::ir::ir_type::SizedType;
     pub use crate::ir::ir_type::StoreType;
     pub use crate::ir::ir_type::Type;
 
@@ -479,66 +466,53 @@ pub mod any {
     pub use crate::ir::ir_type::PackedScalarType;
     pub use crate::ir::ir_type::PackedVector;
 
-    pub use crate::ir::ir_type::RuntimeSizedArrayField;
-    pub use crate::ir::ir_type::SizedField;
-    pub use crate::ir::ir_type::SizedStruct;
-    pub use crate::ir::ir_type::StructKind;
-    pub use crate::ir::ir_type::StructKindRef;
+    // LayoutType
+    pub use ir::Vector;
+    pub use ir::Matrix;
+    pub use ir::Atomic;
+    pub use ir::SizedArray;
+    pub use ir::SizedStruct;
+    pub use ir::SizedType;
+    pub use ir::RuntimeSizedArray;
+    pub use ir::UnsizedStruct;
+    pub use ir::LayoutType;
+    pub use ir::RuntimeSizedArrayField;
+    pub use ir::SizedField;
+    pub use ir::StructKind;
+    pub use ir::StructKindRef;
+    pub use ir::FieldOffsets;
+    pub use ir::Repr;
+
+    // LayoutType atoms
+    pub use ir::Len;
+    pub use ir::Len2;
+    pub use ir::LenEven;
+    pub use ir::ScalarConstant;
+    pub use ir::ScalarType;
+    pub use ir::ScalarTypeFp;
+    pub use ir::ScalarTypeInteger;
+    pub use ir::CanonName;
+    pub use ir::FieldOptions;
+
+    // TypeLayout (calculated LayoutType)
+    pub use ir::type_layout::TypeLayout;
+    pub use ir::type_layout::VectorLayout;
+    pub use ir::type_layout::MatrixLayout;
+    pub use ir::type_layout::ArrayLayout;
+    pub use ir::type_layout::StructLayout;
+    pub use ir::type_layout::FieldLayout;
+
+    // layout calculation utility
+    pub use ir::ir_type::layout_type::StructLayoutCalculator;
+
+    // address space and language compatibility checks
+    pub use ir::type_layout::compatible_with::TypeLayoutCompatibleWith;
+
     pub use crate::ir::ir_type::StructureDefinitionError;
     pub use crate::ir::ir_type::StructureFieldNamesMustBeUnique;
 
-    pub mod layout {
-        use crate::frontend::rust_types::type_layout;
-
-        // type layout
-        pub use type_layout::TypeLayout;
-        pub use type_layout::compatible_with::TypeLayoutCompatibleWith;
-        pub use type_layout::Repr;
-        pub mod repr {
-            use crate::frontend::rust_types::type_layout;
-        }
-        pub use type_layout::VectorLayout;
-        pub use type_layout::MatrixLayout;
-        pub use type_layout::ArrayLayout;
-        pub use type_layout::StructLayout;
-        pub use type_layout::FieldLayout;
-
-        // recipe types
-        pub use type_layout::recipe::TypeLayoutRecipe;
-        pub use type_layout::recipe::UnsizedStruct;
-        pub use type_layout::recipe::RuntimeSizedArray;
-        pub use type_layout::recipe::SizedType;
-        pub use type_layout::recipe::Vector;
-        pub use type_layout::recipe::Matrix;
-        pub use type_layout::recipe::MatrixMajor;
-        pub use type_layout::recipe::SizedArray;
-        pub use type_layout::recipe::Atomic;
-        pub use type_layout::recipe::PackedVector;
-        pub use type_layout::recipe::SizedStruct;
-
-        // recipe type parts
-        pub use type_layout::recipe::ScalarType;
-        pub use type_layout::recipe::ScalarTypeFp;
-        pub use type_layout::recipe::ScalarTypeInteger;
-        pub use type_layout::recipe::Len;
-        pub use type_layout::recipe::Len2;
-        pub use type_layout::recipe::SizedField;
-        pub use type_layout::recipe::RuntimeSizedArrayField;
-        pub use type_layout::recipe::CanonName;
-        pub use type_layout::recipe::SizedOrArray;
-        pub use type_layout::recipe::FieldOptions;
-
-        // layout calculation utility
-        pub use type_layout::recipe::StructLayoutCalculator;
-        pub use type_layout::recipe::FieldOffsets;
-
-        // conversion and builder errors
-        pub use type_layout::recipe::builder::IsUnsizedStructError;
-        pub use type_layout::recipe::builder::StructFromPartsError;
-
-        // helpful cpu layout comparison (TODO should be made a function without args)
-        pub use crate::frontend::rust_types::layout_traits::get_layout_compare_with_cpu_push_error;
-    }
+    // helpful cpu layout comparison (TODO should be made a function without args)
+    pub use crate::frontend::rust_types::layout_traits::get_layout_compare_with_cpu_push_error;
 
     // runtime binding api
     pub use any::shared_io::BindPath;

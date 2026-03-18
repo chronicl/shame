@@ -1,4 +1,5 @@
-use crate::any::layout::{TypeLayoutRecipe, Repr, SizedType};
+use crate::ir::ir_type::layout_type::array_stride;
+use crate::ir::{LayoutType, Repr, SizedType, UnsizedStruct};
 use crate::call_info;
 use crate::common::po2::U32PowerOf2;
 use crate::common::proc_macro_utils::{self, repr_c_struct_layout, ReprCError, ReprCField};
@@ -11,12 +12,9 @@ use crate::frontend::encoding::io_iter::LocationCounter;
 use crate::frontend::encoding::{EncodingError, EncodingErrorKind};
 use crate::frontend::error::InternalError;
 use crate::frontend::rust_types::len::*;
-use crate::frontend::rust_types::type_layout::eq::{CheckEqLayoutMismatch, LayoutMismatch};
-use crate::frontend::rust_types::type_layout::{ArrayLayout, VectorLayout};
-use crate::ir::ir_type::{
-    align_of_array, align_of_array_from_element_alignment, byte_size_of_array_from_stride_len, round_up,
-    stride_of_array_from_element_align_size, CanonName, ScalarTypeFp, ScalarTypeInteger,
-};
+use crate::ir::type_layout::eq::{CheckEqLayoutMismatch, LayoutMismatch};
+use crate::ir::type_layout::{ArrayLayout, VectorLayout};
+use crate::ir::{CanonName, ScalarTypeFp, ScalarTypeInteger};
 use crate::ir::pipeline::StageMask;
 use crate::ir::recording::Context;
 
@@ -25,8 +23,8 @@ use super::error::FrontendError;
 use super::mem::AddressSpace;
 use super::reference::{AccessMode, AccessModeReadable};
 use super::struct_::{BufferFields, SizedFields, Struct};
-use super::type_layout::recipe::{self, array_stride, Vector, ScalarType};
-use super::type_layout::{self, FieldLayout, StructLayout, TypeLayout};
+use super::ir::{Vector, ScalarType};
+use super::ir::type_layout::{self, FieldLayout, StructLayout, TypeLayout};
 use super::type_traits::{
     BindingArgs, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles, VertexAttribute,
 };
@@ -139,7 +137,7 @@ use std::rc::Rc;
 ///
 pub trait GpuLayout {
     /// Returns a [`TypeLayoutRecipe`] that describes how a layout algorithm (repr) should layout this type in memory.
-    fn layout_recipe() -> TypeLayoutRecipe;
+    fn layout_recipe() -> LayoutType;
 
     /// For `GpuSized` types, this returns the [`SizedType`] that describes the type's layout.
     fn layout_recipe_sized() -> SizedType
@@ -147,8 +145,8 @@ pub trait GpuLayout {
         Self: GpuSized,
     {
         match Self::layout_recipe() {
-            TypeLayoutRecipe::Sized(s) => s,
-            TypeLayoutRecipe::RuntimeSizedArray(_) | TypeLayoutRecipe::UnsizedStruct(_) => {
+            LayoutType::Sized(s) => s,
+            LayoutType::RuntimeSizedArray(_) | LayoutType::UnsizedStruct(_) => {
                 unreachable!("Self is GpuSized, which these TypeLayoutRecipe variants aren't.")
             }
         }
@@ -539,18 +537,16 @@ where
     Array<vec<i32, x1>, Size<4>>: for<'trivial_bound> GpuSized,
 {
     fn get_sizedstruct_type() -> ir::SizedStruct {
-        let struct_ = ir::SizedStruct::new_nonempty(
-            std::stringify!(GpuType).into(),
+        ir::SizedStruct::new(
+            std::stringify!(GpuType),
             vec![
-                ir::SizedField::new("a".into(), None, None, <vec<f32, x1> as GpuSized>::sized_ty()),
-                ir::SizedField::new("b".into(), None, None, <vec<u32, x1> as GpuSized>::sized_ty()),
+                ir::SizedField::new("a", <vec<f32, x1> as GpuSized>::sized_ty()),
+                ir::SizedField::new("b", <vec<u32, x1> as GpuSized>::sized_ty()),
+                ir::SizedField::new("c", <vec<i32, x1> as GpuSized>::sized_ty()),
             ],
-            ir::SizedField::new("c".into(), None, None, <vec<i32, x1> as GpuSized>::sized_ty()),
-        );
-        match struct_ {
-            Ok(s) => s,
-            Err(ir::StructureFieldNamesMustBeUnique { .. }) => unreachable!("field names are assumed unique"),
-        }
+            // TODO(chronicl)
+            Repr::Wgsl,
+        )
     }
 }
 
@@ -634,21 +630,23 @@ impl BufferFields for GpuT {
                     last_unsized = Some(crate::ir::RuntimeSizedArrayField {
                         name,
                         custom_min_align,
-                        element_ty,
+                        array: ir::RuntimeSizedArray::new(element_ty),
                     })
                 }
             }
         }
 
-        use ir::ir_type::BufferBlockDefinitionError as E;
-        match ir::BufferBlock::new(std::stringify!(GpuType).into(), fields, last_unsized) {
-            Ok(t) => t,
-            Err(e) => match e {
-                E::MustHaveAtLeastOneField => unreachable!(">= 1 field is ensured by derive macro"),
-                E::FieldNamesMustBeUnique(_) => {
-                    unreachable!("unique field idents are ensured by rust struct definition")
-                }
-            },
+        let name = stringify!(GpuT);
+        match last_unsized {
+            Some(last_unsized) => UnsizedStruct::new(
+                name,
+                fields,
+                last_unsized,
+                // TODO(chronicl)
+                Repr::Wgsl,
+            )
+            .into(),
+            None => SizedStruct::new(name, fields, Repr::Wgsl).into(),
         }
     }
 }
@@ -669,7 +667,7 @@ where
 }
 
 impl GpuLayout for GpuT {
-    fn layout_recipe() -> recipe::TypeLayoutRecipe { todo!() }
+    fn layout_recipe() -> LayoutType { todo!() }
 
     fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
         Some(Ok((
@@ -799,6 +797,7 @@ fn cpu_layout_of_scalar(scalar: ScalarType) -> TypeLayout {
         ScalarType::F64 => (size_of::<f64>(), align_of::<f64>()),
         ScalarType::U32 => (size_of::<u32>(), align_of::<u32>()),
         ScalarType::I32 => (size_of::<i32>(), align_of::<i32>()),
+        ScalarType::Bool => (size_of::<i32>(), align_of::<i32>()),
         // Waiting for f16 to become stable
         // ScalarType::F16 => (size_of::<f16>(), align_of::<f16>()),
         ScalarType::F16 => (2, 2),
@@ -809,7 +808,7 @@ fn cpu_layout_of_scalar(scalar: ScalarType) -> TypeLayout {
         align: U32PowerOf2::try_from(align as u32)
             .expect("aligns are power of 2s in rust")
             .into(),
-        ty: Vector::new(scalar, recipe::Len::X1),
+        ty: Vector::new(scalar, ir::Len::X1),
         debug_is_atomic: false,
     }
     .into()

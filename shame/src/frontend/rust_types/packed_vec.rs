@@ -8,7 +8,7 @@ use crate::{
     any::{AsAny, DataPackingFn},
     common::floating_point::f16,
     f32x2, f32x4, gpu_layout, i32x4,
-    ir::ir_type::LayoutType,
+    ir::LayoutType,
     u32x1, u32x4,
 };
 use crate::frontend::rust_types::len::{x1, x2, x3, x4};
@@ -16,7 +16,7 @@ use crate::frontend::rust_types::vec::vec;
 use crate::{
     call_info,
     frontend::any::{render_io::VertexAttribFormat, Any, InvalidReason},
-    ir::{self, recording::Context, PackedVector, SizedType},
+    ir::{self, recording::Context, PackedVector, SizedType, Repr, type_layout::TypeLayout},
 };
 
 use super::{
@@ -24,7 +24,6 @@ use super::{
     layout_traits::{from_single_any, ArrayElementsUnsizedError, FromAnys, GpuLayout},
     len::LenEven,
     scalar_type::ScalarType,
-    type_layout::{self, recipe, Repr, TypeLayout},
     type_traits::{GpuAligned, GpuSized, NoAtomics, NoBools, NoHandles, VertexAttribute},
     vec::IsVec,
     GpuType,

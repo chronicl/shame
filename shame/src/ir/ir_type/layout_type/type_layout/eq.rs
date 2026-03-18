@@ -1,8 +1,7 @@
 use crate::common::format::display;
 use crate::common::prettify::UnwrapDisplayOr;
-use crate::frontend::rust_types::type_layout::display::LayoutInfoFlags;
 
-use super::*;
+use super::{*, display::LayoutInfoFlags};
 
 /// Contains information about the layout mismatch between two `TypeLayout`s.
 ///

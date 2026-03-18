@@ -4,7 +4,7 @@ use crate::frontend::any::Any;
 use crate::TextureSampleUsageType;
 use crate::ir::StructKindRef;
 use crate::ir::expr::type_check;
-use crate::ir::ir_type::{LayoutType, Vector};
+use crate::ir::{LayoutType, Vector};
 use crate::{
     call_info,
     common::small_vec::SmallVec,
@@ -13,7 +13,7 @@ use crate::{
     ir::{
         self,
         expr::type_check::{SigFormatting, SignatureStrings},
-        ir_type::{CanonName, Len, Len2, ScalarType, SizedType, StoreType},
+        CanonName, Len, Len2, ScalarType, SizedType, StoreType,
         recording::CallInfo,
         Type,
     },

@@ -325,7 +325,7 @@ impl TypeCheck for BuiltinShaderOut {
                 let distance_count = count;
                 return sig!(
                     { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                    [Array(f32x1, n)] if n.get() <= 8 && n == distance_count && **f32x1 == SizedType::Vector(ir_type::Vector::new(F32, X1)) => Unit,
+                    [Array(f32x1, n)] if n.get() <= 8 && n == distance_count && **f32x1 == SizedType::Vector(ir::Vector::new(F32, X1)) => Unit,
                 )(self, args);
             }
             BuiltinShaderOut::FragDepth => sig!([F32] => Unit),
@@ -344,7 +344,7 @@ pub struct Interpolator {
 impl Interpolator {
     fn get_sized_type(&self) -> SizedType {
         let (len, stype) = self.vec_ty;
-        ir_type::Vector::new(stype, len).into()
+        ir::Vector::new(stype, len).into()
     }
 }
 

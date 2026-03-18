@@ -1,9 +1,6 @@
 use crate::{
     frontend::any::shared_io::BufferBindingType,
-    ir::{
-        Type,
-        ir_type::recipe::{LayoutType, SizedType, ScalarType},
-    },
+    ir::{Type, LayoutType, SizedType, ScalarType},
 };
 
 use super::{StoreType};

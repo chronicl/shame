@@ -1,9 +1,8 @@
 use thiserror::Error;
 
-use super::{Len, ScalarType};
 use crate::{
     frontend::{any::shared_io::SamplingMethod, texture::texture_formats::BuiltinTextureFormatId},
-    ir::{SizedType, ir_type::Vector},
+    ir::{Len, ScalarType, SizedType, Vector},
 };
 use std::{fmt::Display, hash::Hash, num::NonZeroU32, sync::Arc};
 

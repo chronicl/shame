@@ -1,8 +1,8 @@
 use crate::{
     common::small_vec_actual::SmallVec,
     ir::{
-        self, ScalarTypeFp, ScalarTypeInteger, Type,
-        ir_type::{Atomic, LayoutType, Len, Len2, Matrix, ScalarType, SizedArray, SizedType, StoreType, Vector},
+        self, ScalarTypeFp, ScalarTypeInteger, Type, Atomic, LayoutType, Len, Len2, Matrix, ScalarType, SizedArray,
+        SizedType, StoreType, Vector,
     },
 };
 use std::{fmt::Write, num::NonZeroU32, rc::Rc};
@@ -14,7 +14,7 @@ pub trait TypeCheck {
 
 macro_rules! vec_store {
     ($len:pat, $scalar:pat) => {
-        crate::ir::StoreType::Layout(crate::ir::ir_type::LayoutType::Sized(crate::ir::SizedType::Vector(crate::ir::ir_type::Vector {
+        crate::ir::StoreType::Layout(crate::ir::LayoutType::Sized(crate::ir::SizedType::Vector(crate::ir::Vector {
             len: len @ $len,
             scalar: scalar @ $scalar,
         })))
@@ -29,7 +29,7 @@ macro_rules! atomic_store {
 }
 macro_rules! mat_store {
     ($columns:pat, $rows:pat, $scalar:pat) => {
-        crate::ir::StoreType::Layout(crate::ir::ir_type::LayoutType::Sized(crate::ir::SizedType::Matrix(crate::ir::ir_type::Matrix {
+        crate::ir::StoreType::Layout(crate::ir::LayoutType::Sized(crate::ir::SizedType::Matrix(crate::ir::Matrix {
             columns: columns @ $columns,
             rows: rows @ $rows,
             scalar: scalar @ $scalar,
@@ -38,7 +38,7 @@ macro_rules! mat_store {
 }
 macro_rules! array_store {
     ($element:pat, $len:pat) => {
-        crate::ir::StoreType::Layout(crate::ir::ir_type::LayoutType::Sized(crate::ir::SizedType::Array(crate::ir::ir_type::SizedArray {
+        crate::ir::StoreType::Layout(crate::ir::LayoutType::Sized(crate::ir::SizedType::Array(crate::ir::SizedArray {
             element: element @ $element,
             len: len @ $len,
         })))

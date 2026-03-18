@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use super::{type_layout::TypeLayout, vec_range::VecRangeError};
+use super::{ir::type_layout::TypeLayout, vec_range::VecRangeError};
 use crate::ir::{self, Type};
 
 #[derive(Error, Debug, Clone)]

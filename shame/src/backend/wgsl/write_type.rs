@@ -4,14 +4,15 @@ use super::{
     WgslContext, WgslErrorKind,
 };
 use crate::ir::{
-    self, AccessMode,
-    ir_type::{ChannelFormatShaderType, LayoutType, SamplesPerPixel, TextureSampleUsageType, TextureShape},
+    self, AccessMode, LayoutType,
+    ir_type::{ChannelFormatShaderType, SamplesPerPixel, TextureSampleUsageType, TextureShape},
 };
 use crate::{
     backend::code_write_buf::CodeWriteSpan,
     frontend::any::shared_io::SamplingMethod,
     ir::{
-        ir_type::{HandleType, ScalarTypeInteger},
+        ScalarTypeInteger,
+        ir_type::{HandleType},
         recording::CallInfo,
         AddressSpace, Len, ScalarType, SizedType, StoreType, Type,
     },

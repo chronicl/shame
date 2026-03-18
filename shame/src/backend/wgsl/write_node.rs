@@ -11,12 +11,13 @@ use crate::{
     common::pool::Key,
     frontend::any::shared_io::{BindPath, SamplingMethod},
     ir::{
-        self, Comp4, CompoundOp, HandleType, Len, Node, ScalarConstant, ScalarType, SizedType, StoreType, Type,
+        CanonName, LayoutType, Matrix, SizedArray, StructKindRef, Vector, self, Comp4, CompoundOp, HandleType, Len,
+        Node, ScalarConstant, ScalarType, SizedType, StoreType, Type,
         expr::{
             Assign, Binding, BuiltinFn, Decomposition, Expr, FnRelated, Literal, Operator, PipelineIo,
             PushConstantsField, RefLoad, Show, TextureFn,
         },
-        ir_type::{CanonName, LayoutType, Matrix, SizedArray, StructKindRef, TextureShape, Vector},
+        ir_type::{TextureShape},
         recording::{CallInfo, FunctionDef, TemplateStructParams},
     },
 };

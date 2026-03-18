@@ -14,7 +14,7 @@ pub(crate) mod type_check;
 
 use std::fmt::Display;
 
-use crate::{impl_track_caller_fn_any, ir::ir_type, ir::Type, sig, try_ctx_track_caller};
+use crate::{impl_track_caller_fn_any, ir::ir_type, ir, ir::Type, sig, try_ctx_track_caller};
 pub use alloc::*;
 pub use assign::*;
 pub use builtin_fn::*;
@@ -59,7 +59,7 @@ pub enum Expr {
 impl TypeCheck for Expr {
     #[rustfmt::skip]
     fn infer_type(&self, args: &[Type]) -> Result<Type, NoMatchingSignature> {
-        use ir_type::{Len::*, StoreType::*, *};
+        use ir::{Len::*, StoreType::*, *};
         match self {
             Expr::VarIdent      (x) => x.infer_type(args),
             Expr::Assign        (x) => x.infer_type(args),

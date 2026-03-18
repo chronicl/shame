@@ -593,7 +593,7 @@ impl StructLayoutCalculator {
 mod tests {
     use super::*;
     use crate::any::U32PowerOf2;
-    use crate::frontend::rust_types::type_layout::Repr;
+    use super::super::Repr;
     use crate::ir::{Len, Len2, ScalarTypeFp, ScalarTypeInteger};
     use std::num::NonZeroU32;
     use std::rc::Rc;

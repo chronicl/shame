@@ -12,7 +12,7 @@ use thiserror::Error;
 use super::{PossibleStages, ShaderStage, StageMask};
 use crate::{
     BindingIter, DepthLhs, StencilMasking, Test, TypeLayout,
-    any::layout::Repr,
+    ir::Repr,
     call_info,
     common::{
         integer::post_inc_usize,
@@ -33,10 +33,7 @@ use crate::{
             rasterizer::{Draw, FragmentQuad, FragmentStage, PrimitiveAssembly},
         },
         error::InternalError,
-        rust_types::{
-            len::x3,
-            type_layout::{self, StructLayout, recipe},
-        },
+        rust_types::{len::x3},
     },
     ir::{
         self, FragmentShadingRate, Node, SizedField, SizedStruct, SizedType, StoreType, StructureDefinitionError,
@@ -355,7 +352,7 @@ impl WipPushConstantsField {
         let (byte_size, _) = sized_struct.byte_size_and_align();
 
         // TODO(release) the `.expect()` calls here can be removed by building a `std::alloc::Layout`-like builder for struct layouts.
-        let sized_struct: recipe::SizedStruct = sized_struct
+        let sized_struct: ir::SizedStruct = sized_struct
             .try_into()
             .map_err(|e| InternalError::new(true, format!("{e}")))?;
         let layout = sized_struct.layout();

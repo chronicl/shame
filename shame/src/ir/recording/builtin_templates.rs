@@ -1,7 +1,6 @@
-use crate::any::layout::Repr;
+use crate::ir::{Atomic, LayoutType, Repr, Vector};
 use crate::frontend::any::Any;
 use crate::ir::expr::type_check::SizedTypeShorthand;
-use crate::ir::ir_type::{Atomic, LayoutType};
 use crate::{
     call_info,
     frontend::any::record_node,
@@ -14,7 +13,6 @@ use crate::{
         },
         recording::Context,
         SizedStruct, SizedType, StoreType, StructureFieldNamesMustBeUnique, Type, ScalarType,
-        ir_type::Vector,
     },
     same, sig,
 };

@@ -5,13 +5,10 @@
 use std::fmt::{Display, Write};
 
 use crate::{
-    any::{
-        layout::{ArrayLayout, StructLayout},
-        U32PowerOf2,
-    },
+    any::{U32PowerOf2},
     common::prettify::UnwrapDisplayOr,
-    TypeLayout,
 };
+use super::{TypeLayout, ArrayLayout, StructLayout};
 
 impl Display for TypeLayout {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.write(f, LayoutInfoFlags::ALL) }

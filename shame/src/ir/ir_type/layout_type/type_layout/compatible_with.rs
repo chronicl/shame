@@ -1,38 +1,34 @@
 use std::fmt::Write;
 
 use crate::{
-    BufferAddressSpace, Language, TypeLayout,
-    any::layout::StructLayout,
-    call_info,
+    BufferAddressSpace, Language, call_info,
     common::{
         format::display,
         prettify::{UnwrapDisplayOr, set_color},
     },
-    frontend::{
-        encoding::buffer::BufferAddressSpaceEnum,
-        rust_types::type_layout::{
-            ArrayLayout,
-            display::{self, LayoutInfoFlags},
-            eq::{LayoutMismatch, StructMismatch, TopLevelMismatch, try_find_mismatch},
-            recipe::to_layout::RecipeContains,
-        },
-    },
-    ir::{recording::Context},
+    frontend::{encoding::buffer::BufferAddressSpaceEnum},
+    ir::{recording::Context, LayoutType},
     mem,
 };
 
-use super::{recipe::TypeLayoutRecipe, Repr};
+use super::{
+    TypeLayout, Repr, StructLayout,
+    from_ir::RecipeContains,
+    ArrayLayout,
+    display::{self, LayoutInfoFlags},
+    eq::{LayoutMismatch, StructMismatch, TopLevelMismatch, try_find_mismatch},
+};
 
 pub use mem::{Storage, Uniform};
 
-/// `TypeLayoutCompatibleWith<AddressSpace>` is a [`TypeLayoutRecipe`] with the additional
+/// `TypeLayoutCompatibleWith<AddressSpace>` is a [`LayoutType`] with the additional
 /// guarantee that the [`TypeLayout`] it produces is compatible with the specified `AddressSpace`.
 ///
 /// Address space requirements are language specific, which is why `TypeLayoutCompatibleWith` constructors
 /// additionally take a [`Language`] parameter.
 ///
 /// To be "compatible with" an address space means that
-/// - the recipe is **valid** ([`TypeLayoutRecipe::layout`] succeeds)
+/// - the recipe is **valid** ([`LayoutType::layout`] succeeds)
 /// - the type layout **satisfies the layout requirements** of the address space
 /// - the type layout recipe is **representable** in the target language
 ///
@@ -43,7 +39,7 @@ pub use mem::{Storage, Uniform};
 /// 2. the available layout algorithms in the target language can produce the same layout as the one produced by the recipe
 /// 3. support for the custom attributes the recipe uses, such as `#[align(N)]` and `#[size(N)]`.
 ///    Custom attributes may be rejected by the target language itself (NotRepresentable error)
-///    or by the layout algorithms specified in the recipe (InvalidRecipe error during `TypeLayoutRecipe -> TypeLayout` conversion).
+///    or by the layout algorithms specified in the recipe (InvalidRecipe error during `LayoutType -> TypeLayout` conversion).
 ///
 /// For example for wgsl we have
 /// 1. PackedVector can be part of a recipe, but can not be expressed in wgsl,
@@ -55,16 +51,16 @@ pub use mem::{Storage, Uniform};
 /// 3. Wgsl only supports custom struct field attributes `#[align(N)]` and `#[size(N)]` currently.
 #[derive(Debug, Clone)]
 pub struct TypeLayoutCompatibleWith<AddressSpace> {
-    recipe: TypeLayoutRecipe,
+    recipe: LayoutType,
     _phantom: std::marker::PhantomData<AddressSpace>,
 }
 
 impl<AS: BufferAddressSpace> TypeLayoutCompatibleWith<AS> {
     /// TODO(chronicl)
-    pub fn recipe(&self) -> &TypeLayoutRecipe { &self.recipe }
+    pub fn recipe(&self) -> &LayoutType { &self.recipe }
 
     /// TODO(chronicl)
-    pub fn try_from(language: Language, recipe: TypeLayoutRecipe) -> Result<Self, AddressSpaceError> {
+    pub fn try_from(language: Language, recipe: LayoutType) -> Result<Self, AddressSpaceError> {
         let address_space = AS::BUFFER_ADDRESS_SPACE;
         let layout = recipe.layout();
 
@@ -173,9 +169,9 @@ pub enum NotRepresentable {
     #[error("{0}")]
     LayoutError(LayoutError),
     #[error("{0} contains a {3}, which is not allowed in {1}'s {2} address space.")]
-    MayNotContain(TypeLayoutRecipe, Language, BufferAddressSpaceEnum, RecipeContains),
+    MayNotContain(LayoutType, Language, BufferAddressSpaceEnum, RecipeContains),
     #[error("Unknown layout error occured for {0} in {1} address space.")]
-    UnknownLayoutError(TypeLayoutRecipe, BufferAddressSpaceEnum),
+    UnknownLayoutError(LayoutType, BufferAddressSpaceEnum),
 }
 
 #[derive(thiserror::Error, Debug, Clone)]
@@ -186,14 +182,14 @@ pub enum RequirementsNotSatisfied {
         "The size of `{0}` on the gpu is not known at compile time. {1}'s {2} address space \
      requires that the size of {0} on the gpu is known at compile time."
     )]
-    MustBeSized(TypeLayoutRecipe, Language, BufferAddressSpaceEnum),
+    MustBeSized(LayoutType, Language, BufferAddressSpaceEnum),
     #[error("Unknown layout error occured for {0} in {1} address space.")]
-    UnknownLayoutError(TypeLayoutRecipe, BufferAddressSpaceEnum),
+    UnknownLayoutError(LayoutType, BufferAddressSpaceEnum),
 }
 
 #[derive(Debug, Clone)]
 pub struct LayoutError {
-    recipe: TypeLayoutRecipe,
+    recipe: LayoutType,
     mismatch: LayoutMismatch,
 
     /// Used to adjust the error message

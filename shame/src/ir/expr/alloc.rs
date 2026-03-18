@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
 use crate::frontend::any::Any;
-use crate::ir::ir_type::LayoutType;
 use crate::ir::recording::NodeRecordingError;
 use crate::{
     call_info,
@@ -10,13 +9,11 @@ use crate::{
     impl_track_caller_fn_any,
     ir::{
         expr::Expr,
-        ir_type::{
-            AccessMode, AddressSpace, Indirection,
-            Len::*,
-            Len2,
-            ScalarType::{self, *},
-            StoreType::*,
-        },
+        Len::*,
+        Len2,
+        ScalarType::{self, *},
+        LayoutType,
+        ir_type::{AccessMode, AddressSpace, Indirection, StoreType::*},
         recording::{
             AllocError, AllocStmt, Context, ExprStmt, Ident, InteractionKind, MemoryInteractionEvent, MemoryRegion,
             Priority, Stmt, TimeInstant,

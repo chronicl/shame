@@ -11,15 +11,11 @@ use crate::{
     frontend::error::InternalError,
     impl_track_caller_fn_any,
     ir::{
-        ir_type::{
-            AccessMode, AddressSpace, Indirection,
-            Len::*,
-            Len2,
-            ScalarType::{self, *},
-            SizedType::*,
-            StoreType::*,
-            Type::Unit,
-        },
+        Len::*,
+        Len2,
+        ScalarType::{self, *},
+        SizedType::*,
+        ir_type::{AccessMode, AddressSpace, Indirection, StoreType::*, Type::Unit},
         recording::{Context, InteractionKind, MemoryInteractionEvent, MemoryRegion},
     },
 };

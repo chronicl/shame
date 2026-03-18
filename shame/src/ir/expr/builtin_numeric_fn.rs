@@ -8,13 +8,10 @@ use crate::frontend::any::Any;
 use crate::{
     impl_track_caller_fn_any,
     ir::{
-        ir_type::{
-            AccessMode, AddressSpace, Indirection,
-            Len::*,
-            Len2,
-            ScalarType::{self, *},
-            StoreType::*,
-        },
+        Len::*,
+        Len2,
+        ScalarType::{self, *},
+        ir_type::{AccessMode, AddressSpace, Indirection, StoreType::*},
         recording::{BuiltinTemplateStructs, FrexpGenerics, ModfGenerics},
     },
 };

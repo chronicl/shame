@@ -1,3 +1,4 @@
+use crate::any::TypeLayoutCompatibleWith;
 use crate::common::proc_macro_reexports::{GpuLayoutField, GpuStoreImplCategory};
 use crate::frontend::any::shared_io::{BindPath, BindingType, BufferBindingType};
 use crate::frontend::any::{Any, InvalidReason};
@@ -11,7 +12,6 @@ use crate::frontend::rust_types::reference::{Ref};
 use crate::frontend::rust_types::reference::{AccessMode, Read, ReadWrite};
 use crate::frontend::rust_types::scalar_type::{ScalarType, ScalarTypeFp, ScalarTypeNumber};
 use crate::frontend::rust_types::struct_::{BufferFields, SizedFields, Struct};
-use crate::frontend::rust_types::type_layout::compatible_with::{AddressSpaceError, TypeLayoutCompatibleWith};
 use crate::frontend::rust_types::type_traits::{BindingArgs, GpuSized, GpuStore, NoAtomics, NoBools, NoHandles};
 use crate::frontend::rust_types::AsAny;
 use crate::frontend::rust_types::vec::vec;
