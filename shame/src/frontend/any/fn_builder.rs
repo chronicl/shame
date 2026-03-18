@@ -6,13 +6,13 @@ use crate::{
     common::{pool::Key, small_vec::SmallVec},
     frontend::{encoding::EncodingErrorKind, error::InternalError},
     ir::{
-        self,
+        self, AccessMode, Node, SizedType, Type,
         expr::{ArgViewKind, Expr, FnRelated},
+        ir_type::LayoutType,
         recording::{
             AllocError, BlockKind, BlockSeriesRecorder, BodyKind, CallInfo, Context, Dependence, FlowStmt, FnError,
             FunctionDef, Ident, Jump, MemoryRegion, Priority, Stmt, TimeInstant,
         },
-        AccessMode, Node, SizedType, Type,
     },
 };
 
@@ -87,10 +87,10 @@ impl Any {
                 // https://www.w3.org/TR/WGSL/#function-restriction
                 match (pass_as, &store_ty) {
                     // sized types
-                    (PA::Value | PA::InOut | PA::Out | PA::Ptr(..), ST::Sized(_)) => Ok(()),
+                    (PA::Value | PA::InOut | PA::Out | PA::Ptr(..), ST::Layout(LayoutType::Sized(_))) => Ok(()),
 
-                    // runtime-sized array
-                    (PA::Ptr(addr, am), ST::RuntimeSizedArray(_)) => Ok(()),
+                    // runtime-sized array  TODO(chronicl) about unsized structs
+                    (PA::Ptr(addr, am), ST::Layout(LayoutType::RuntimeSizedArray(_))) => Ok(()),
 
                     // handles (not supported for now, even though shader languages technically support this)
                     (_, ST::Handle(_)) => Err(FnError::InvalidFunctionParameterType(pass_as, store_ty.clone())),

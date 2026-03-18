@@ -18,7 +18,14 @@ pub use ir_type::ScalarConstant;
 pub use ir_type::ScalarType;
 pub use ir_type::ScalarTypeFp;
 pub use ir_type::ScalarTypeInteger;
+pub use ir_type::Vector;
+pub use ir_type::Matrix;
+pub use ir_type::Atomic;
+pub use ir_type::SizedArray;
+pub use ir_type::SizedStruct;
 pub use ir_type::SizedType;
+pub use ir_type::RuntimeSizedArray;
+pub use ir_type::UnsizedStruct;
 pub use ir_type::StoreType;
 pub use ir_type::Type;
 
@@ -27,12 +34,10 @@ pub use ir_type::PackedFloat;
 pub use ir_type::PackedScalarType;
 pub use ir_type::PackedVector;
 
-pub use ir_type::BufferBlock;
 pub use ir_type::RuntimeSizedArrayField;
 pub use ir_type::SizedField;
-pub use ir_type::SizedStruct;
-pub use ir_type::Struct;
 pub use ir_type::StructKind;
+pub use ir_type::StructKindRef;
 pub use ir_type::StructureDefinitionError;
 pub use ir_type::StructureFieldNamesMustBeUnique;
 

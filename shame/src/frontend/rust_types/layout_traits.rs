@@ -568,7 +568,7 @@ impl BufferFields for GpuT {
         }
     }
 
-    fn get_bufferblock_type() -> ir::BufferBlock {
+    fn get_struct_kind() -> ir::StructKind {
         // compiler_error! if the struct has zero fields!
 
         let a = (
@@ -725,7 +725,7 @@ impl GpuStore for GpuT {
         unreachable!()
     }
 
-    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::Fields(Self::get_bufferblock_type()) }
+    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::Fields(Self::get_struct_kind()) }
 }
 
 impl GpuAligned for GpuT {

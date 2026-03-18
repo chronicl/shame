@@ -188,7 +188,6 @@ macro_rules! impl_into_sized_type {
        )*
     };
 }
-
 impl_into_sized_type!(
     Vector       -> SizedType::Vector,
     Matrix       -> SizedType::Matrix,
@@ -196,6 +195,10 @@ impl_into_sized_type!(
     Atomic       -> SizedType::Atomic,
     SizedStruct  -> SizedType::Struct
 );
+
+impl From<ScalarType> for SizedType {
+    fn from(value: ScalarType) -> Self { SizedType::Vector(Vector::new(value, Len::X1)) }
+}
 
 impl<T> From<T> for LayoutType
 where

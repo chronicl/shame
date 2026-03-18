@@ -51,9 +51,7 @@ pub type AtomicU32 = Atomic<u32>;
 pub type AtomicI32 = Atomic<i32>;
 
 impl<T: ScalarTypeInteger> GpuType for Atomic<T> {
-    fn ty() -> ir::Type {
-        ir::Type::Store(Self::store_ty())
-    }
+    fn ty() -> ir::Type { ir::Type::Store(Self::store_ty()) }
 
     fn from_any_unchecked(any: Any) -> Self {
         Atomic {
@@ -65,47 +63,31 @@ impl<T: ScalarTypeInteger> GpuType for Atomic<T> {
 
 impl<T: ScalarTypeInteger> ToGpuType for Atomic<T> {
     type Gpu = Self;
-    fn to_gpu(&self) -> Self::Gpu {
-        *self
-    }
-    fn to_any(&self) -> Any {
-        self.any
-    }
-    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> {
-        Some(self)
-    }
+    fn to_gpu(&self) -> Self::Gpu { *self }
+    fn to_any(&self) -> Any { self.any }
+    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> { Some(self) }
 }
 
 impl<T: ScalarTypeInteger> GpuSized for Atomic<T> {
-    fn sized_ty() -> ir::SizedType {
-        ir::SizedType::Atomic(T::SCALAR_TYPE_INTEGER)
-    }
+    fn sized_ty() -> ir::SizedType { ir::Atomic::new(T::SCALAR_TYPE_INTEGER).into() }
 }
 
 impl<T: ScalarTypeInteger> GpuAligned for Atomic<T> {
-    fn aligned_ty() -> ir::AlignedType {
-        ir::AlignedType::Sized(<Self as GpuSized>::sized_ty())
-    }
+    fn aligned_ty() -> ir::AlignedType { ir::AlignedType::Sized(<Self as GpuSized>::sized_ty()) }
 }
 
 impl<T: ScalarTypeInteger> GpuStore for Atomic<T> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
-    fn store_ty() -> ir::StoreType {
-        ir::StoreType::Sized(<Self as GpuSized>::sized_ty())
-    }
+    fn store_ty() -> ir::StoreType { <Self as GpuSized>::sized_ty().into() }
 
-    fn impl_category() -> GpuStoreImplCategory {
-        GpuStoreImplCategory::GpuType(Self::store_ty())
-    }
+    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
 }
 
 impl<T: ScalarTypeInteger> NoBools for Atomic<T> {}
 impl<T: ScalarTypeInteger> NoHandles for Atomic<T> {}
 
 impl<T: ScalarTypeInteger> AsAny for Atomic<T> {
-    fn as_any(&self) -> Any {
-        self.any
-    }
+    fn as_any(&self) -> Any { self.any }
 }
 
 impl<T: ScalarTypeInteger> From<Any> for Atomic<T> {
@@ -118,20 +100,14 @@ impl<T: ScalarTypeInteger> From<Any> for Atomic<T> {
 }
 
 impl<T: ScalarTypeInteger> FromAnys for Atomic<T> {
-    fn expected_num_anys() -> usize {
-        1
-    }
+    fn expected_num_anys() -> usize { 1 }
 
     #[track_caller]
-    fn from_anys(mut anys: impl Iterator<Item = Any>) -> Self {
-        super::layout_traits::from_single_any(anys).into()
-    }
+    fn from_anys(mut anys: impl Iterator<Item = Any>) -> Self { super::layout_traits::from_single_any(anys).into() }
 }
 
 impl<T: ScalarTypeInteger> GetAllFields for Atomic<T> {
-    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> {
-        []
-    }
+    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
 }
 
 impl<T: ScalarTypeInteger> GpuLayout for Atomic<T> {
@@ -155,15 +131,11 @@ where
 {
     /// (no documentation yet)
     #[track_caller]
-    pub fn load(&self) -> vec<Int, x1> {
-        self.as_any().address().atomic_load().into()
-    }
+    pub fn load(&self) -> vec<Int, x1> { self.as_any().address().atomic_load().into() }
 
     /// (no documentation yet)
     #[track_caller]
-    pub fn store(&self, value: impl To<vec<Int, x1>>) {
-        self.as_any().address().atomic_store(value.to_any());
-    }
+    pub fn store(&self, value: impl To<vec<Int, x1>>) { self.as_any().address().atomic_store(value.to_any()); }
 
     /// (no documentation yet)
     #[track_caller]

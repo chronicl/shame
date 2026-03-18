@@ -38,7 +38,6 @@ use crate::{
     },
     ir::{
         self, SizedStruct, TextureFormatWrapper,
-        ir_type::Field,
         pipeline::{PipelineError, StageMask},
         recording::Context,
     },

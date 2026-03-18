@@ -40,6 +40,15 @@ impl StructKind {
     }
 }
 
+impl From<StructKind> for LayoutType {
+    fn from(s: StructKind) -> Self {
+        match s {
+            StructKind::Sized(s) => LayoutType::Sized(SizedType::Struct(s)),
+            StructKind::Unsized(s) => LayoutType::UnsizedStruct(s),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StructKindRef<'a> {
     Sized(&'a SizedStruct),
@@ -97,6 +106,27 @@ impl StructKindRef<'_> {
             StructKindRef::Sized(_) => StructKindVariant::Sized,
             StructKindRef::Unsized(_) => StructKindVariant::Unsized,
         }
+    }
+
+    pub fn find_field(&self, name: &CanonName) -> Option<LayoutType> {
+        self.sized_fields()
+            .iter()
+            .find(|f| &f.name == name)
+            .map(|f| LayoutType::Sized(f.ty.clone()))
+            .or_else(|| {
+                self.last_unsized()
+                    .filter(|f| &f.name == name)
+                    .map(|f| LayoutType::RuntimeSizedArray(f.array.clone()))
+            })
+    }
+
+    pub fn is_empty(&self) -> bool { self.sized_fields().is_empty() && self.last_unsized().is_none() }
+
+    pub fn field_names(&self) -> impl Iterator<Item = &CanonName> {
+        self.sized_fields()
+            .iter()
+            .map(|f| &f.name)
+            .chain(self.last_unsized().as_ref().map(|f| &f.name))
     }
 }
 
@@ -234,7 +264,7 @@ impl StructRegistry {
     ) -> bool {
         if !self.contains(s) {
             self.defs
-                .push((s.to_kind(), StructDef::new_for_struct(s, idents, call_info)));
+                .push((s.to_owned(), StructDef::new_for_struct(s, idents, call_info)));
             true
         } else {
             false

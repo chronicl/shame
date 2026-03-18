@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use super::{
-    type_check::{NoMatchingSignature, SigFormatting, TypeCheck},
+    type_check::{NoMatchingSignature, SigFormatting, TypeCheck, SizedTypeShorthand::*},
     BuiltinFn, Expr,
 };
 use crate::frontend::any::Any;
@@ -13,7 +13,6 @@ use crate::{
             Len::*,
             Len2,
             ScalarType::{self, *},
-            SizedType::*,
             StoreType::*,
         },
         recording::{BuiltinTemplateStructs, FrexpGenerics, ModfGenerics},

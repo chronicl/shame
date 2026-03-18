@@ -2,6 +2,9 @@ use std::{borrow::Cow, fmt::Display, num::NonZeroU32, ops::Deref, rc::Rc};
 
 use crate::frontend::any::Any;
 use crate::TextureSampleUsageType;
+use crate::ir::StructKindRef;
+use crate::ir::expr::type_check;
+use crate::ir::ir_type::{LayoutType, Vector};
 use crate::{
     call_info,
     common::small_vec::SmallVec,
@@ -10,7 +13,7 @@ use crate::{
     ir::{
         self,
         expr::type_check::{SigFormatting, SignatureStrings},
-        ir_type::{CanonName, Field, Len, Len2, ScalarType, SizedType, StoreType},
+        ir_type::{CanonName, Len, Len2, ScalarType, SizedType, StoreType},
         recording::CallInfo,
         Type,
     },
@@ -145,8 +148,8 @@ impl TypeCheck for Decomposition {
         use Len::*;
         use ScalarType::*;
         use StoreType::*;
-        use SizedType::*;
         use Type::*;
+        use type_check::{vec_store, mat_store, array_store};
 
         match self {
             Decomposition::VectorAccess(comps) => sig!(
@@ -155,55 +158,55 @@ impl TypeCheck for Decomposition {
                     comment_below: "where `comps` is a list of up to 4 components (x, y, z or w).",
                     fmt: SigFormatting::RemoveAsterisksAndClone,
                 },
-                [Store(     Sized(Vector(l, t))    )] if comps.len() <= *l => Store(Vector(comps.get_len(), *t).into()),
-                [Ref(alloc, Sized(Vector(l, t)), am)] if comps.len() == 1 => Ref(alloc.clone(), Vector(comps.get_len(), *t).into(), *am),
+                [Store(     vec_store!(l, t)    )] if comps.len() <= *l => Store(Vector::new(*t, comps.get_len()).into()),
+                [Ref(alloc, vec_store!(l, t), am)] if comps.len() == 1 => Ref(alloc.clone(), Vector::new(*t, comps.get_len()).into(), *am),
             )(self, args),
             Decomposition::VectorIndex => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Store(    Sized(Vector(l, t))    ), Store(Sized(Vector(X1, U32 | I32)))] => Store(Vector(X1, *t).into()),
-                [Ref(alloc, Sized(Vector(l, t)), am), Store(Sized(Vector(X1, U32 | I32)))] => Ref(alloc.clone(), Vector(X1, *t).into(), *am),
+                [Store(     vec_store!(l, t)    ), Store(vec_store!(X1, U32 | I32))] => Store(Vector::new(*t, X1).into()),
+                [Ref(alloc, vec_store!(l, t), am), Store(vec_store!(X1, U32 | I32))] => Ref(alloc.clone(), Vector::new(*t, X1).into(), *am),
             )(self, args),
             Decomposition::VectorIndexConst(i) => sig!(
                 {
                     name: Decomposition::VectorAccess(i),
                     fmt: SigFormatting::RemoveAsterisksAndClone,
                 },
-                [Store(     Sized(Vector(l, t))    )] if *i < *l => Store(Vector(X1, *t).into()),
-                [Ref(alloc, Sized(Vector(l, t)), am)] if *i < *l => Ref(alloc.clone(), Vector(X1, *t).into(), *am),
+                [Store(     vec_store!(l, t)    )] if *i < *l => Store(Vector::new(*t, X1).into()),
+                [Ref(alloc, vec_store!(l, t), am)] if *i < *l => Ref(alloc.clone(), Vector::new(*t, X1).into(), *am),
             )(self, args),
             Decomposition::MatrixIndex => sig!(
-                [Store(     Sized(Matrix(col, row, t))    ), Store(Sized(Vector(X1, U32 | I32)))] => Store(Vector((*row).into(), (*t).into()).into()),
-                [Ref(alloc, Sized(Matrix(col, row, t)), am), Store(Sized(Vector(X1, U32 | I32)))] => Ref(alloc.clone(), Vector((*row).into(), (*t).into()).into(), *am),
+                [Store(     mat_store!(col, row, t)    ), Store(vec_store!(X1, U32 | I32))] => Store(Vector::new((*t).into(), (*row).into()).into()),
+                [Ref(alloc, mat_store!(col, row, t), am), Store(vec_store!(X1, U32 | I32))] => Ref(alloc.clone(), Vector::new((*t).into(), (*row).into()).into(), *am),
             )(self, args),
             Decomposition::MatrixIndexConst(i) => sig!(
                 {
                     name: Decomposition::MatrixIndexConst(i),
                     fmt: SigFormatting::RemoveAsterisksAndClone,
                 },
-                [Store(     Sized(Matrix(col, row, t))    )] if *i < *col => Store(Vector((*row).into(), (*t).into()).into()),
-                [Ref(alloc, Sized(Matrix(col, row, t)), am)] if *i < *col => Ref(alloc.clone(), Vector((*row).into(), (*t).into()).into(), *am),
+                [Store(     mat_store!(col, row, t)    )] if *i < *col => Store(Vector::new((*t).into(), (*row).into()).into()),
+                [Ref(alloc, mat_store!(col, row, t), am)] if *i < *col => Ref(alloc.clone(), Vector::new((*t).into(), (*row).into()).into(), *am),
             )(self, args),
             Decomposition::ArrayIndex => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Store(Sized(Array(t, _))), Store(Sized(Vector(X1, I32 | U32)))] => Type::from((**t).clone()),
-                [Ref(alloc, Sized(Array(t, _)), am), Store(Sized(Vector(X1, I32 | U32)))] => Ref(alloc.clone(), (**t).clone().into(), *am),
-                [Ref(alloc, RuntimeSizedArray(t), am), Store(Sized(Vector(X1, I32 | U32)))] => Ref(alloc.clone(), (*t).clone().into(), *am),
+                [Store(     array_store!(t, _)), Store(vec_store!(X1, I32 | U32))] => Type::from((**t).clone()),
+                [Ref(alloc, array_store!(t, _), am), Store(vec_store!(X1, I32 | U32))] => Ref(alloc.clone(), (**t).clone().into(), *am),
+                [Ref(alloc, StoreType::Layout(LayoutType::RuntimeSizedArray(t)), am), Store(vec_store!(X1, I32 | U32))] => Ref(alloc.clone(), (*t).clone().into(), *am),
             )(self, args),
             Decomposition::ArrayIndexConst(i) => sig!(
                 {
                     name: Decomposition::ArrayIndexConst(i),
                     fmt: SigFormatting::RemoveAsterisksAndClone,
                 },
-                [Store(Sized(Array(t, n)))] if *i < n.get() => Type::from((**t).clone()),
-                [Ref(alloc, Sized(Array(t, n)), am)] if *i < n.get() => Ref(alloc.clone(), (**t).clone().into(), *am),
-                [Ref(alloc, RuntimeSizedArray(t), am)] => Ref(alloc.clone(), (*t).clone().into(), *am),
+                [Store(     array_store!(t, n))] if *i < n.get() => Type::from((**t).clone()),
+                [Ref(alloc, array_store!(t, n), am)] if *i < n.get() => Ref(alloc.clone(), (**t).clone().into(), *am),
+                [Ref(alloc, StoreType::Layout(LayoutType::RuntimeSizedArray(t)), am)] => Ref(alloc.clone(), (*t).clone().into(), *am),
             )(self, args),
             Decomposition::BindingArrayIndex => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
                 // For texture binding arrays
-                [Store(BindingArray(t, n)), Store(Sized(Vector(X1, I32 | U32)))] => Type::Store((**t).clone()),
+                [Store(BindingArray(t, n)), Store(vec_store!(X1, I32 | U32))] => Type::Store((**t).clone()),
                 // For buffer binding arrays
-                [Ref(alloc, BindingArray(t, n), am), Store(Sized(Vector(X1, I32 | U32)))] => Ref(alloc.clone(), (**t).clone(), *am),
+                [Ref(alloc, BindingArray(t, n), am), Store(vec_store!(X1, I32 | U32))] => Ref(alloc.clone(), (**t).clone(), *am),
             )(self, args),
             Decomposition::BindingArrayIndexConst(i) => sig!(
                 {
@@ -249,11 +252,11 @@ impl Decomposition {
             }
         };
 
-        let struct_: &Rc<ir::Struct> = match single_arg {
-            Ref(_, Sized(Structure(struct_)), _) |
-            Store(Sized(Structure(struct_))) => struct_,
+        let struct_: StructKindRef<'_> = match single_arg {
+            Ref(_, StoreType::Layout(LayoutType::Sized(SizedType::Struct(s))), _) |
+            Store(StoreType::Layout(LayoutType::Sized(SizedType::Struct(s)))) => s.into(),
 
-            Ref(_, BufferBlock(struct_), _) => struct_,
+            Ref(_, StoreType::Layout(LayoutType::UnsizedStruct(s)), _) => s.into(),
 
             _ => {
                 return Err(no_matching_sig_with_comment(
@@ -267,9 +270,9 @@ impl Decomposition {
 
         match struct_.find_field(field_name) {
             Some(field) => Ok(match single_arg {
-                Ref(alloc, _, am) => Type::Ref(alloc.clone(), Field::ty(field), *am),
-                Ptr(alloc, _, am) => Type::Ref(alloc.clone(), Field::ty(field), *am),
-                _ => Type::Store(Field::ty(field)),
+                Ref(alloc, _, am) => Type::Ref(alloc.clone(), StoreType::Layout(field), *am),
+                Ptr(alloc, _, am) => Type::Ref(alloc.clone(), StoreType::Layout(field), *am),
+                Store(_) | Unit => Type::Store(StoreType::Layout(field)),
             }),
             None => Err(no_matching_sig_with_comment({
                 let mut s = String::new();
@@ -279,8 +282,8 @@ impl Decomposition {
                     writeln!(s, "this struct has no fields.");
                 } else {
                     writeln!(s, "its fields are:");
-                    for field in struct_.fields() {
-                        writeln!(s, "- `{}`", field.name());
+                    for name in struct_.field_names() {
+                        writeln!(s, "- `{}`", name);
                     }
                 }
                 s

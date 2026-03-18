@@ -1,14 +1,53 @@
 use crate::{
     common::small_vec_actual::SmallVec,
-    ir::ir_type::{Len, Len2, ScalarType, SizedType, StoreType},
-    ir::{self, Type},
+    ir::{
+        self, ScalarTypeFp, ScalarTypeInteger, Type,
+        ir_type::{Atomic, LayoutType, Len, Len2, Matrix, ScalarType, SizedArray, SizedType, StoreType, Vector},
+    },
 };
-use std::fmt::Write;
+use std::{fmt::Write, num::NonZeroU32, rc::Rc};
 use std::{borrow::Cow, fmt::Display};
 
 pub trait TypeCheck {
     fn infer_type(&self, args: &[Type]) -> Result<Type, NoMatchingSignature>;
 }
+
+macro_rules! vec_store {
+    ($len:pat, $scalar:pat) => {
+        crate::ir::StoreType::Layout(crate::ir::ir_type::LayoutType::Sized(crate::ir::SizedType::Vector(crate::ir::ir_type::Vector {
+            len: len @ $len,
+            scalar: scalar @ $scalar,
+        })))
+    };
+}
+macro_rules! atomic_store {
+    ($scalar:pat) => {
+        crate::ir::StoreType::Layout(crate::ir::LayoutType::Sized(crate::ir::SizedType::Atomic(crate::ir::Atomic {
+            scalar: scalar @ $scalar,
+        })))
+    };
+}
+macro_rules! mat_store {
+    ($columns:pat, $rows:pat, $scalar:pat) => {
+        crate::ir::StoreType::Layout(crate::ir::ir_type::LayoutType::Sized(crate::ir::SizedType::Matrix(crate::ir::ir_type::Matrix {
+            columns: columns @ $columns,
+            rows: rows @ $rows,
+            scalar: scalar @ $scalar,
+        })))
+    };
+}
+macro_rules! array_store {
+    ($element:pat, $len:pat) => {
+        crate::ir::StoreType::Layout(crate::ir::ir_type::LayoutType::Sized(crate::ir::SizedType::Array(crate::ir::ir_type::SizedArray {
+            element: element @ $element,
+            len: len @ $len,
+        })))
+    };
+}
+pub(crate) use vec_store;
+pub(crate) use atomic_store;
+pub(crate) use mat_store;
+pub(crate) use array_store;
 
 /// define type signatures for recording-time type checking
 ///
@@ -71,13 +110,15 @@ macro_rules! sig {
         use $crate::ir::expr::type_check::TypeShorthand;
         use $crate::ir::expr::type_check::SignatureStrings;
         use $crate::ir::expr::type_check::shorthand_level_for_args;
+        use std::borrow::Cow;
 
         // map types to type shorthands for simpler syntax on the macro-callsite,
         // then create `SmallVec` from that map-iterator to obtain a matchable
         // slice from `SmallVec`'s `std::ops::Deref`.
-        let vec
-        $($(: Option<SmallVec<&$force_in_type, 4>>)?)?
-         = SmallVec::<_, 4>::from_opt_iter(args.iter().map(TypeShorthand::shorthand_for));
+         let vec
+            $($(: Option<SmallVec<Cow<'_, $force_in_type>, 4>>)?)?
+            = SmallVec::<_, 4>::from_opt_iter(args.iter().map(TypeShorthand::shorthand_for));
+        let vec: Option<SmallVec<&_, 4>> = vec.as_ref().map(|v| v.iter().map(|cow| &**cow).collect());
 
         let shorthand_level = shorthand_level_for_args(&vec);
 
@@ -230,10 +271,16 @@ impl Display for NoMatchingSignature {
             match (&self.shorthand_level, arg) {
                 (Lv::Type, _) => write!(f, "{arg:?}")?,
                 (Lv::StoreType, Type::Store(store_type)) => write!(f, "{store_type:?}")?,
-                (Lv::SizedType, Type::Store(StoreType::Sized(sized_type))) => write!(f, "{sized_type:?}")?,
-                (Lv::ScalarType, Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, scalar_type)))) => {
-                    write!(f, "{scalar_type:?}")?
+                (Lv::SizedType, Type::Store(StoreType::Layout(LayoutType::Sized(sized_type)))) => {
+                    write!(f, "{sized_type:?}")?
                 }
+                (
+                    Lv::ScalarType,
+                    Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Vector(Vector {
+                        len: Len::X1,
+                        scalar: scalar_type,
+                    })))),
+                ) => write!(f, "{scalar_type:?}")?,
                 (Lv::ScalarType, Type::Store(store_type)) => write!(f, "{store_type:?}")?,
                 _ => write!(f, "{arg:?}")?,
             }
@@ -313,25 +360,24 @@ pub(crate) const fn shorthand_level_for_args<T: TypeShorthand, const N: usize>(
 ) -> TypeShorthandLevel {
     T::SHORT_LEVEL
 }
-
-pub(crate) trait TypeShorthand: Sized {
+pub(crate) trait TypeShorthand: Sized + Clone {
     const SHORT_LEVEL: TypeShorthandLevel;
     fn to_type(self) -> Type;
-    fn shorthand_for(t: &Type) -> Option<&Self>;
+    fn shorthand_for(t: &Type) -> Option<Cow<'_, Self>>;
 }
 
 impl TypeShorthand for Type {
     const SHORT_LEVEL: TypeShorthandLevel = TypeShorthandLevel::Type;
     fn to_type(self) -> Type { self }
-    fn shorthand_for(t: &Type) -> Option<&Self> { Some(t) }
+    fn shorthand_for(t: &Type) -> Option<Cow<'_, Self>> { Some(Cow::Borrowed(t)) }
 }
 
 impl TypeShorthand for StoreType {
     const SHORT_LEVEL: TypeShorthandLevel = TypeShorthandLevel::StoreType;
     fn to_type(self) -> Type { Type::Store(self) }
-    fn shorthand_for(t: &Type) -> Option<&Self> {
+    fn shorthand_for(t: &Type) -> Option<Cow<'_, Self>> {
         match t {
-            Type::Store(store_type) => Some(store_type),
+            Type::Store(store_type) => Some(Cow::Borrowed(store_type)),
             _ => None,
         }
     }
@@ -339,10 +385,10 @@ impl TypeShorthand for StoreType {
 
 impl TypeShorthand for SizedType {
     const SHORT_LEVEL: TypeShorthandLevel = TypeShorthandLevel::SizedType;
-    fn to_type(self) -> Type { Type::Store(StoreType::Sized(self)) }
-    fn shorthand_for(t: &Type) -> Option<&Self> {
+    fn to_type(self) -> Type { self.into() }
+    fn shorthand_for(t: &Type) -> Option<Cow<'_, Self>> {
         match t {
-            Type::Store(StoreType::Sized(sized_type)) => Some(sized_type),
+            Type::Store(StoreType::Layout(LayoutType::Sized(sized_type))) => Some(Cow::Borrowed(sized_type)),
             _ => None,
         }
     }
@@ -350,14 +396,55 @@ impl TypeShorthand for SizedType {
 
 impl TypeShorthand for ScalarType {
     const SHORT_LEVEL: TypeShorthandLevel = TypeShorthandLevel::ScalarType;
-    fn to_type(self) -> Type { Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, self))) }
-    fn shorthand_for(t: &Type) -> Option<&Self> {
+    fn to_type(self) -> Type { self.into() }
+    fn shorthand_for(t: &Type) -> Option<Cow<'_, Self>> {
         match t {
-            Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, scalar))) => Some(scalar),
+            Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Vector(Vector { scalar, len: Len::X1 })))) => {
+                Some(Cow::Borrowed(scalar))
+            }
             _ => None,
         }
     }
 }
+
+#[derive(Clone, PartialEq, Eq)]
+pub enum SizedTypeShorthand {
+    Vector(Len, ScalarType),
+    Matrix(Len2, Len2, ScalarTypeFp),
+    Atomic(ScalarTypeInteger),
+    Array(Rc<SizedType>, NonZeroU32),
+}
+
+impl TypeShorthand for SizedTypeShorthand {
+    const SHORT_LEVEL: TypeShorthandLevel = TypeShorthandLevel::SizedType;
+    fn to_type(self) -> Type {
+        match self {
+            SizedTypeShorthand::Vector(len, scalar) => Vector::new(scalar, len).into(),
+            SizedTypeShorthand::Matrix(c, r, scalar) => Matrix {
+                scalar,
+                columns: c,
+                rows: r,
+            }
+            .into(),
+            SizedTypeShorthand::Atomic(scalar) => Atomic { scalar }.into(),
+            SizedTypeShorthand::Array(a, l) => SizedArray::new(a, l).into(),
+        }
+    }
+    fn shorthand_for(t: &Type) -> Option<Cow<'_, Self>> {
+        Some(Cow::Owned(match t {
+            Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Vector(v)))) => Self::Vector(v.len, v.scalar),
+            Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Matrix(m)))) => {
+                Self::Matrix(m.columns, m.rows, m.scalar)
+            }
+            Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Atomic(a)))) => Self::Atomic(a.scalar),
+            Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Array(a)))) => {
+                Self::Array(a.element.clone(), a.len)
+            }
+            _ => return None,
+        }))
+    }
+}
+
 
 #[doc(hidden)] // internal api
 #[macro_export]

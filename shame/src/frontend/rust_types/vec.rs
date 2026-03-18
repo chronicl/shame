@@ -17,14 +17,11 @@ use crate::{
         proc_macro_utils::{collect_into_array_exact, push_wrong_amount_of_args_error},
         small_vec::SmallVec,
     },
-    frontend::encoding::{
-        buffer::{BufferAddressSpace},
-        rasterizer::Gradient,
-    },
+    frontend::encoding::{buffer::BufferAddressSpace, rasterizer::Gradient},
     ir::{
+        Comp4, GradPrecision, Vector, VectorAccess,
         pipeline::StageMask,
         recording::{CallInfoScope, Context, NodeRecordingError},
-        Comp4, GradPrecision, VectorAccess,
     },
 };
 
@@ -539,7 +536,7 @@ impl<T: ScalarType, L: Len> Deref for vec<T, L> {
 }
 
 impl<T: ScalarType, L: Len> GpuSized for vec<T, L> {
-    fn sized_ty() -> ir::SizedType { ir::SizedType::Vector(L::LEN, T::SCALAR_TYPE) }
+    fn sized_ty() -> ir::SizedType { Vector::new(T::SCALAR_TYPE, L::LEN).into() }
 }
 
 impl<T: ScalarType, L: Len> GpuAligned for vec<T, L> {
@@ -548,7 +545,7 @@ impl<T: ScalarType, L: Len> GpuAligned for vec<T, L> {
 
 impl<T: ScalarType, L: Len> GpuStore for vec<T, L> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = L::VecComponentsRef<T, AS, AM>;
-    fn store_ty() -> ir::StoreType { ir::StoreType::Sized(<Self as GpuSized>::sized_ty()) }
+    fn store_ty() -> ir::StoreType { <Self as GpuSized>::sized_ty().into() }
 
     fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
 }

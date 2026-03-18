@@ -21,7 +21,7 @@ use crate::{
         },
         rust_types::{
             layout_traits::CpuLayoutCompareError,
-            type_layout::{compatible_with::AddressSpaceError, recipe::ir_compat::IRConversionError},
+            type_layout::{compatible_with::AddressSpaceError},
         },
     },
     ir::{
@@ -305,8 +305,6 @@ pub enum EncodingErrorKind {
     AddressSpaceError(#[from] AddressSpaceError),
     #[error("{0}")]
     BindingError(#[from] BindingError),
-    #[error("{0}")]
-    IrConversionError(#[from] IRConversionError),
     #[error("{0}")]
     CpuLayoutCompareError(#[from] CpuLayoutCompareError),
     #[error("{0}")]

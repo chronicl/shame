@@ -10,7 +10,7 @@ use crate::{
         },
     },
     ir::{
-        ir_type::{round_up, CanonName},
+        ir_type::{CanonName},
         recording::{CallInfo, CallInfoScope, Context},
         AlignedType, SizedType,
     },
@@ -91,9 +91,12 @@ impl std::fmt::Display for CpuLayoutImplMismatch {
                 cpu_layout_provided_field_size: cpu_layout_impl_size,
             } => {
                 let field_index_count_from_1 = field_index + 1;
-                write!(f, "Field {field_index_count_from_1} of struct `{struct_name}` has a type with a `CpuLayout` implementation that \
-                claims this field is a `{t}` ");
-                
+                write!(
+                    f,
+                    "Field {field_index_count_from_1} of struct `{struct_name}` has a type with a `CpuLayout` implementation that \
+                claims this field is a `{t}` "
+                );
+
                 match cpu_layout_impl_size {
                     Some(s) => write!(f, "with a byte-size of {s},"),
                     None => write!(f, "with a size unknown at compile time,"),
@@ -101,7 +104,10 @@ impl std::fmt::Display for CpuLayoutImplMismatch {
 
                 match std_mem_size {
                     Some(s) => write!(f, "\nbut this field has an actual byte-size of {s}"),
-                    None => write!(f, "\nbut the size of this field is actually unknown at compile-time (unsized)"),
+                    None => write!(
+                        f,
+                        "\nbut the size of this field is actually unknown at compile-time (unsized)"
+                    ),
                 };
                 writeln!(f, ".")?;
                 writeln!(
@@ -232,3 +238,13 @@ pub fn repr_c_struct_layout(
 
 #[track_caller]
 pub fn call_info_scope() -> CallInfoScope { Context::call_info_scope() }
+
+pub fn round_up(multiple_of: u64, n: u64) -> u64 {
+    match multiple_of {
+        0 => match n {
+            0 => 0,
+            n => panic!("cannot round up {n} to a multiple of 0"),
+        },
+        k @ 1.. => n.div_ceil(k) * k,
+    }
+}

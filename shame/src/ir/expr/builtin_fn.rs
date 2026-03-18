@@ -1,22 +1,22 @@
 use std::{fmt::Display, num::NonZeroU32, ops::Not, rc::Rc};
 
-use super::{type_check::*, Comp4, ExponentFn, Expr, NumericFn, TextureFn};
+use super::{type_check::*, type_check::SizedTypeShorthand::*, Comp4, ExponentFn, Expr, NumericFn, TextureFn};
 use crate::{
     call_info,
     common::integer::i4,
     frontend::{
-        any::{record_node, shared_io::SamplingMethod, Any, ArgumentNotAvailable, InvalidReason},
+        any::{Any, ArgumentNotAvailable, InvalidReason, record_node, shared_io::SamplingMethod},
         encoding::EncodingErrorKind,
     },
     impl_track_caller_fn_any,
     ir::{
+        HandleType, SamplesPerPixel, SizedType, StructureFieldNamesMustBeUnique,
         ir_type::{
-            AccessMode, AddressSpace, Indirection,
+            self, AccessMode, AddressSpace, Indirection, LayoutType,
             Len::*,
             Len2,
             ScalarType::{self, *},
-            ScalarTypeFp, SizedStruct,
-            SizedType::*,
+            ScalarTypeFp, SizedArray, SizedStruct,
             StoreType::*,
             TextureShape,
             Type::Unit,
@@ -26,7 +26,6 @@ use crate::{
             AtomicCompareExchangeWeakGenerics, BuiltinTemplateStructs, Context, InteractionKind, MemoryRegion,
             NodeRecordingError, TemplateStructParams,
         },
-        HandleType, SamplesPerPixel, SizedType, StructureFieldNamesMustBeUnique,
     },
 };
 
@@ -227,7 +226,7 @@ impl Display for Constructor {
                 len2_to_u32(*rows)
             ),
             Constructor::Array(sized_type, non_zero) => write!(f, "array<{sized_type}, {}>(...)", non_zero.get()),
-            Constructor::Structure(sized_struct) => write!(f, "struct {}(...)", sized_struct.name()),
+            Constructor::Structure(sized_struct) => write!(f, "struct {}(...)", sized_struct.name),
         }
     }
 }
@@ -315,7 +314,7 @@ impl TypeCheck for Constructor {
                 )(self, args)
             }
             Constructor::Array(t, len) => {
-                let return_ty = ir::SizedType::Array(t.clone(), *len);
+                let return_ty = SizedArray::new(t.clone(), *len);
                 let signature_str = || {
                     use std::fmt::Write;
                     let mut sig = String::new();
@@ -337,7 +336,7 @@ impl TypeCheck for Constructor {
                 match len.get() as usize == args.len() {
                     true => {
                         let valid = args.iter().all(|arg| match arg {
-                            Type::Store(StoreType::Sized(arg)) => arg == &**t,
+                            Type::Store(StoreType::Layout(LayoutType::Sized(arg))) => arg == &**t,
                             _ => false,
                         });
                         match valid {
@@ -353,10 +352,10 @@ impl TypeCheck for Constructor {
                     use std::fmt::Write;
                     let mut sig = String::new();
                     write!(sig, "[");
-                    for s in s.sized_fields() {
+                    for s in s.fields.iter() {
                         write!(sig, "{}, ", s.ty);
                     }
-                    write!(sig, "] => {}", s.name());
+                    write!(sig, "] => {}", s.name);
                     sig
                 };
                 let no_matching_sig = || NoMatchingSignature {
@@ -367,14 +366,14 @@ impl TypeCheck for Constructor {
                     signature_formatting: None,
                     comment: None,
                 };
-                match s.len() == args.len() {
+                match s.fields.len() == args.len() {
                     true => {
-                        let valid = s.fields().map(|f| &f.ty).zip(args).all(|(field, arg)| match arg {
-                            Type::Store(StoreType::Sized(arg)) => arg == field,
+                        let valid = s.fields.iter().map(|f| &f.ty).zip(args).all(|(field, arg)| match arg {
+                            Type::Store(StoreType::Layout(LayoutType::Sized(arg))) => arg == field,
                             _ => false,
                         });
                         match valid {
-                            true => Ok(Type::from(SizedType::Structure(s.clone()))),
+                            true => Ok(Type::from(SizedType::Struct(s.clone()))),
                             false => Err(no_matching_sig()),
                         }
                     }
@@ -413,7 +412,10 @@ impl Any {
         // arg is not a scalar, this extra typecheck is added
         Context::try_with(call_info!(), |ctx| {
             match self.ty() {
-                Some(Type::Store(StoreType::Sized(SizedType::Vector(X1, t)))) => {
+                Some(Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Vector(ir_type::Vector {
+                    len: X1,
+                    scalar: t,
+                }))))) => {
                     match ir::Len2::try_from(len_after) {
                         Err(_) => *self, //noop, trying to splat from scalar to scalar,
                         Ok(len2) => {
@@ -440,7 +442,12 @@ impl Any {
     pub fn extend_vec_to_len(&self, len_after: ir::Len2) -> Any {
         let call_info = call_info!();
         Context::try_with(call_info!(), |ctx| match self.ty() {
-            Some(ty @ Type::Store(StoreType::Sized(SizedType::Vector(len_before, t)))) => {
+            Some(
+                ty @ Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Vector(ir_type::Vector {
+                    len: len_before,
+                    scalar: t,
+                })))),
+            ) => {
                 let zero = || Any::new_scalar(t.constant_from_f64(0.0));
                 let expr = Expr::BuiltinFn(BuiltinFn::Constructor(Constructor::Vector(len_after, t)));
                 let extra_components = u32::from(len_after) as i32 - u32::from(len_before) as i32;
@@ -576,7 +583,7 @@ impl TypeCheck for ArrayFn {
         use {AddressSpace::*, Type::*};
         (match self {
             ArrayFn::ArrayLength => sig! {
-               [Ptr(alloc, RuntimeSizedArray(_), _)] if alloc.address_space == Storage => U32
+               [Ptr(alloc, StoreType::Layout(LayoutType::RuntimeSizedArray(_)), _)] if alloc.address_space == Storage => U32
             },
         })(self, args)
     }
@@ -676,16 +683,18 @@ impl TypeCheck for AtomicFn {
         (match self {
             AtomicFn::AtomicLoad => sig! {
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                [Type::Ptr(allocation, Sized(Atomic(t)), ReadWrite)]
+                [Type::Ptr(allocation, StoreType::Layout(LayoutType::Sized(Atomic(a))), ReadWrite)]
                 if matches!(allocation.address_space, Storage | WorkGroup)
-                => ScalarType::from(*t)
+                => ScalarType::from(a.scalar)
             },
             AtomicFn::AtomicStore => sig! {
-                [Type::Ptr(allocation, Sized(Atomic(t0)), ReadWrite), Type::Store(Sized(Vector(X1, t)))]
-                if t0 == t && matches!(allocation.address_space, Storage | WorkGroup) => Unit
+                [Type::Ptr(allocation, StoreType::Layout(LayoutType::Sized(Atomic(a))), ReadWrite),
+                 Type::Store(Layout(LayoutType::Sized(SizedType::Vector(ir_type::Vector{ len: X1,scalar:  t}))))]
+                if a.scalar.as_scalar_type2() == *t && matches!(allocation.address_space, Storage | WorkGroup) => Unit
             },
             AtomicFn::AtomicReadModifyWrite(_) | AtomicFn::AtomicExchange => sig! {
-                [Type::Ptr(allocation, Sized(Atomic(t0)), ReadWrite), Type::Store(Sized(Vector(X1, t)))] if t0 == t => t
+                [Type::Ptr(allocation,  StoreType::Layout(LayoutType::Sized(Atomic(a))), ReadWrite),
+                 Type::Store(Layout(LayoutType::Sized(SizedType::Vector(ir_type::Vector{ len: X1,scalar:  t}))))] if a.scalar.as_scalar_type2() == *t => t
             },
             AtomicFn::AtomicCompareExchangeWeak(generics) => {
                 return BuiltinTemplateStructs::infer_type(
@@ -908,19 +917,19 @@ mod tests {
         let bitcast = BuiltinFn::Reinterpret(ReinterpretFn::Bitcast(ScalarType::F32));
         let select = BuiltinFn::Logical(LogicalFn::Select);
 
-        let args = &[
-            Type::from(SizedType::Vector(Len::X2, ScalarType::Bool)),
-            Type::from(SizedType::Vector(Len::X2, ScalarType::F16)),
-            Type::from(SizedType::Vector(Len::X2, ScalarType::F16)),
+        let args: &[Type] = &[
+            ir_type::Vector::new(ScalarType::Bool, Len::X2).into(),
+            ir_type::Vector::new(ScalarType::F16, Len::X2).into(),
+            ir_type::Vector::new(ScalarType::F16, Len::X2).into(),
         ];
 
         assert!(ctor_vec.infer_type(args).is_err());
         assert!(bitcast.infer_type(args).is_err());
 
-        let args = &[
-            Type::from(SizedType::Vector(Len::X2, ScalarType::F16)),
-            Type::from(SizedType::Vector(Len::X2, ScalarType::F16)),
-            Type::from(SizedType::Vector(Len::X2, ScalarType::Bool)),
+        let args: &[Type] = &[
+            ir_type::Vector::new(ScalarType::F16, Len::X2).into(),
+            ir_type::Vector::new(ScalarType::F16, Len::X2).into(),
+            ir_type::Vector::new(ScalarType::Bool, Len::X2).into(),
         ];
         assert!(select.infer_type(args).is_ok());
 

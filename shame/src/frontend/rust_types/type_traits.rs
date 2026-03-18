@@ -20,7 +20,7 @@ use crate::{
     },
     ir::{
         self,
-        ir_type::{align_of_array, AlignedType},
+        ir_type::{AlignedType},
         pipeline::StageMask,
         recording::Context,
     },
@@ -122,7 +122,7 @@ pub trait GpuStore: GpuAligned + GetAllFields + FromAnys {
 #[doc(hidden)] // proc macro detail
 pub enum GpuStoreImplCategory {
     GpuType(ir::StoreType),
-    Fields(ir::BufferBlock),
+    Fields(ir::StructKind),
 }
 
 impl GpuStoreImplCategory {
@@ -130,10 +130,7 @@ impl GpuStoreImplCategory {
     pub fn to_store_ty(self) -> ir::StoreType {
         match self {
             GpuStoreImplCategory::GpuType(ty) => ty,
-            GpuStoreImplCategory::Fields(buffer_block) => match buffer_block.clone().try_into() {
-                Ok(sized) => ir::StoreType::Sized(ir::SizedType::Structure(sized)),
-                Err(_) => ir::StoreType::BufferBlock(buffer_block),
-            },
+            GpuStoreImplCategory::Fields(s) => s.into(),
         }
     }
 }

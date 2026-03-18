@@ -6,7 +6,7 @@ use crate::{
     any::U32PowerOf2,
     call_info,
     common::prettify::set_color,
-    ir::{self, ir_type::BufferBlockDefinitionError, recording::Context, StructureFieldNamesMustBeUnique},
+    ir::{self, recording::Context, StructureFieldNamesMustBeUnique},
     GpuSized,
 };
 
@@ -15,7 +15,6 @@ use super::{Repr};
 
 pub(crate) mod align_size;
 pub(crate) mod builder;
-pub(crate) mod ir_compat;
 pub(crate) mod to_layout;
 
 pub use align_size::{FieldOffsets, MatrixMajor, StructLayoutCalculator, array_size, array_stride, array_align};

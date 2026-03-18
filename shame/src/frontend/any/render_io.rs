@@ -5,6 +5,8 @@ use thiserror::Error;
 use crate::any::layout::{Repr};
 use crate::frontend::any::Any;
 use crate::frontend::rust_types::type_layout::{recipe, TypeLayout};
+use crate::ir::{self, Vector};
+use crate::ir::ir_type::LayoutType;
 use crate::{
     call_info,
     common::iterator_ext::try_collect,
@@ -17,7 +19,7 @@ use crate::{
     },
     ir::{
         expr::{BuiltinShaderIn, BuiltinShaderIo, Expr, Interpolator, ShaderIo},
-        ir_type::{stride_of_array_from_element_align_size, CanonName, LenEven, TextureFormatId},
+        ir_type::{CanonName, LenEven, TextureFormatId},
         pipeline::{PipelineError, RecordedWithIndex},
         recording::Context,
         Len, PackedVector, ScalarType, SizedType, StoreType, TextureFormatWrapper, Type,
@@ -108,7 +110,7 @@ impl Any {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VertexAttribFormat {
     /// regular [`crate::vec`] types
-    Fine(Len, recipe::ScalarType),
+    Fine(Len, ir::ScalarType),
     /// packed [`crate::packed::PackedVec`] types
     Coarse(PackedVector),
 }
@@ -238,7 +240,7 @@ impl VertexAttribFormat {
     #[allow(missing_docs)]
     pub fn type_in_shader(self) -> SizedType {
         match self {
-            VertexAttribFormat::Fine(l, t) => SizedType::Vector(l, t.into()),
+            VertexAttribFormat::Fine(l, t) => Vector::new(t, l).into(),
             VertexAttribFormat::Coarse(coarse) => coarse.decompressed_ty(),
         }
     }
@@ -317,7 +319,9 @@ impl Any {
             let mut render_pipeline = ctx.render_pipeline_mut();
 
             let vec_ty = match ty {
-                Type::Store(StoreType::Sized(SizedType::Vector(len, stype))) => Ok((*len, *stype)),
+                Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Vector(Vector { len, scalar })))) => {
+                    Ok((*len, *scalar))
+                }
                 _ => Err(PipelineError::InvalidAttributeType(ty.clone())),
             };
 

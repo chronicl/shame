@@ -1,11 +1,14 @@
 use super::{NoMatchingSignature, TypeCheck};
 use crate::{
-    ir::{self, expr::type_check::SigFormatting, AddressSpace},
+    ir::{
+        self,
+        expr::type_check::{SigFormatting, SizedTypeShorthand::*},
+        AddressSpace,
+    },
     same, sig,
 };
 use ir::Len::*;
 use ir::ScalarType::*;
-use ir::SizedType::*;
 use ir::StoreType::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,11 +1,14 @@
 use std::fmt::Display;
 
-use super::{type_check::TypeCheck, BuiltinFn, Constructor};
+use super::{
+    type_check::{TypeCheck, SizedTypeShorthand::*},
+    BuiltinFn, Constructor,
+};
 use crate::frontend::any::Any;
 use crate::{
     impl_track_caller_fn_any, ir, ir::expr::type_check::NoMatchingSignature, ir::expr::Expr, ir::ir_type, ir::Type, sig,
 };
-use ir_type::{Len::*, SizedType::*, StoreType::*};
+use ir_type::{Len::*, StoreType::*};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Literal(pub ir_type::ScalarConstant);

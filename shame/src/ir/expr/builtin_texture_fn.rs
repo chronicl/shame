@@ -1,6 +1,9 @@
 use std::{fmt::Display, num::NonZeroU32, ops::Not, rc::Rc};
 
-use super::{type_check::*, BuiltinFn, Comp4, ExponentFn, Expr, NumericFn};
+use super::{
+    type_check::{*, SizedTypeShorthand::*, vec_store},
+    BuiltinFn, Comp4, ExponentFn, Expr, NumericFn,
+};
 use crate::backend::wgsl::WgslErrorKind;
 use crate::frontend::any::shared_io::SamplingMethod as SamplingMethodEnum;
 use crate::{Language, TextureSampleUsageType};
@@ -24,7 +27,6 @@ use crate::{
             Len2,
             ScalarType::{self, *},
             ScalarTypeFp, SizedStruct,
-            SizedType::*,
             StoreType::*,
             TextureShape,
             Type::Unit,
@@ -40,7 +42,7 @@ use crate::{ir, ir::StoreType, ir::Type, same, sig};
 #[allow(clippy::enum_variant_names)]
 #[rustfmt::skip]
 // functions with an `uv_offset` or `uvw_offset` parameter only support this offset for non-Cube textures
-// 
+//
 // the 3rd component of `uvw_offset` will be ignored for textures with less than 3 dimensions
 pub enum TextureFn {
     TextureDimensions,
@@ -49,7 +51,7 @@ pub enum TextureFn {
     TextureNumSamples,
     TextureGather {
         /// must be None for depth textures and Some for color textures
-        channel: Option<Comp4>, 
+        channel: Option<Comp4>,
         uv_offset: Option<[i4; 2]>,
     },
     TextureGatherCompare { uv_offset: Option<[i4; 2]> },
@@ -402,9 +404,9 @@ impl TypeCheck for TextureFn {
                     [Handle(SampledTexture(d, _, _) | StorageTexture(d, _, _))] if *d == _3D => Vector(X3, U32),
 
                     // 2nd arg is miplevel
-                    [Handle(SampledTexture(d, _, _)), Sized(Vector(X1, I32 | U32))] if *d == _1D => Vector(X1, U32),
-                    [Handle(SampledTexture(d, _, _)), Sized(Vector(X1, I32 | U32))] if matches!(*d, _2D | _2DArray(_) | Cube | CubeArray(_)) => Vector(X2, U32),
-                    [Handle(SampledTexture(d, _, _)), Sized(Vector(X1, I32 | U32))] if *d == _3D => Vector(X3, U32),
+                    [Handle(SampledTexture(d, _, _)), vec_store!(X1, I32 | U32)] if *d == _1D => Vector(X1, U32),
+                    [Handle(SampledTexture(d, _, _)), vec_store!(X1, I32 | U32)] if matches!(*d, _2D | _2DArray(_) | Cube | CubeArray(_)) => Vector(X2, U32),
+                    [Handle(SampledTexture(d, _, _)), vec_store!(X1, I32 | U32)] if *d == _3D => Vector(X3, U32),
                 )(self, args)
                 // WGSL spec: If level is outside the range [0, textureNumLevels(t)) then an indeterminate value for the return type may be returned.
                 // TODO(release) consider making the array size part of the shame type, so out of bounds access can be caught
@@ -440,10 +442,10 @@ impl TypeCheck for TextureFn {
 
                         // actual type signatures
                         let inferred_type = sig!(
-                            [Handle(SampledTexture(         _2D, sample_ty, _)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32)) ] => Vector(X4, ScalarType::from(sample_ty.channel_ty())),
-                            [Handle(SampledTexture(        Cube, sample_ty, _)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32))] => Vector(X4, ScalarType::from(sample_ty.channel_ty())),
-                            [Handle(SampledTexture( _2DArray(_), sample_ty, _)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32))] => Vector(X4, ScalarType::from(sample_ty.channel_ty())),
-                            [Handle(SampledTexture(CubeArray(_), sample_ty, _)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32))] => Vector(X4, ScalarType::from(sample_ty.channel_ty())),
+                            [Handle(SampledTexture(         _2D, sample_ty, _)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32) ] => Vector(X4, ScalarType::from(sample_ty.channel_ty())),
+                            [Handle(SampledTexture(        Cube, sample_ty, _)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32)] => Vector(X4, ScalarType::from(sample_ty.channel_ty())),
+                            [Handle(SampledTexture( _2DArray(_), sample_ty, _)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32), /*array_index:*/ vec_store!(X1, U32 | I32)] => Vector(X4, ScalarType::from(sample_ty.channel_ty())),
+                            [Handle(SampledTexture(CubeArray(_), sample_ty, _)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32), /*array_index:*/ vec_store!(X1, U32 | I32)] => Vector(X4, ScalarType::from(sample_ty.channel_ty())),
                         )(self, args);
 
                         offset_check.and(spp_check).and(component_check).and(inferred_type)
@@ -464,10 +466,10 @@ impl TypeCheck for TextureFn {
                         };
 
                         let inferred_type = sig!(
-                            [Handle(SampledTexture(         _2D, Depth, _)), Handle(Sampler(Comparison)), /*uv:*/ Sized(Vector(X2, F32)),                                                /*depth_ref:*/ Sized(Vector(X1, F32))] => Vector(X4, F32),
-                            [Handle(SampledTexture(        Cube, Depth, _)), Handle(Sampler(Comparison)), /*uv:*/ Sized(Vector(X3, F32)),                                                /*depth_ref:*/ Sized(Vector(X1, F32))] => Vector(X4, F32),
-                            [Handle(SampledTexture( _2DArray(_), Depth, _)), Handle(Sampler(Comparison)), /*uv:*/ Sized(Vector(X2, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*depth_ref:*/ Sized(Vector(X1, F32))] => Vector(X4, F32),
-                            [Handle(SampledTexture(CubeArray(_), Depth, _)), Handle(Sampler(Comparison)), /*uv:*/ Sized(Vector(X3, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*depth_ref:*/ Sized(Vector(X1, F32))] => Vector(X4, F32),
+                            [Handle(SampledTexture(         _2D, Depth, _)), Handle(Sampler(Comparison)), /*uv:*/ vec_store!(X2, F32),                                                /*depth_ref:*/ vec_store!(X1, F32)] => Vector(X4, F32),
+                            [Handle(SampledTexture(        Cube, Depth, _)), Handle(Sampler(Comparison)), /*uv:*/ vec_store!(X3, F32),                                                /*depth_ref:*/ vec_store!(X1, F32)] => Vector(X4, F32),
+                            [Handle(SampledTexture( _2DArray(_), Depth, _)), Handle(Sampler(Comparison)), /*uv:*/ vec_store!(X2, F32), /*array_index:*/ vec_store!(X1, U32 | I32), /*depth_ref:*/ vec_store!(X1, F32)] => Vector(X4, F32),
+                            [Handle(SampledTexture(CubeArray(_), Depth, _)), Handle(Sampler(Comparison)), /*uv:*/ vec_store!(X3, F32), /*array_index:*/ vec_store!(X1, U32 | I32), /*depth_ref:*/ vec_store!(X1, F32)] => Vector(X4, F32),
                         )(self, args);
 
                         offset_check.and(inferred_type)
@@ -485,25 +487,25 @@ impl TypeCheck for TextureFn {
                 match spp {
                     Single => match shape {
                         _1D => sig!(
-                            [Handle(SampledTexture(_1D, st, Single)), /*uv:*/ Sized(Vector(X1, U32 | I32)), /*level:*/ Sized(Vector(X1, U32 | I32))] => st.type_in_wgsl(),
-                            [Handle(StorageTexture(_1D, fmt, Read | ReadWrite)), /*uv:*/ Sized(Vector(X1, U32 | I32))] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),
+                            [Handle(SampledTexture(_1D, st, Single)), /*uv:*/ vec_store!(X1, U32 | I32), /*level:*/ vec_store!(X1, U32 | I32)] => st.type_in_wgsl(),
+                            [Handle(StorageTexture(_1D, fmt, Read | ReadWrite)), /*uv:*/ vec_store!(X1, U32 | I32)] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),
                         )(self, args),
                         _2D => sig!(
-                            [Handle(SampledTexture(_2D, st, Single)), /*uv:*/ Sized(Vector(X2, U32 | I32)), /*level:*/ Sized(Vector(X1, U32 | I32))] => st.type_in_wgsl(),
-                            [Handle(StorageTexture(_2D, fmt, Read | ReadWrite)), /*uv:*/ Sized(Vector(X2, U32 | I32))] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),        
+                            [Handle(SampledTexture(_2D, st, Single)), /*uv:*/ vec_store!(X2, U32 | I32), /*level:*/ vec_store!(X1, U32 | I32)] => st.type_in_wgsl(),
+                            [Handle(StorageTexture(_2D, fmt, Read | ReadWrite)), /*uv:*/ vec_store!(X2, U32 | I32)] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),
                         )(self, args),
                         _2DArray(n) => sig!(
-                            [Handle(SampledTexture(_2DArray(n), st, Single)), /*uv:*/ Sized(Vector(X2, U32 | I32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*level:*/ Sized(Vector(X1, U32 | I32))] => st.type_in_wgsl(),
-                            [Handle(StorageTexture(_2DArray(n), fmt, Read | ReadWrite)), /*uv:*/ Sized(Vector(X2, U32 | I32)), /*array_index:*/ Sized(Vector(X1, U32 | I32))] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),        
+                            [Handle(SampledTexture(_2DArray(n), st, Single)), /*uv:*/ vec_store!(X2, U32 | I32), /*array_index:*/ vec_store!(X1, U32 | I32), /*level:*/ vec_store!(X1, U32 | I32)] => st.type_in_wgsl(),
+                            [Handle(StorageTexture(_2DArray(n), fmt, Read | ReadWrite)), /*uv:*/ vec_store!(X2, U32 | I32), /*array_index:*/ vec_store!(X1, U32 | I32)] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),
                         )(self, args),
                         _3D => sig!(
-                            [Handle(SampledTexture(_3D, st, Single)), /*uv:*/ Sized(Vector(X3, U32 | I32)), /*level:*/ Sized(Vector(X1, U32 | I32))] => st.type_in_wgsl(),
-                            [Handle(StorageTexture(_3D, fmt, Read | ReadWrite)), /*uv:*/ Sized(Vector(X3, U32 | I32))] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),        
+                            [Handle(SampledTexture(_3D, st, Single)), /*uv:*/ vec_store!(X3, U32 | I32), /*level:*/ vec_store!(X1, U32 | I32)] => st.type_in_wgsl(),
+                            [Handle(StorageTexture(_3D, fmt, Read | ReadWrite)), /*uv:*/ vec_store!(X3, U32 | I32)] if fmt.is_sampleable() => fmt.sample_type_in_wgsl().expect("storage formats are always sampleable"),
                         )(self, args),
                         Cube | CubeArray(_) => Err(error("unsupported texture shape".into())),
                     },
                     Multi => sig!(
-                        [Handle(SampledTexture(_2D, st,  Multi)), /*uv:*/ Sized(Vector(X2, U32 | I32)), /*sample_index:*/ Sized(Vector(X1, U32 | I32))] => st.type_in_wgsl(),
+                        [Handle(SampledTexture(_2D, st,  Multi)), /*uv:*/ vec_store!(X2, U32 | I32), /*sample_index:*/ vec_store!(X1, U32 | I32)] => st.type_in_wgsl(),
                     )(self, args)
                 }
             },
@@ -511,16 +513,16 @@ impl TypeCheck for TextureFn {
                 use AccessMode::*;
                 match shape {
                     _1D => sig!(
-                        [Handle(StorageTexture(_1D, fmt, Write | ReadWrite)), /*uv:*/ Sized(Vector(X1, U32 | I32)), Sized(Vector(X4, s))] if Some(*s) == fmt.scalar_type_in_shader() => Unit,
+                        [Handle(StorageTexture(_1D, fmt, Write | ReadWrite)), /*uv:*/ vec_store!(X1, U32 | I32), vec_store!(X4, s)] if Some(*s) == fmt.scalar_type_in_shader() => Unit,
                     )(self, args),
                     _2D => sig!(
-                        [Handle(StorageTexture(_2D, fmt, Write | ReadWrite)), /*uv:*/ Sized(Vector(X2, U32 | I32)), Sized(Vector(X4, s))] if Some(*s) == fmt.scalar_type_in_shader() => Unit,
+                        [Handle(StorageTexture(_2D, fmt, Write | ReadWrite)), /*uv:*/ vec_store!(X2, U32 | I32), vec_store!(X4, s)] if Some(*s) == fmt.scalar_type_in_shader() => Unit,
                     )(self, args),
                     _2DArray(n) => sig!(
-                        [Handle(StorageTexture(_2DArray(n), fmt, Write | ReadWrite)), /*uv:*/ Sized(Vector(X2, U32 | I32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), Sized(Vector(X4, s))] if Some(*s) == fmt.scalar_type_in_shader() => Unit,
+                        [Handle(StorageTexture(_2DArray(n), fmt, Write | ReadWrite)), /*uv:*/ vec_store!(X2, U32 | I32), /*array_index:*/ vec_store!(X1, U32 | I32), vec_store!(X4, s)] if Some(*s) == fmt.scalar_type_in_shader() => Unit,
                     )(self, args),
                     _3D => sig!(
-                        [Handle(StorageTexture(     _3D, fmt, Write | ReadWrite)), /*uv:*/ Sized(Vector(X3, U32 | I32)), Sized(Vector(X4, s))] if Some(*s) == fmt.scalar_type_in_shader() => Unit,
+                        [Handle(StorageTexture(     _3D, fmt, Write | ReadWrite)), /*uv:*/ vec_store!(X3, U32 | I32), vec_store!(X4, s)] if Some(*s) == fmt.scalar_type_in_shader() => Unit,
                     )(self, args),
                     Cube | CubeArray(_) => Err(error("unsupported texture shape".into())),
                 }
@@ -545,11 +547,11 @@ impl TypeCheck for TextureFn {
                         };
 
                         let inferred_ty = sig!(
-                            [Handle(SampledTexture(         _1D, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X1, F32))] => sample_ty.type_in_wgsl(),
-                            [Handle(SampledTexture(         _2D, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32))] => sample_ty.type_in_wgsl(),
-                            [Handle(SampledTexture( _2DArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32))] => sample_ty.type_in_wgsl(),
-                            [Handle(SampledTexture(  _3D | Cube, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32))] => sample_ty.type_in_wgsl(),
-                            [Handle(SampledTexture(CubeArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32))] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture(         _1D, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X1, F32)] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture(         _2D, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32)] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture( _2DArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32), /*array_index:*/ vec_store!(X1, U32 | I32)] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture(  _3D | Cube, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32)] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture(CubeArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32), /*array_index:*/ vec_store!(X1, U32 | I32)] => sample_ty.type_in_wgsl(),
                         )(self, args);
 
                         offset_check.and(inferred_ty)
@@ -567,10 +569,10 @@ impl TypeCheck for TextureFn {
                         };
 
                         let inferred_ty = sig!(
-                            [Handle(SampledTexture(          _2D, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32)), /*bias:*/ Sized(Vector(X1, F32))] => sample_ty.type_in_wgsl(),
-                            [Handle(SampledTexture(  _2DArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*bias:*/ Sized(Vector(X1, F32))] => sample_ty.type_in_wgsl(),
-                            [Handle(SampledTexture(   _3D | Cube, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32)), /*bias:*/ Sized(Vector(X1, F32))] => sample_ty.type_in_wgsl(),
-                            [Handle(SampledTexture( CubeArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*bias:*/ Sized(Vector(X1, F32))] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture(          _2D, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32), /*bias:*/ vec_store!(X1, F32)] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture(  _2DArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32), /*array_index:*/ vec_store!(X1, U32 | I32), /*bias:*/ vec_store!(X1, F32)] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture(   _3D | Cube, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32), /*bias:*/ vec_store!(X1, F32)] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture( CubeArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32), /*array_index:*/ vec_store!(X1, U32 | I32), /*bias:*/ vec_store!(X1, F32)] => sample_ty.type_in_wgsl(),
                         )(self, args);
 
                         offset_check.and(inferred_ty)
@@ -588,10 +590,10 @@ impl TypeCheck for TextureFn {
                             _ => Ok(()),
                         };
                         let inferred_ty = sig!(
-                            [Handle(SampledTexture(          _2D, Depth, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32)), /*depth_ref:*/ Sized(Vector(X1, F32))] => F32,
-                            [Handle(SampledTexture(  _2DArray(_), Depth, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*depth_ref:*/ Sized(Vector(X1, F32))] => F32,
-                            [Handle(SampledTexture(         Cube, Depth, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32)), /*depth_ref:*/ Sized(Vector(X1, F32))] => F32,
-                            [Handle(SampledTexture( CubeArray(_), Depth, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*depth_ref:*/ Sized(Vector(X1, F32))] => F32,
+                            [Handle(SampledTexture(          _2D, Depth, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32), /*depth_ref:*/ vec_store!(X1, F32)] => F32,
+                            [Handle(SampledTexture(  _2DArray(_), Depth, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32), /*array_index:*/ vec_store!(X1, U32 | I32), /*depth_ref:*/ vec_store!(X1, F32)] => F32,
+                            [Handle(SampledTexture(         Cube, Depth, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32), /*depth_ref:*/ vec_store!(X1, F32)] => F32,
+                            [Handle(SampledTexture( CubeArray(_), Depth, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32), /*array_index:*/ vec_store!(X1, U32 | I32), /*depth_ref:*/ vec_store!(X1, F32)] => F32,
                         )(self, args);
 
                         offset_check.and(inferred_ty)
@@ -609,10 +611,10 @@ impl TypeCheck for TextureFn {
                         };
 
                         let inferred_ty = sig!(
-                            [Handle(SampledTexture(          _2D, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32)),                                              /*ddx:*/ Sized(Vector(X2, F32)), /*ddy:*/ Sized(Vector(X2, F32))] => sample_ty.type_in_wgsl(),
-                            [Handle(SampledTexture(  _2DArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*ddx:*/ Sized(Vector(X2, F32)), /*ddy:*/ Sized(Vector(X2, F32))] => sample_ty.type_in_wgsl(),
-                            [Handle(SampledTexture(   _3D | Cube, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32)),                                              /*ddx:*/ Sized(Vector(X3, F32)), /*ddy:*/ Sized(Vector(X3, F32))] => sample_ty.type_in_wgsl(),
-                            [Handle(SampledTexture( CubeArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*ddx:*/ Sized(Vector(X3, F32)), /*ddy:*/ Sized(Vector(X3, F32))] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture(          _2D, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32),                                              /*ddx:*/ vec_store!(X2, F32), /*ddy:*/ vec_store!(X2, F32)] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture(  _2DArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32), /*array_index:*/ vec_store!(X1, U32 | I32), /*ddx:*/ vec_store!(X2, F32), /*ddy:*/ vec_store!(X2, F32)] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture(   _3D | Cube, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32),                                              /*ddx:*/ vec_store!(X3, F32), /*ddy:*/ vec_store!(X3, F32)] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture( CubeArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32), /*array_index:*/ vec_store!(X1, U32 | I32), /*ddx:*/ vec_store!(X3, F32), /*ddy:*/ vec_store!(X3, F32)] => sample_ty.type_in_wgsl(),
                         )(self, args);
 
                         offset_check.and(inferred_ty)
@@ -630,15 +632,15 @@ impl TypeCheck for TextureFn {
                         };
 
                         let inferred_ty = sig!(
-                            [Handle(SampledTexture(          _2D, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32)), /*level:*/ Sized(Vector(X1, F32))] => sample_ty.type_in_wgsl(),
-                            [Handle(SampledTexture(  _2DArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*level:*/ Sized(Vector(X1, F32))] => sample_ty.type_in_wgsl(),
-                            [Handle(SampledTexture(   _3D | Cube, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32)), /*level:*/ Sized(Vector(X1, F32))] => sample_ty.type_in_wgsl(),
-                            [Handle(SampledTexture( CubeArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*level:*/ Sized(Vector(X1, F32))] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture(          _2D, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32), /*level:*/ vec_store!(X1, F32)] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture(  _2DArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32), /*array_index:*/ vec_store!(X1, U32 | I32), /*level:*/ vec_store!(X1, F32)] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture(   _3D | Cube, sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32), /*level:*/ vec_store!(X1, F32)] => sample_ty.type_in_wgsl(),
+                            [Handle(SampledTexture( CubeArray(_), sample_ty, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32), /*array_index:*/ vec_store!(X1, U32 | I32), /*level:*/ vec_store!(X1, F32)] => sample_ty.type_in_wgsl(),
 
-                            [Handle(SampledTexture(          _2D, Depth, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32)), /*level:*/ Sized(Vector(X1, U32 | I32))] => SizedType::from(Depth),
-                            [Handle(SampledTexture(  _2DArray(_), Depth, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*level:*/ Sized(Vector(X1, U32 | I32))] => SizedType::from(Depth),
-                            [Handle(SampledTexture(   _3D | Cube, Depth, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32)), /*level:*/ Sized(Vector(X1, U32 | I32))] => SizedType::from(Depth),
-                            [Handle(SampledTexture( CubeArray(_), Depth, Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X3, F32)), /*array_index:*/ Sized(Vector(X1, U32 | I32)), /*level:*/ Sized(Vector(X1, U32 | I32))] => SizedType::from(Depth),
+                            [Handle(SampledTexture(          _2D, Depth, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32), /*level:*/ vec_store!(X1, U32 | I32)] => SizedType::from(Depth),
+                            [Handle(SampledTexture(  _2DArray(_), Depth, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32), /*array_index:*/ vec_store!(X1, U32 | I32), /*level:*/ vec_store!(X1, U32 | I32)] => SizedType::from(Depth),
+                            [Handle(SampledTexture(   _3D | Cube, Depth, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32), /*level:*/ vec_store!(X1, U32 | I32)] => SizedType::from(Depth),
+                            [Handle(SampledTexture( CubeArray(_), Depth, Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X3, F32), /*array_index:*/ vec_store!(X1, U32 | I32), /*level:*/ vec_store!(X1, U32 | I32)] => SizedType::from(Depth),
                         )(self, args);
 
                         offset_check.and(inferred_ty)
@@ -647,7 +649,7 @@ impl TypeCheck for TextureFn {
                 }
             },
             TextureFn::TextureSampleBaseClampToEdge => sig!(
-                [Handle(SampledTexture(_2D, st, SamplesPerPixel::Single)), Handle(Sampler(_)), /*uv:*/ Sized(Vector(X2, F32))] if st.shader_scalar_ty() == F32 => st.type_in_wgsl(),
+                [Handle(SampledTexture(_2D, st, SamplesPerPixel::Single)), Handle(Sampler(_)), /*uv:*/ vec_store!(X2, F32)] if st.shader_scalar_ty() == F32 => st.type_in_wgsl(),
             )(self, args),
         })
     }

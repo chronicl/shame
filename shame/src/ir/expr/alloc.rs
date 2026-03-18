@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use crate::frontend::any::Any;
+use crate::ir::ir_type::LayoutType;
 use crate::ir::recording::NodeRecordingError;
 use crate::{
     call_info,
@@ -69,7 +70,7 @@ impl Any {
                         None => Ok(()),
                         Some(val) => match val.ty() {
                             None => Err(AllocError::InitWithInvalidAny(ty.clone())),
-                            Some(Store(Sized(val_ty))) if val_ty == ty => Ok(()),
+                            Some(Store(StoreType::Layout(LayoutType::Sized(val_ty)))) if val_ty == ty => Ok(()),
                             Some(val_ty) => Err(AllocError::InitWithWrongType(ty.clone(), val_ty)),
                         },
                     };
@@ -88,7 +89,7 @@ impl Any {
                     if initial_value.is_some() {
                         Err(AllocError::AllocationDoesNotSupportInitialValues(address_space))
                     } else {
-                        let ty = Store(Sized(ty.clone())); // this is here in case this function gets refactored to take a non-sized type in the future
+                        let ty: Type = ty.clone().into(); // this is here in case this function gets refactored to take a non-sized type in the future
                         if ty.is_plain_and_fixed_footprint() {
                             Ok(())
                         } else {
@@ -104,7 +105,7 @@ impl Any {
             match addr_check.and_then(|()| {
                 MemoryRegion::new(
                     ctx.latest_user_caller(),
-                    StoreType::Sized(ty),
+                    ty.into(),
                     Some(ctx.pool_mut().push(Ident::Chosen(Priority::Auto, "c".into()))),
                     None,
                     access,

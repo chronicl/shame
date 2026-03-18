@@ -10,13 +10,12 @@ use crate::frontend::encoding::fill::{Fill, PickVertex};
 use crate::frontend::encoding::EncodingErrorKind;
 use crate::frontend::error::InternalError;
 use crate::frontend::texture::texture_traits::StorageTextureFormat;
-use crate::ir::expr::type_check::SigFormatting;
-use crate::ir::ir_type::{TextureAspect, TextureSampleUsageType};
+use crate::ir::expr::type_check::{SigFormatting, SizedTypeShorthand::*};
+use crate::ir::ir_type::{self, TextureAspect, TextureSampleUsageType};
 use crate::ir::pipeline::{PipelineError, PossibleStages, ShaderStage, StageMask};
 use crate::ir::recording::{Context, NodeRecordingError};
 use crate::ir::Len::*;
 use crate::ir::ScalarType::*;
-use crate::ir::SizedType::*;
 use crate::ir::StoreType::*;
 use crate::ir::Type::Unit;
 use crate::ir::{self, ChannelFormatShaderType, Len, ScalarConstant, ScalarType, SizedType, StoreType};
@@ -326,7 +325,7 @@ impl TypeCheck for BuiltinShaderOut {
                 let distance_count = count;
                 return sig!(
                     { fmt: SigFormatting::RemoveAsterisksAndClone, },
-                    [Array(f32x1, n)] if n.get() <= 8 && n == distance_count && **f32x1 == Vector(X1, F32) => Unit,
+                    [Array(f32x1, n)] if n.get() <= 8 && n == distance_count && **f32x1 == SizedType::Vector(ir_type::Vector::new(F32, X1)) => Unit,
                 )(self, args);
             }
             BuiltinShaderOut::FragDepth => sig!([F32] => Unit),
@@ -345,7 +344,7 @@ pub struct Interpolator {
 impl Interpolator {
     fn get_sized_type(&self) -> SizedType {
         let (len, stype) = self.vec_ty;
-        SizedType::Vector(len, stype)
+        ir_type::Vector::new(stype, len).into()
     }
 }
 

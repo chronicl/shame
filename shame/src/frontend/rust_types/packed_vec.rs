@@ -7,7 +7,9 @@ use std::{
 use crate::{
     any::{AsAny, DataPackingFn},
     common::floating_point::f16,
-    f32x2, f32x4, gpu_layout, i32x4, u32x1, u32x4,
+    f32x2, f32x4, gpu_layout, i32x4,
+    ir::ir_type::LayoutType,
+    u32x1, u32x4,
 };
 use crate::frontend::rust_types::len::{x1, x2, x3, x4};
 use crate::frontend::rust_types::vec::vec;
@@ -146,7 +148,10 @@ impl<T: PackedScalarType, L: LenEven> From<Any> for PackedVec<T, L> {
             match any.ty() {
                 None => Unpackable::Unpacked(any.into()),
                 Some(ty) => match ty {
-                    ir::Type::Store(ir::StoreType::Sized(ir::SizedType::Vector(len, t))) => {
+                    ir::Type::Store(ir::StoreType::Layout(LayoutType::Sized(ir::SizedType::Vector(ir::Vector {
+                        len,
+                        scalar: t,
+                    })))) => {
                         // if we get an u32x1 (with future wgpu vertex formats supported, like uint8x1) then
                         // thats an unpacked type, not a packed type that uses u32 as a neutral "bytes" type.
                         let t_unpacked = T::Unpacked::SCALAR_TYPE;

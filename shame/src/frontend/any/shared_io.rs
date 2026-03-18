@@ -15,7 +15,6 @@ use crate::frontend::error::InternalError;
 use crate::frontend::rust_types::type_layout::compatible_with::{
     self, AddressSpaceError, RequirementsNotSatisfied, TypeLayoutCompatibleWith,
 };
-use crate::frontend::rust_types::type_layout::recipe::ir_compat::IRConversionError;
 use crate::ir::expr::Binding;
 use crate::ir::expr::Expr;
 use crate::ir::ir_type::{AccessModeReadable, HandleType, SamplesPerPixel};

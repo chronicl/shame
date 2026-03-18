@@ -49,8 +49,7 @@ pub mod ir {
     pub use crate::ir::*;
 }
 pub use crate::frontend::any;
-pub use crate::ir::ir_type::BufferBlock;
-pub use crate::ir::ir_type::BufferBlockDefinitionError;
+pub use crate::ir::ir_type::StructKind;
 pub use crate::ir::pipeline::StageMask;
 pub use crate::ir::recording::CallInfo;
 pub use crate::ir::recording::CallInfoScope;

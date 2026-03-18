@@ -1,13 +1,20 @@
+use crate::any::layout::Repr;
 use crate::frontend::any::Any;
+use crate::ir::expr::type_check::SizedTypeShorthand;
+use crate::ir::ir_type::{Atomic, LayoutType};
 use crate::{
     call_info,
     frontend::any::record_node,
     frontend::encoding::pipeline_info::Dict,
     ir::{
         self,
-        expr::{type_check::SigFormatting, AtomicFn, BuiltinFn, Expr, NoMatchingSignature, NumericFn},
+        expr::{
+            type_check::{SigFormatting},
+            AtomicFn, BuiltinFn, Expr, NoMatchingSignature, NumericFn,
+        },
         recording::Context,
-        SizedStruct, SizedType, StoreType, StructureFieldNamesMustBeUnique, Type,
+        SizedStruct, SizedType, StoreType, StructureFieldNamesMustBeUnique, Type, ScalarType,
+        ir_type::Vector,
     },
     same, sig,
 };
@@ -70,8 +77,7 @@ impl BuiltinTemplateStructs {
     pub(crate) fn infer_type(args: &[Type], params: TemplateStructParams) -> Result<Type, NoMatchingSignature> {
         let result: Result<Type, NoMatchingSignature> = Context::try_with(call_info!(), |ctx| {
             let mut self_ = ctx.pipeline().builtin_template_structs.borrow_mut();
-            let template_struct = SizedType::Structure(self_.instantiate_if_needed(params));
-            use ir::SizedType::Vector;
+            let template_struct = SizedType::Struct(self_.instantiate_if_needed(params));
             match params {
                 TemplateStructParams::Frexp(FrexpGenerics(fp, len)) => {
                     let t = ir::ScalarType::from(fp);
@@ -81,7 +87,7 @@ impl BuiltinTemplateStructs {
                             name: Frexp(len, t),
                             fmt: SigFormatting::RemoveAsterisksAndClone,
                         },
-                        [Vector(l0, t0)] if *l0 == len && *t0 == t => template_struct,
+                        [SizedTypeShorthand::Vector(l0, t0)] if *l0 == len && *t0 == t => template_struct,
                     )(&params, args)
                 }
                 TemplateStructParams::Modf(ModfGenerics(fp, len)) => {
@@ -92,7 +98,7 @@ impl BuiltinTemplateStructs {
                             name: Modf(len, t),
                             fmt: SigFormatting::RemoveAsterisksAndClone,
                         },
-                        [Vector(l0, t0)] if *l0 == len && *t0 == t => template_struct,
+                        [SizedTypeShorthand::Vector(l0, t0)] if *l0 == len && *t0 == t => template_struct,
                     )(&params, args)
                 }
                 TemplateStructParams::AtomicCompareExchangeWeak(AtomicCompareExchangeWeakGenerics(
@@ -109,8 +115,7 @@ impl BuiltinTemplateStructs {
                     */
                     use ir::AccessMode::*;
                     use ir::Len::*;
-                    use ir::SizedType::*;
-                    use ir::StoreType::*;
+                    use ir::StoreType;
                     use Type::*;
 
                     struct AtomicCompareExchangeWeak((), ()); // struct declaration only used for "name" below, so the generics make sense in the generated error message
@@ -120,9 +125,9 @@ impl BuiltinTemplateStructs {
                             fmt: SigFormatting::RemoveAsterisksAndClone,
                         },
                         [
-                            Ptr(region, Sized(Atomic(t0)), ReadWrite),
-                            Store(Sized(Vector(X1, t1))),
-                            Store(Sized(Vector(X1, t2))),
+                            Ptr(region, StoreType::Layout(LayoutType::Sized(SizedType::Atomic(Atomic { scalar: t0 }))), ReadWrite),
+                            Store(StoreType::Layout(LayoutType::Sized(SizedType::Vector(Vector{ len: X1,scalar: t1 })))),
+                            Store(StoreType::Layout(LayoutType::Sized(SizedType::Vector(Vector{ len: X1,scalar: t2 })))),
                         ]
                         if region.address_space == address_space &&
                             same!(t t0 t1 t2)
@@ -142,7 +147,7 @@ impl BuiltinTemplateStructs {
     }
 }
 
-fn new_field(ident: &'static str, ty: SizedType) -> ir::SizedField { ir::SizedField::new(ident.into(), None, None, ty) }
+fn new_field(ident: &'static str, ty: SizedType) -> ir::SizedField { ir::SizedField::new(ident, ty) }
 
 impl BuiltinTemplateStructs {
     fn instantiate_if_needed(&mut self, params: TemplateStructParams) -> ir::SizedStruct {
@@ -150,38 +155,38 @@ impl BuiltinTemplateStructs {
             .entry(params)
             .or_insert_with(|| match params {
                 TemplateStructParams::Frexp(FrexpGenerics(fp, len)) => {
-                    let struc = SizedStruct::new_nonempty(
-                        format!("frexp_{fp}{len}_t").into(),
-                        [new_field("fract", SizedType::Vector(len, fp.into()))].into(),
-                        new_field("exp", SizedType::Vector(len, ir::ScalarType::I32)),
-                    );
-                    match struc {
-                        Err(StructureFieldNamesMustBeUnique { .. }) => unreachable!("field names above are unique"),
-                        Ok(s) => s,
-                    }
+                    SizedStruct::new(
+                        format!("frexp_{fp}{len}_t"),
+                        std::vec![
+                            new_field("fract", Vector::new(fp.into(), len).into()),
+                            new_field("exp", Vector::new(ir::ScalarType::I32, len).into())
+                        ],
+                        // TODO(chronicl)
+                        Repr::Wgsl,
+                    )
                 }
                 TemplateStructParams::Modf(ModfGenerics(fp, len)) => {
-                    let struc = SizedStruct::new_nonempty(
-                        format!("modf_{fp}{len}_t").into(),
-                        [new_field("fract", SizedType::Vector(len, fp.into()))].into(),
-                        new_field("whole", SizedType::Vector(len, fp.into())),
-                    );
-                    match struc {
-                        Err(StructureFieldNamesMustBeUnique { .. }) => unreachable!("field names above are unique"),
-                        Ok(s) => s,
-                    }
+                    SizedStruct::new(
+                        format!("modf_{fp}{len}_t"),
+                        std::vec![
+                            new_field("fract", Vector::new(fp.into(), len).into()),
+                            new_field("whole", Vector::new(fp.into(), len).into()),
+                        ],
+                        // TOOD(chronicl)
+                        Repr::Wgsl,
+                    )
                 }
                 TemplateStructParams::AtomicCompareExchangeWeak(AtomicCompareExchangeWeakGenerics(addr, int)) => {
                     let int = ir::ScalarType::from(int);
-                    let struc = SizedStruct::new_nonempty(
-                        format!("atomicCmpExWk_{int}_{}_t", addr.ident_suffix()).into(),
-                        [new_field("old_value", SizedType::Vector(ir::Len::X1, int))].into(),
-                        new_field("exchanged", SizedType::Vector(ir::Len::X1, ir::ScalarType::Bool)),
-                    );
-                    match struc {
-                        Err(StructureFieldNamesMustBeUnique { .. }) => unreachable!("field names above are unique"),
-                        Ok(s) => s,
-                    }
+                    SizedStruct::new(
+                        format!("atomicCmpExWk_{int}_{}_t", addr.ident_suffix()),
+                        std::vec![
+                            new_field("old_value", Vector::new(int, ir::Len::X1).into()),
+                            new_field("exchanged", Vector::new(ir::ScalarType::Bool, ir::Len::X1).into()),
+                        ],
+                        // TOOD(chronicl)
+                        Repr::Wgsl,
+                    )
                 }
             })
             .clone()

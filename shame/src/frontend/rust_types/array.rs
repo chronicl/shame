@@ -21,7 +21,6 @@ use crate::frontend::encoding::flow::{for_range_impl, FlowFn};
 use crate::frontend::error::InternalError;
 use crate::frontend::rust_types::reference::Ref;
 use crate::frontend::rust_types::vec::vec;
-use crate::ir::ir_type::stride_of_array_from_element_align_size;
 use crate::ir::pipeline::StageMask;
 use crate::ir::recording::Context;
 use crate::{call_info, for_count, ir};
@@ -118,7 +117,7 @@ impl<T: GpuType + GpuSized + GpuStore, N: ArrayLen> GpuStore for Array<T, N> {
 impl<T: GpuType + GpuSized, N: ArrayLen> GpuAligned for Array<T, N> {
     fn aligned_ty() -> ir::AlignedType {
         match N::LEN {
-            Some(len) => ir::AlignedType::Sized(ir::SizedType::Array(Rc::new(T::sized_ty()), len)),
+            Some(len) => ir::AlignedType::Sized(ir::SizedArray::new(Rc::new(T::sized_ty()), len).into()),
             None => ir::AlignedType::RuntimeSizedArray(T::sized_ty()),
         }
     }
@@ -126,10 +125,11 @@ impl<T: GpuType + GpuSized, N: ArrayLen> GpuAligned for Array<T, N> {
 
 impl<T: GpuType + GpuSized, const N: usize> GpuSized for Array<T, Size<N>> {
     fn sized_ty() -> ir::SizedType {
-        ir::SizedType::Array(
+        ir::SizedArray::new(
             Rc::new(T::sized_ty()),
             Size::<N>::LEN.expect("known length at compile time"),
         )
+        .into()
     }
 }
 
@@ -208,8 +208,8 @@ impl<T: GpuType + GpuSized, N: ArrayLen> Array<T, N> {
     fn array_store_ty() -> ir::StoreType {
         let element_ty = <T as GpuSized>::sized_ty();
         match N::LEN {
-            Some(n) => ir::StoreType::Sized(ir::SizedType::Array(Rc::new(element_ty), n)),
-            None => ir::StoreType::RuntimeSizedArray(element_ty),
+            Some(n) => ir::SizedArray::new(Rc::new(element_ty), n).into(),
+            None => ir::RuntimeSizedArray::new(element_ty).into(),
         }
     }
 }
