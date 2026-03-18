@@ -190,7 +190,7 @@ impl TypeCheck for Decomposition {
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
                 [Store(     array_store!(t, _)), Store(vec_store!(X1, I32 | U32))] => Type::from((**t).clone()),
                 [Ref(alloc, array_store!(t, _), am), Store(vec_store!(X1, I32 | U32))] => Ref(alloc.clone(), (**t).clone().into(), *am),
-                [Ref(alloc, StoreType::Layout(LayoutType::RuntimeSizedArray(t)), am), Store(vec_store!(X1, I32 | U32))] => Ref(alloc.clone(), (*t).clone().into(), *am),
+                [Ref(alloc, StoreType::Layout(LayoutType::RuntimeSizedArray(t)), am), Store(vec_store!(X1, I32 | U32))] => Ref(alloc.clone(), t.element.clone().into(), *am),
             )(self, args),
             Decomposition::ArrayIndexConst(i) => sig!(
                 {
@@ -199,7 +199,7 @@ impl TypeCheck for Decomposition {
                 },
                 [Store(     array_store!(t, n))] if *i < n.get() => Type::from((**t).clone()),
                 [Ref(alloc, array_store!(t, n), am)] if *i < n.get() => Ref(alloc.clone(), (**t).clone().into(), *am),
-                [Ref(alloc, StoreType::Layout(LayoutType::RuntimeSizedArray(t)), am)] => Ref(alloc.clone(), (*t).clone().into(), *am),
+                [Ref(alloc, StoreType::Layout(LayoutType::RuntimeSizedArray(t)), am)] => Ref(alloc.clone(), t.element.clone().into(), *am),
             )(self, args),
             Decomposition::BindingArrayIndex => sig!(
                 { fmt: SigFormatting::RemoveAsterisksAndClone, },
