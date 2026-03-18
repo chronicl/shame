@@ -1,4 +1,5 @@
 use super::*;
+use crate::ir::ScalarType;
 
 //            Size and align of layout recipe types             //
 // https://www.w3.org/TR/WGSL/#address-space-layout-constraints //
@@ -331,14 +332,14 @@ impl Matrix {
 
 #[allow(missing_docs)]
 impl Atomic {
-    pub const fn byte_size(&self) -> u64 { self.scalar.as_scalar_type().byte_size() }
+    pub const fn byte_size(&self) -> u64 { self.scalar.as_scalar_type2().byte_size() }
     pub const fn align(&self, repr: Repr) -> U32PowerOf2 {
         match repr {
             Repr::Packed => return PACKED_ALIGN,
             Repr::Wgsl | Repr::WgslUniform => {}
         }
 
-        self.scalar.as_scalar_type().align(repr)
+        self.scalar.as_scalar_type2().align(repr)
     }
 }
 

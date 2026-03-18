@@ -1,13 +1,13 @@
 use std::{fmt::Display, num::NonZeroU32};
 
 use crate::{
-    any::{U32PowerOf2},
+    any::U32PowerOf2,
     common::floating_point::{f16, f32_eq_where_nans_are_equal, f64_eq_where_nans_are_equal},
-    frontend::rust_types::type_layout::{self, recipe::align_size::PACKED_ALIGN, Repr},
-    ir::Comp4,
+    frontend::rust_types::type_layout::{self, Repr, recipe::align_size::PACKED_ALIGN},
+    ir::{Comp4, SizedType, ir_type::Vector},
 };
 
-use super::{SizedType, Type};
+use super::{Type};
 
 /// (no documentation yet)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -229,6 +229,17 @@ pub enum ScalarTypeFp {
     F64,
 }
 
+impl ScalarTypeFp {
+    // TODO(chronicl) remove2
+    pub const fn as_scalar_type2(self) -> ScalarType {
+        match self {
+            ScalarTypeFp::F16 => ScalarType::F16,
+            ScalarTypeFp::F32 => ScalarType::F32,
+            ScalarTypeFp::F64 => ScalarType::F64,
+        }
+    }
+}
+
 impl Display for ScalarTypeFp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
@@ -274,6 +285,15 @@ impl From<ScalarTypeFp> for ScalarType {
 pub enum ScalarTypeInteger {
     U32,
     I32,
+}
+
+impl ScalarTypeInteger {
+    pub const fn as_scalar_type2(self) -> ScalarType {
+        match self {
+            ScalarTypeInteger::U32 => ScalarType::U32,
+            ScalarTypeInteger::I32 => ScalarType::I32,
+        }
+    }
 }
 
 impl From<ScalarTypeInteger> for ScalarType {
@@ -534,10 +554,11 @@ impl PackedVector {
         match repr {
             Repr::Packed => PACKED_ALIGN,
             Repr::Wgsl | Repr::WgslUniform => {
+                // Treating WgslUniform as Wgsl, because packed vectors aren't supported in uniform buffers.
                 let align = match self.byte_size() {
-                    PackedVectorByteSize::_2 => SizedType::Vector(Len::X1, ScalarType::F16).align(),
-                    PackedVectorByteSize::_4 => SizedType::Vector(Len::X1, ScalarType::U32).align(),
-                    PackedVectorByteSize::_8 => SizedType::Vector(Len::X2, ScalarType::U32).align(),
+                    PackedVectorByteSize::_2 => Vector::new(ScalarType::F16, Len::X1).align(Repr::Wgsl),
+                    PackedVectorByteSize::_4 => Vector::new(ScalarType::U32, Len::X1).align(Repr::Wgsl),
+                    PackedVectorByteSize::_8 => Vector::new(ScalarType::U32, Len::X2).align(Repr::Wgsl),
                 };
                 U32PowerOf2::try_from(align as u32).expect("the above all have power of 2 align")
             }
@@ -557,6 +578,6 @@ impl PackedScalarType {
 
 impl PackedVector {
     pub fn decompressed_ty(&self) -> SizedType {
-        SizedType::Vector(self.len.into(), self.scalar_type.decompressed_ty())
+        Vector::new(self.scalar_type.decompressed_ty(), self.len.into()).into()
     }
 }

@@ -11,14 +11,13 @@ use crate::{
     common::pool::Key,
     frontend::any::shared_io::{BindPath, SamplingMethod},
     ir::{
-        self,
+        self, Comp4, CompoundOp, HandleType, Len, Node, ScalarConstant, ScalarType, SizedType, StoreType, Type,
         expr::{
             Assign, Binding, BuiltinFn, Decomposition, Expr, FnRelated, Literal, Operator, PipelineIo,
             PushConstantsField, RefLoad, Show, TextureFn,
         },
-        ir_type::{CanonName, TextureShape},
+        ir_type::{CanonName, LayoutType, Matrix, SizedArray, StructKindRef, TextureShape, Vector},
         recording::{CallInfo, FunctionDef, TemplateStructParams},
-        Comp4, CompoundOp, HandleType, Len, Node, ScalarConstant, ScalarType, SizedType, StoreType, Type,
     },
 };
 
@@ -213,9 +212,9 @@ pub(super) fn write_binding_ident(
     };
     let write_store_ty = |code: &mut CodeWriteSpan, sty: &_| -> Result<(), WgslError> {
         match sty {
-            StoreType::Sized(st) => code.write_str(match st {
-                SizedType::Atomic(scalar_type_integer) => "atomic",
-                _ => "buffer",
+            StoreType::Layout(l) => code.write_str(match l {
+                LayoutType::Sized(SizedType::Atomic(_)) => "atomic",
+                LayoutType::Sized(_) | LayoutType::RuntimeSizedArray(_) | LayoutType::UnsizedStruct(_) => "buffer",
             })?,
             StoreType::Handle(handle) => match handle {
                 HandleType::SampledTexture(shape, ty, spp) => {
@@ -232,8 +231,6 @@ pub(super) fn write_binding_ident(
                     SamplingMethod::Comparison => "compar",
                 })?,
             },
-            StoreType::RuntimeSizedArray(sized_type) => code.write_str("buffer")?,
-            StoreType::BufferBlock(buffer_block) => code.write_str("buffer")?,
             StoreType::BindingArray(s, n) => code.write_str("binding_array")?,
         };
         Ok(())
@@ -251,21 +248,22 @@ pub(super) fn write_field_access(
     let arg = get_single_arg(node)?;
     let ty = &ctx.ctx.pool()[arg].ty;
 
-    let struct_ = match ty {
-        Type::Store(StoreType::Sized(SizedType::Structure(s))) => Ok(s as &Rc<ir::Struct>),
-        Type::Ref(_, StoreType::BufferBlock(s), _) => Ok(s as &Rc<ir::Struct>),
-        Type::Ref(_, StoreType::Sized(SizedType::Structure(s)), _) => Ok(s as &Rc<ir::Struct>),
+    let struct_: StructKindRef<'_> = match ty {
+        Type::Store(StoreType::Layout(LayoutType::Sized(SizedType::Struct(s)))) |
+        Type::Ref(_, StoreType::Layout(LayoutType::Sized(SizedType::Struct(s))), _) => Ok(s.into()),
+        Type::Store(StoreType::Layout(LayoutType::UnsizedStruct(s))) |
+        Type::Ref(_, StoreType::Layout(LayoutType::UnsizedStruct(s)), _) => Ok(s.into()),
         _ => Err(WgslErrorKind::FieldAccessOnNonStruct(ty.clone(), field_name.clone())
             .at_level(node.call_info, WgslErrorLevel::InternalPleaseReport)),
     }?;
 
     let registry = ctx.ctx.struct_registry();
     let def = registry.get(struct_).ok_or_else(|| {
-        WgslErrorKind::UnregisteredStruct(struct_.clone())
+        WgslErrorKind::UnregisteredStruct(struct_.to_owned())
             .at_level(node.call_info, WgslErrorLevel::InternalPleaseReport)
     })?;
 
-    let (ident, field) = def.get_field_by_name(field_name).ok_or_else(|| {
+    let ident = def.get_field_ident(field_name).ok_or_else(|| {
         WgslErrorKind::UnknownFieldForStruct(ty.clone(), field_name.clone())
             .at_level(node.call_info, WgslErrorLevel::InternalPleaseReport)
     })?;
@@ -525,27 +523,34 @@ fn write_builtin_fn_name(
     use crate::ir::GradPrecision as Prec;
     match builtin_fn {
         BuiltinFn::Constructor(x) => {
-            let sized_type = match x {
+            let sized_type: SizedType = match x {
                 Constructor::Default(t) => t.clone(),
-                Constructor::Scalar(s) => SizedType::Vector(Len::X1, *s),
-                Constructor::Vector(len, s) => SizedType::Vector((*len).into(), *s),
-                Constructor::Matrix(cols, rows, s) => SizedType::Matrix(*cols, *rows, *s),
-                Constructor::Array(e, c) => SizedType::Array(e.clone(), *c),
-                Constructor::Structure(def) => SizedType::Structure(def.clone()),
+                Constructor::Scalar(s) => Vector::new(*s, Len::X1).into(),
+                Constructor::Vector(len, s) => Vector::new(*s, (*len).into()).into(),
+                Constructor::Matrix(c, r, s) => Matrix {
+                    scalar: *s,
+                    columns: *c,
+                    rows: *r,
+                }
+                .into(),
+                Constructor::Array(e, len) => SizedArray::new(e.clone(), *len).into(),
+                Constructor::Structure(def) => def.clone().into(),
             };
             write_sized_type(code, &sized_type, node.call_info, ctx)?
         }
         BuiltinFn::Reinterpret(x) => match x {
             ReinterpretFn::Bitcast(t) => {
                 let (len, stype) = match &node.ty {
-                    Type::Store(ir::StoreType::Sized(ir::SizedType::Vector(len, stype))) => Ok((*len, *stype)),
+                    Type::Store(ir::StoreType::Layout(LayoutType::Sized(ir::SizedType::Vector(v)))) => {
+                        Ok((v.len, v.scalar))
+                    }
                     t => Err(WgslErrorKind::BitcastCannotReturnType(t.clone())
                         .at_level(node.call_info, WgslErrorLevel::InternalPleaseReport)),
                 }?;
 
                 code.write_str("bitcast<")?;
                 // the type in the angle brackets is always the return type
-                write_sized_type(code, &SizedType::Vector(len, stype), node.call_info, ctx)?;
+                write_sized_type(code, &Vector::new(stype, len).into(), node.call_info, ctx)?;
                 code.write_str(">")?;
             }
         },

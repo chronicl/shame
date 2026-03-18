@@ -3,18 +3,17 @@ use crate::{
     backend::{
         code_write_buf::CodeWriteSpan,
         wgsl::{
-            address_space_var_qualifier_str,
+            WgslErrorKind, address_space_var_qualifier_str,
             error::WgslErrorLevel,
             write_sized_type,
-            write_type::{self, address_space_ptr_qualifier_str, write_memory_view_type, MemoryViewKind},
-            WgslErrorKind,
+            write_type::{self, MemoryViewKind, address_space_ptr_qualifier_str, write_memory_view_type},
         },
     },
     call_info,
     ir::{
-        self,
+        self, SizedType,
+        ir_type::{Atomic, Vector},
         recording::{AtomicCompareExchangeWeakGenerics, FrexpGenerics, ModfGenerics, TemplateStructParams},
-        SizedStruct, SizedType,
     },
 };
 use std::fmt::Write;
@@ -35,7 +34,7 @@ pub(super) fn write_builtin_template_wrapper_functions(
 
     let (struct_ident_key, call_info) = {
         let struct_registry = ctx.ctx.struct_registry();
-        let Some(struct_def) = struct_registry.get(struct_) else {
+        let Some(struct_def) = struct_registry.get(struct_.into()) else {
             return Err(WgslErrorKind::MissingTemplateStructDefinition(*params)
                 .at_level(call_info!(), WgslErrorLevel::InternalPleaseReport));
         };
@@ -52,7 +51,7 @@ pub(super) fn write_builtin_template_wrapper_functions(
             let t = ir::ScalarType::from(*fp);
 
             write!(code, "(e: ")?;
-            write_sized_type(&mut code, &SizedType::Vector(*len, t), call_info, ctx)?;
+            write_sized_type(&mut code, &Vector::new(t, *len).into(), call_info, ctx)?;
             writeln!(
                 code,
                 ") -> {struct_ident} {{
@@ -65,7 +64,7 @@ pub(super) fn write_builtin_template_wrapper_functions(
             let t = ir::ScalarType::from(*fp);
 
             write!(code, "(e: ")?;
-            write_sized_type(&mut code, &SizedType::Vector(*len, t), call_info, ctx)?;
+            write_sized_type(&mut code, &Vector::new(t, *len).into(), call_info, ctx)?;
             writeln!(
                 code,
                 ") -> {struct_ident} {{
@@ -83,15 +82,15 @@ pub(super) fn write_builtin_template_wrapper_functions(
                 &mut code,
                 MemoryViewKind::Ptr,
                 *addr,
-                &ir::StoreType::Sized(SizedType::Atomic(*int)),
+                &Atomic::new(*int).into(),
                 ir::AccessMode::ReadWrite,
                 call_info,
                 ctx,
             )?;
             write!(code, ",\n{arg_indent}cmp: ")?;
-            write_sized_type(&mut code, &ir::SizedType::Vector(ir::Len::X1, t), call_info, ctx)?;
+            write_sized_type(&mut code, &Vector::new(t, ir::Len::X1).into(), call_info, ctx)?;
             write!(code, ",\n{arg_indent}v: ")?;
-            write_sized_type(&mut code, &ir::SizedType::Vector(ir::Len::X1, t), call_info, ctx)?;
+            write_sized_type(&mut code, &Vector::new(t, ir::Len::X1).into(), call_info, ctx)?;
             writeln!(
                 code,
                 "

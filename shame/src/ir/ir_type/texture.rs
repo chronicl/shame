@@ -1,8 +1,10 @@
 //! Texture formats, largely copied or modified from the `wgpu` crate
 
 use crate::backend::language::Language;
+use crate::ir::SizedType;
+use crate::ir::ir_type::Vector;
 
-use super::{AccessMode, Len, ScalarType, SizedType, StoreType};
+use super::{AccessMode, Len, ScalarType, StoreType};
 use std::any::Any;
 use std::borrow::Cow;
 use std::cmp::PartialEq;
@@ -588,15 +590,16 @@ impl BuiltinTextureFormatId {
         use super::Len::*;
         use super::ScalarType::*;
         self.sample_type(None).map(|sample_type| {
-            SizedType::Vector(
-                X4,
+            Vector::new(
                 match sample_type {
                     TextureSampleTypeOld::Float { filterable } => F32,
                     TextureSampleTypeOld::Depth => F32,
                     TextureSampleTypeOld::Sint => I32,
                     TextureSampleTypeOld::Uint => U32,
                 },
+                X4,
             )
+            .into()
         })
     }
 }

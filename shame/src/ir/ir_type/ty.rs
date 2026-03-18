@@ -1,4 +1,3 @@
-use self::struct_::SizedStruct;
 use crate::{
     any::layout::Repr,
     frontend::any::shared_io,
@@ -99,20 +98,6 @@ impl Display for StoreType {
     }
 }
 
-impl Display for SizedType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SizedType::Vector(l, t) => write!(f, "{t}{l}"),
-            SizedType::Matrix(c, r, t) => {
-                write!(f, "mat<{}, {}, {}>", ScalarType::from(*t), Len::from(*c), Len::from(*r))
-            }
-            SizedType::Array(t, n) => write!(f, "array<{t}, {n}>"),
-            SizedType::Atomic(t) => write!(f, "atomic<{}>", ScalarType::from(*t)),
-            SizedType::Structure(s) => write!(f, "{}", s.name()),
-        }
-    }
-}
-
 impl Display for HandleType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -148,9 +133,10 @@ pub enum AlignedType {
 
 impl AlignedType {
     pub fn align(&self) -> u64 {
+        // TODO(chronicl)
         match self {
-            AlignedType::Sized(sized) => sized.align(),
-            AlignedType::RuntimeSizedArray(sized) => align_of_array(sized),
+            AlignedType::Sized(sized) => sized.align(Repr::Wgsl).as_u64(),
+            AlignedType::RuntimeSizedArray(a) => a.align(Repr::Wgsl).as_u64(),
         }
     }
 }

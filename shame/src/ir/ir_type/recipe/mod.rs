@@ -7,10 +7,10 @@ use crate::{
     any::{U32PowerOf2, layout::Repr},
     call_info,
     common::prettify::set_color,
-    ir::{self, StructureFieldNamesMustBeUnique, ir_type::BufferBlockDefinitionError, recording::Context},
+    ir::{self, StructureFieldNamesMustBeUnique, recording::Context},
 };
 
-pub use crate::ir::{Len, Len2, PackedVector, ScalarTypeFp, ScalarTypeInteger, ir_type::CanonName};
+pub use crate::ir::{Len, Len2, PackedVector, ScalarTypeFp, ScalarTypeInteger, ScalarType, ir_type::CanonName};
 
 pub(crate) mod align_size;
 pub(crate) mod builder;
@@ -65,10 +65,24 @@ pub struct SizedArray {
     pub len: NonZeroU32,
 }
 
+impl SizedArray {
+    /// Creates a new `SizedArray` from it's element type and length.
+    pub fn new(element_ty: Rc<SizedType>, len: NonZeroU32) -> Self {
+        Self {
+            element: element_ty,
+            len,
+        }
+    }
+}
+
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Atomic {
     pub scalar: ScalarTypeInteger,
+}
+
+impl Atomic {
+    pub fn new(scalar: ScalarTypeInteger) -> Self { Self { scalar } }
 }
 
 #[allow(missing_docs)]
@@ -77,19 +91,13 @@ pub struct RuntimeSizedArray {
     pub element: SizedType,
 }
 
-/// Scalar types with known memory layout.
-///
-/// Same as `ir::ScalarType`, but without `ScalarType::Bool` since booleans
-/// don't have a standardized memory representation.
-#[allow(missing_docs)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ScalarType {
-    F16,
-    F32,
-    U32,
-    I32,
-    F64,
-    Bool,
+impl RuntimeSizedArray {
+    /// Creates a new `RuntimeSizedArray` from it's element type.
+    pub fn new(element_ty: impl Into<SizedType>) -> Self {
+        RuntimeSizedArray {
+            element: element_ty.into(),
+        }
+    }
 }
 
 /// A struct with a known fixed size.
@@ -128,12 +136,45 @@ pub struct SizedField {
     pub ty: SizedType,
 }
 
+impl SizedField {
+    /// Creates a new `SizedField`.
+    pub fn new(options: impl Into<FieldOptions>, ty: impl Into<SizedType>) -> Self {
+        let options = options.into();
+        Self {
+            name: options.name,
+            custom_min_size: options.custom_min_size,
+            custom_min_align: options.custom_min_align,
+            ty: ty.into(),
+        }
+    }
+}
+
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RuntimeSizedArrayField {
     pub name: CanonName,
     pub custom_min_align: Option<U32PowerOf2>,
     pub array: RuntimeSizedArray,
+}
+
+impl RuntimeSizedArrayField {
+    /// Creates a new `RuntimeSizedArrayField` given it's field name,
+    /// an optional custom minimum align and it's element type.
+    pub fn new(
+        name: impl Into<CanonName>,
+        custom_min_align: Option<U32PowerOf2>,
+        element_ty: impl Into<SizedType>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            custom_min_align,
+            array: RuntimeSizedArray {
+                element: element_ty.into(),
+            },
+        }
+    }
+
+    pub fn element_ty(&self) -> &SizedType { &self.array.element }
 }
 
 //   Conversions to ScalarType, SizedType and TypeLayoutRecipe   //
@@ -147,6 +188,7 @@ macro_rules! impl_into_sized_type {
        )*
     };
 }
+
 impl_into_sized_type!(
     Vector       -> SizedType::Vector,
     Matrix       -> SizedType::Matrix,
@@ -167,31 +209,6 @@ impl From<UnsizedStruct> for LayoutType {
 }
 impl From<RuntimeSizedArray> for LayoutType {
     fn from(a: RuntimeSizedArray) -> Self { LayoutType::RuntimeSizedArray(a) }
-}
-
-// TODO(chronicl) remove 2
-impl ScalarTypeInteger {
-    pub const fn as_scalar_type2(self) -> ScalarType {
-        match self {
-            ScalarTypeInteger::I32 => ScalarType::I32,
-            ScalarTypeInteger::U32 => ScalarType::U32,
-        }
-    }
-}
-impl From<ScalarTypeInteger> for ScalarType {
-    fn from(int: ScalarTypeInteger) -> Self { int.as_scalar_type2() }
-}
-impl ScalarTypeFp {
-    pub const fn as_scalar_type2(self) -> ScalarType {
-        match self {
-            ScalarTypeFp::F16 => ScalarType::F16,
-            ScalarTypeFp::F32 => ScalarType::F32,
-            ScalarTypeFp::F64 => ScalarType::F64,
-        }
-    }
-}
-impl From<ScalarTypeFp> for ScalarType {
-    fn from(int: ScalarTypeFp) -> Self { int.as_scalar_type2() }
 }
 
 // Display impls
@@ -235,11 +252,11 @@ impl std::fmt::Display for Matrix {
 }
 
 impl std::fmt::Display for SizedArray {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "Array<{}, {}>", &*self.element, self.len) }
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "array<{}, {}>", &*self.element, self.len) }
 }
 
 impl std::fmt::Display for Atomic {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "Atomic<{}>", ScalarType::from(self.scalar)) }
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "atomic<{}>", ScalarType::from(self.scalar)) }
 }
 
 impl std::fmt::Display for SizedStruct {
@@ -251,18 +268,5 @@ impl std::fmt::Display for UnsizedStruct {
 }
 
 impl std::fmt::Display for RuntimeSizedArray {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "Array<{}>", self.element) }
-}
-
-impl std::fmt::Display for ScalarType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            ScalarType::F16 => "f16",
-            ScalarType::F32 => "f32",
-            ScalarType::F64 => "f64",
-            ScalarType::U32 => "u32",
-            ScalarType::I32 => "i32",
-            ScalarType::Bool => "bool",
-        })
-    }
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "array<{}>", self.element) }
 }

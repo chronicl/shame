@@ -484,16 +484,16 @@ fn write_struct_definition(code: &mut CodeWriteSpan, def: &StructDef, ctx: &Wgsl
     writeln!(code, "struct {} {{", &ctx.idents[def.ident()])?;
     {
         let indent = ctx.indent.deeper();
-        for (ident, field) in def.fields() {
+        for (ident, custom_min_align, custom_min_size, ty) in def.fields() {
             write!(code, "{indent}")?;
-            if let Some(align) = field.custom_min_align() {
+            if let Some(align) = custom_min_align {
                 write!(code, "@align({}) ", u64::from(align))?;
             }
-            if let Some(size) = field.custom_min_size() {
+            if let Some(size) = custom_min_size {
                 write!(code, "@size({size}) ")?;
             }
             write!(code, "{}: ", &ctx.idents[*ident])?;
-            write_store_type(&mut code, &field.ty(), def.call_info(), ctx)?;
+            write_store_type(&mut code, &StoreType::Layout(ty), def.call_info(), ctx)?;
             writeln!(code, ",")?;
         }
     }

@@ -4,9 +4,8 @@ use super::{
     WgslContext, WgslErrorKind,
 };
 use crate::ir::{
-    self,
-    ir_type::{ChannelFormatShaderType, SamplesPerPixel, TextureSampleUsageType, TextureShape},
-    AccessMode,
+    self, AccessMode,
+    ir_type::{ChannelFormatShaderType, LayoutType, SamplesPerPixel, TextureSampleUsageType, TextureShape},
 };
 use crate::{
     backend::code_write_buf::CodeWriteSpan,
@@ -151,11 +150,20 @@ pub(super) fn write_store_type(
     ctx: &WgslContext,
 ) -> Result<(), WgslError> {
     match store {
-        StoreType::Sized(sized) => write_sized_type(code, sized, call_info, ctx),
-        StoreType::RuntimeSizedArray(elem) => {
+        StoreType::Layout(LayoutType::Sized(sized)) => write_sized_type(code, sized, call_info, ctx),
+        StoreType::Layout(LayoutType::RuntimeSizedArray(a)) => {
             write!(code, "array<")?;
-            write_sized_type(code, elem, call_info, ctx)?;
+            write_sized_type(code, &a.element, call_info, ctx)?;
             write!(code, ">")?;
+            Ok(())
+        }
+        StoreType::Layout(LayoutType::UnsizedStruct(s)) => {
+            let ident = match ctx.ctx.struct_registry().get(s.into()) {
+                Some(def) => Ok(def.ident()),
+                None => Err(WgslErrorKind::MissingStructDefinition(s.name.to_string())
+                    .at_level(call_info, WgslErrorLevel::InternalPleaseReport)),
+            }?;
+            write!(code, "{}", &ctx.idents[ident])?;
             Ok(())
         }
         StoreType::Handle(handle) => {
@@ -228,15 +236,6 @@ pub(super) fn write_store_type(
                 }
             }
         }
-        StoreType::BufferBlock(block) => {
-            let ident = match ctx.ctx.struct_registry().get(block) {
-                Some(def) => Ok(def.ident()),
-                None => Err(WgslErrorKind::MissingStructDefinition(block.name().to_string())
-                    .at_level(call_info, WgslErrorLevel::InternalPleaseReport)),
-            }?;
-            write!(code, "{}", &ctx.idents[ident])?;
-            Ok(())
-        }
         StoreType::BindingArray(s, n) => {
             write!(code, "binding_array<")?;
             write_store_type(code, s, call_info, ctx)?;
@@ -258,39 +257,39 @@ pub(super) fn write_sized_type(
     use SizedType as T;
     let at_caller = |e: WgslErrorKind| e.at(call_info);
     match sized {
-        T::Vector(len, stype) => match len {
-            Len::X1 => write!(code, "{}", scalar_type_str(*stype).map_err(at_caller)?)?,
+        T::Vector(v) => match v.len {
+            Len::X1 => write!(code, "{}", scalar_type_str(v.scalar).map_err(at_caller)?)?,
             xn => write!(
                 code,
                 "vec{}{}",
-                u32::from(*xn),
-                scalar_type_suffix(*stype).map_err(at_caller)?
+                u32::from(v.len),
+                scalar_type_suffix(v.scalar).map_err(at_caller)?
             )?,
         },
-        T::Matrix(c, r, stype) => write!(
+        T::Matrix(m) => write!(
             code,
             "mat{}x{}{}",
-            u32::from(*c),
-            u32::from(*r),
-            scalar_type_suffix((*stype).into()).map_err(at_caller)?
+            u32::from(m.columns),
+            u32::from(m.rows),
+            scalar_type_suffix((m.scalar).into()).map_err(at_caller)?
         )?,
-        T::Atomic(t) => write!(
+        T::Atomic(a) => write!(
             code,
             "atomic<{}>",
-            match *t {
+            match a.scalar {
                 ScalarTypeInteger::U32 => "u32",
                 ScalarTypeInteger::I32 => "i32",
             }
         )?,
-        T::Array(elem, count) => {
+        T::Array(a) => {
             write!(code, "array<")?;
-            write_store_type(code, &StoreType::from((**elem).clone()), call_info, ctx)?;
-            write!(code, ", {count}>")?;
+            write_store_type(code, &(*a.element).clone().into(), call_info, ctx)?;
+            write!(code, ", {}>", a.len.get())?;
         }
-        T::Structure(struct_) => {
-            let ident = match ctx.ctx.struct_registry().get(struct_) {
+        T::Struct(s) => {
+            let ident = match ctx.ctx.struct_registry().get(s.into()) {
                 Some(def) => Ok(def.ident()),
-                None => Err(WgslErrorKind::MissingStructDefinition(struct_.name().to_string())
+                None => Err(WgslErrorKind::MissingStructDefinition(s.name.to_string())
                     .at_level(call_info, WgslErrorLevel::InternalPleaseReport)),
             }?;
             write!(code, "{}", &ctx.idents[ident])?;

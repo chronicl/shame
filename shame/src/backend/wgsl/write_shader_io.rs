@@ -4,7 +4,10 @@ use super::{
     write_node::get_single_arg,
     WgslContext,
 };
-use crate::{frontend::any::render_io::VertexAttributeCooked, ir::pipeline::LateRecorded};
+use crate::{
+    frontend::any::render_io::VertexAttributeCooked,
+    ir::{ir_type::Vector, pipeline::LateRecorded},
+};
 use crate::frontend::any::render_io::FragmentSampleMethod;
 use crate::frontend::any::render_io::FragmentSamplePosition;
 use crate::frontend::any::render_io::Location;
@@ -21,7 +24,7 @@ use crate::{
         expr::*,
         pipeline::{ShaderStage, WipRenderPipelineDescriptor},
         recording::{Block, BlockKind, BodyKind, CallInfo, Context},
-        Len, Node, SizedType, StoreType, Type,
+        Len, Node, StoreType, Type,
     },
 };
 use std::fmt::Write;
@@ -377,7 +380,7 @@ fn push_supersampling_enforcing_entry_if_needed(
                     .max()
                     .unwrap_or(0),
             );
-            let ty = Type::Store(StoreType::Sized(SizedType::Vector(Len::X1, ir::ScalarType::F32)));
+            let ty = Vector::new(ir::ScalarType::F32, Len::X1).into();
             let fill = Some(FragmentSampleMethod::Interpolated(
                 Fill::Perspective,
                 FragmentSamplePosition::PerSample,
@@ -484,7 +487,7 @@ pub(super) fn prepare_io_definitions(stage: ShaderStage, ctx: &WgslContext) -> R
                 {
                     let entry = Entry {
                         io: ShaderIo::GetVertexInput(*location),
-                        ty: Type::Store(StoreType::Sized(format.type_in_shader())),
+                        ty: format.type_in_shader().into(),
                         fill: None,
                         io_category: IOCategory::Input,
                         is_supersampling_dummy: false,
@@ -498,7 +501,7 @@ pub(super) fn prepare_io_definitions(stage: ShaderStage, ctx: &WgslContext) -> R
                 let (len, stype) = terp.vec_ty;
                 let entry = Entry {
                     io: ShaderIo::Interpolate(terp.location),
-                    ty: Type::Store(StoreType::Sized(SizedType::Vector(len, stype))),
+                    ty: Vector::new(stype, len).into(),
                     fill: Some(terp.method),
                     io_category: IOCategory::Output,
                     is_supersampling_dummy: false,
@@ -515,7 +518,7 @@ pub(super) fn prepare_io_definitions(stage: ShaderStage, ctx: &WgslContext) -> R
                 let (len, stype) = terp.vec_ty;
                 let entry = Entry {
                     io: ShaderIo::GetInterpolated(terp.location),
-                    ty: Type::Store(StoreType::Sized(SizedType::Vector(len, stype))),
+                    ty: Vector::new(stype, len).into(),
                     io_category: IOCategory::Input,
                     fill: Some(terp.method),
                     is_supersampling_dummy: false,
