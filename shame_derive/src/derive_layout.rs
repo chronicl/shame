@@ -473,7 +473,7 @@ pub fn impl_for_struct(
                                                 name: std::stringify!(#field_ident).into(),
                                                 custom_min_size: #field_size,
                                                 custom_min_align: #field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")),
-                                                ty: <#first_fields_type as #re::GpuSized>::sized_ty(),
+                                                ty: <#field_type as #re::GpuSized>::sized_ty(),
                                             }
                                         ),*
                                     ]),
