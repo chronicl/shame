@@ -1,13 +1,10 @@
 use std::{
-    array,
     fmt::{Display, Write},
-    ops::{Index, IndexMut},
+    ops::Index,
 };
 
-use crate::{
-    common::integer::saturating_post_dec_u8,
-    frontend::{any::render_io::ChannelWrites, rust_types::len},
-};
+use crate::frontend::any::render_io::ChannelWrites;
+
 type Bits = u64;
 
 /// A [`Vec<bool>`] with a maximum capacity of 64

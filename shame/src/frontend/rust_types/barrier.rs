@@ -1,9 +1,7 @@
-use crate::frontend::any::Any;
-use crate::frontend::rust_types::reference::Ref;
-
+use crate::frontend::{any::Any, rust_types::reference::Ref};
 use super::{
     mem,
-    reference::{AccessMode, AccessModeReadable},
+    reference::{AccessModeReadable},
     type_traits::{GpuSized, GpuStore, NoAtomics},
     AsAny, GpuType,
 };

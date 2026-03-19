@@ -1,38 +1,32 @@
-use std::{fmt::Display, num::NonZeroU32, ops::Not, rc::Rc};
+use std::fmt::Display;
 
 use super::{
     type_check::{*, SizedTypeShorthand::*, vec_store},
-    BuiltinFn, Comp4, ExponentFn, Expr, NumericFn,
+    BuiltinFn, Comp4, Expr,
 };
-use crate::backend::wgsl::WgslErrorKind;
-use crate::frontend::any::shared_io::SamplingMethod as SamplingMethodEnum;
-use crate::{Language, TextureSampleUsageType};
 use crate::{
+    Language, TextureSampleUsageType,
+    backend::wgsl::WgslErrorKind,
     call_info,
     common::integer::i4,
     frontend::{
-        any::{record_node, Any, ArgumentNotAvailable, InvalidReason},
-        encoding::EncodingErrorKind,
-        rust_types::{AsAny, GpuType},
-        texture::{
-            texture_traits::{SamplingMethod, TextureCoords},
-            RateUnadjustedMipFn,
-        },
+        any::{Any, InvalidReason, record_node, shared_io::SamplingMethod as SamplingMethodEnum},
+        rust_types::AsAny,
+        texture::{RateUnadjustedMipFn, texture_traits::TextureCoords},
     },
     impl_track_caller_fn_any,
     ir::{
+        self, AccessMode, HandleType,
         Len::*,
-        Len2,
+        SamplesPerPixel,
         ScalarType::{self, *},
-        ScalarTypeFp, SizedStruct,
-        ir_type::{AccessMode, AddressSpace, Indirection, StoreType::*, TextureShape, Type::Unit},
-        pipeline::{PossibleStages, ShaderStage, StageMask},
+        SizedType, StoreType, Type,
+        ir_type::{StoreType::*, TextureShape, Type::Unit},
         recording::{Context, NodeRecordingError},
-        HandleType, SamplesPerPixel, SizedType,
     },
+    sig,
 };
 
-use crate::{ir, ir::StoreType, ir::Type, same, sig};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(clippy::enum_variant_names)]
 #[rustfmt::skip]

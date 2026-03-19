@@ -1,9 +1,9 @@
 #![allow(missing_docs)]
-use std::{rc::Rc, sync::atomic::AtomicU64};
+use std::rc::Rc;
 
 use crate::{
     AccessModeReadable, ArrayLen, Binding, Buffer, BufferAddressSpace, BufferContent, GpuIndex, GpuLayout, GpuStore,
-    NoAtomics, NoBools, NoHandles, RuntimeSize,
+    NoBools, NoHandles, RuntimeSize,
     any::{Any, BindingType},
     call_info,
     common::proc_macro_reexports::BindingArgs,
@@ -13,10 +13,9 @@ use crate::{
         rust_types::{layout_traits::get_layout_compare_with_cpu_push_error, mem, vec::ToInteger},
     },
     ir::{
-        self, LayoutType, Repr, RuntimeSizedArrayField, SizedField, SizedStruct, SizedType, StoreType, UnsizedStruct,
+        LayoutType, Repr, RuntimeSizedArrayField, SizedField, SizedStruct, SizedType, StoreType, UnsizedStruct,
         recording::Context, type_layout::compatible_with::TypeLayoutCompatibleWith,
     },
-    mem::Storage,
 };
 
 // struct registration handles deduplication of struct names,

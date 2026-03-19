@@ -1,25 +1,18 @@
-use std::cell::Cell;
 use std::marker::PhantomData;
 
-use render_io::ChannelWrites;
-
-use crate::frontend::any::blend::Blend;
-use crate::frontend::any::{Any, InvalidReason};
-use crate::frontend::rust_types::len::x4;
-use crate::frontend::rust_types::scalar_type::ScalarType;
-use crate::frontend::rust_types::vec::IsVec;
-use crate::frontend::rust_types::To;
-use crate::ir::pipeline::PipelineError;
-use crate::ir::recording::Context;
-use crate::ir::{Len, TextureFormatId};
-use crate::{call_info, f32x1};
-use crate::{frontend::any::render_io, ir};
-
-use crate::frontend::texture::texture_traits::{
-    Blendable, ColorTargetFormat, Multi, Single, Spp, SupportsSpp, TexelShaderType, TextureFormat,
+use crate::{
+    call_info,
+    frontend::{
+        any::{Any, blend::Blend, render_io},
+        rust_types::{To, len::x4, scalar_type::ScalarType, vec::IsVec},
+        texture::texture_traits::{Blendable, ColorTargetFormat, Multi, Single, Spp, SupportsSpp, TextureFormat},
+    },
+    ir::{TextureFormatId, pipeline::PipelineError, recording::Context},
 };
 
 use super::rasterizer::FragmentStage;
+
+use render_io::ChannelWrites;
 
 /// (no documentation yet)
 pub struct ColorTarget<Format: ColorTargetFormat, SPP: Spp = Single>

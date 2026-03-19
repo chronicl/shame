@@ -14,7 +14,7 @@ pub(crate) mod type_check;
 
 use std::fmt::Display;
 
-use crate::{impl_track_caller_fn_any, ir::ir_type, ir, ir::Type, sig, try_ctx_track_caller};
+use crate::ir::Type;
 pub use alloc::*;
 pub use assign::*;
 pub use builtin_fn::*;
@@ -29,11 +29,8 @@ pub use shader_io_expr::*;
 pub use type_check::NoMatchingSignature;
 pub use type_check::TypeCheck;
 
-use super::pipeline::PipelineKind;
 use super::pipeline::PossibleStages;
 use super::pipeline::StageMask;
-use super::recording::Stmt;
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
@@ -59,7 +56,6 @@ pub enum Expr {
 impl TypeCheck for Expr {
     #[rustfmt::skip]
     fn infer_type(&self, args: &[Type]) -> Result<Type, NoMatchingSignature> {
-        use ir::{Len::*, StoreType::*, *};
         match self {
             Expr::VarIdent      (x) => x.infer_type(args),
             Expr::Assign        (x) => x.infer_type(args),

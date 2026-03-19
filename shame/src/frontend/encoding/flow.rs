@@ -1,32 +1,19 @@
-use crate::frontend::rust_types::len::x1;
-use crate::frontend::rust_types::mem::Cell;
-use crate::frontend::rust_types::reference::ReadWrite;
-use crate::frontend::rust_types::vec::ToInteger;
-use crate::frontend::rust_types::vec::ToVec;
-use crate::frontend::rust_types::vec_range::Inclusivity;
-use crate::i32x1;
-use crate::ir;
-use crate::ir::recording::FlowStmt;
-use crate::ir::recording::StmtError;
-use crate::u32x1;
-
-use crate::boolx1;
-use crate::frontend::rust_types::reference::Ref;
-use crate::frontend::rust_types::scalar_type::ScalarTypeInteger;
-use crate::frontend::rust_types::vec::vec;
-use crate::frontend::rust_types::vec::zero;
-use crate::frontend::rust_types::{AsAny, GpuType, To, ToGpuType};
-use crate::VecRange;
 use crate::{
-    call_info,
-    frontend::any::flow_builders::*,
-    frontend::rust_types::reference::AccessMode,
-    ir::recording::{Context, Jump, Stmt, TimeInstant},
-    mem::AddressSpace,
+    VecRange, boolx1, call_info,
+    frontend::{
+        any::flow_builders::*,
+        rust_types::{
+            AsAny, ToGpuType,
+            len::x1,
+            mem::Cell,
+            reference::Ref,
+            scalar_type::ScalarTypeInteger,
+            vec::{ToInteger, ToVec, vec},
+            vec_range::Inclusivity,
+        },
+    },
+    ir::recording::{Context, FlowStmt, Jump, StmtError, TimeInstant},
 };
-
-use super::EncodingErrorKind;
-
 
 #[cfg(not(feature = "relaxed_control_flow"))]
 pub trait FlowFn: 'static {}

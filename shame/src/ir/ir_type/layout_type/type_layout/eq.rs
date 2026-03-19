@@ -1,4 +1,9 @@
-use crate::common::format::display;
+use std::fmt::Display;
+use std::fmt::Write;
+
+use crate::any::Context;
+use crate::call_info;
+use crate::common::{format::display, prettify::set_color};
 use crate::common::prettify::UnwrapDisplayOr;
 
 use super::{*, display::LayoutInfoFlags};

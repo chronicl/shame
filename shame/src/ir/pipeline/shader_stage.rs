@@ -1,6 +1,6 @@
 use std::{
     fmt::{Display, Write},
-    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Neg, Not},
+    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Not},
 };
 
 use super::PipelineKind;

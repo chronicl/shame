@@ -8,18 +8,14 @@ use crate::frontend::any::Any;
 use crate::{
     call_info,
     frontend::any::record_node,
-    frontend::error::InternalError,
-    impl_track_caller_fn_any,
     ir::{
         Len::*,
-        Len2,
-        ScalarType::{self, *},
-        SizedType::*,
-        ir_type::{AccessMode, AddressSpace, Indirection, StoreType::*, Type::Unit},
-        recording::{Context, InteractionKind, MemoryInteractionEvent, MemoryRegion},
+        ScalarType::{*},
+        ir_type::{AccessMode, AddressSpace, Type::Unit},
+        recording::{InteractionKind, MemoryRegion},
     },
 };
-use crate::{ir, ir::ir_type::StoreType, ir::Type, same, sig};
+use crate::{ir::Type, same, sig};
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

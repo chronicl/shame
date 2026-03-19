@@ -1,8 +1,5 @@
-use super::{len::*, scalar_type::ScalarType, vec::vec, vec::ToVec, To, ToGpuType};
-use crate::common::floating_point::f16;
-use crate::frontend::any::Any;
-use crate::ir::ScalarConstant;
-use crate::{boolx1, f16x1, f32x1, f64x1, i32x1, u32x1};
+use crate::{common::floating_point::f16, f16x1, f64x1, frontend::any::Any, ir::ScalarConstant};
+use super::{len::*, scalar_type::ScalarType, vec::vec, vec::ToVec, ToGpuType};
 
 impl<A, B, T: ScalarType> ToGpuType for (A, B)
 where

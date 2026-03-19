@@ -2,8 +2,7 @@ use std::{fmt::Display, rc::Rc};
 
 use crate::{
     call_info,
-    common::{pool::Key, small_vec_actual::SmallVec},
-    frontend::any::fn_builder::PassAs,
+    common::pool::Key,
     ir::{
         self,
         expr::type_check::SignatureStrings,

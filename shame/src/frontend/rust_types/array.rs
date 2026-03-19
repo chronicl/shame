@@ -1,34 +1,27 @@
-use super::atomic::Atomic;
-use super::index::GpuIndex;
-use super::layout_traits::{ArrayElementsUnsizedError, FromAnys, GetAllFields, GpuLayout};
-use super::len::x1;
-use super::mem::AddressSpace;
-use super::reference::{AccessMode, AccessModeReadable, AccessModeWritable, Read};
-use super::scalar_type::ScalarTypeInteger;
-use super::ir::type_layout::{self, TypeLayout, ArrayLayout};
-use super::type_traits::{
-    BindingArgs, EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles,
+use std::{borrow::Cow, marker::PhantomData, num::NonZeroU32, ops::Deref, rc::Rc};
+
+use crate::{
+    frontend::{
+        any::Any,
+        encoding::flow::{FlowFn, for_range_impl},
+        rust_types::{reference::Ref, vec::vec},
+    },
+    ir::{self},
 };
-use super::vec::{ToInteger, ToVec};
-use super::{AsAny, GpuType};
-use super::{To, ToGpuType};
-use crate::common::small_vec::SmallVec;
-use crate::frontend::any::shared_io::{BindPath, BindingType};
-use crate::frontend::any::Any;
-use crate::frontend::any::InvalidReason;
-use crate::frontend::encoding::buffer::{Buffer, BufferAddressSpace};
-use crate::frontend::encoding::flow::{for_range_impl, FlowFn};
-use crate::frontend::error::InternalError;
-use crate::frontend::rust_types::reference::Ref;
-use crate::frontend::rust_types::vec::vec;
-use crate::ir::pipeline::StageMask;
-use crate::ir::recording::Context;
-use crate::{call_info, for_count, ir};
-use std::borrow::Cow;
-use std::marker::PhantomData;
-use std::num::NonZeroU32;
-use std::ops::Deref;
-use std::rc::Rc;
+
+use super::{
+    AsAny, GpuType, To, ToGpuType,
+    index::GpuIndex,
+    ir::type_layout::{ArrayLayout, TypeLayout},
+    layout_traits::{ArrayElementsUnsizedError, FromAnys, GetAllFields, GpuLayout},
+    len::x1,
+    mem::AddressSpace,
+    reference::{AccessMode, AccessModeReadable},
+    type_traits::{
+        EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles,
+    },
+    vec::ToInteger,
+};
 
 /// Amount of elements in an [`Array`]
 ///

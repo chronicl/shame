@@ -3,7 +3,7 @@ use thiserror::Error;
 use crate::{
     common::{pool::Key, small_vec::SmallVec},
     frontend::any::{fn_builder::PassAs, InvalidReason},
-    ir::{AccessMode, AddressSpace, StoreType, Type},
+    ir::{AccessMode, AddressSpace, StoreType},
 };
 
 use super::{Block, CallInfo, Ident, Node};

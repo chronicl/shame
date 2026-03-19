@@ -4,8 +4,7 @@ use crate::ir::ir_type::AddressSpace;
 use crate::ir::pipeline::PipelineKind;
 use crate::ir::pipeline::{PossibleStages, StageMask};
 use crate::{
-    common::pool::{Key, Pool, PoolRef},
-    ir::expr::Expr,
+    common::pool::{Key, PoolRef},
     ir::recording::{context::Context, stmt::Stmt},
 };
 

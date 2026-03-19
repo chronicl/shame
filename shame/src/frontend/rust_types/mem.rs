@@ -2,10 +2,8 @@ use super::mem;
 use super::reference::*;
 use super::type_traits::GpuSized;
 use super::type_traits::GpuStore;
-use crate::frontend::any;
 use crate::frontend::any::Any;
 use crate::ir;
-use std::marker::PhantomData;
 
 /// ### the function's address space, memory is reclaimed after the block scope ends.
 ///

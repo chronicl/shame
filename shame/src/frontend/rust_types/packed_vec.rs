@@ -1,27 +1,23 @@
 #![allow(non_camel_case_types)]
-use std::{
-    borrow::Cow,
-    marker::{PhantomData, PhantomPinned},
-};
 
 use crate::{
     any::{AsAny, DataPackingFn},
     common::floating_point::f16,
-    f32x2, f32x4, gpu_layout, i32x4,
+    f32x2, f32x4, i32x4,
     ir::LayoutType,
     u32x1, u32x4,
 };
-use crate::frontend::rust_types::len::{x1, x2, x3, x4};
+use crate::frontend::rust_types::len::{x1, x2, x4};
 use crate::frontend::rust_types::vec::vec;
 use crate::{
     call_info,
     frontend::any::{render_io::VertexAttribFormat, Any, InvalidReason},
-    ir::{self, recording::Context, PackedVector, SizedType, Repr, type_layout::TypeLayout},
+    ir::{self, recording::Context, PackedVector, SizedType},
 };
 
 use super::{
     error::FrontendError,
-    layout_traits::{from_single_any, ArrayElementsUnsizedError, FromAnys, GpuLayout},
+    layout_traits::{from_single_any, FromAnys},
     len::LenEven,
     scalar_type::ScalarType,
     type_traits::{GpuAligned, GpuSized, NoAtomics, NoBools, NoHandles, VertexAttribute},

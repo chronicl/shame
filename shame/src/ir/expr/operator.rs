@@ -1,16 +1,19 @@
-use super::{operation::*, Decomposition, Expr, NoMatchingSignature, TypeCheck};
-use crate::frontend::any::Any;
+use std::{fmt::Display, ops::*};
+
 use crate::{
     call_info,
-    frontend::{any::record_node, error::InternalError},
+    frontend::{
+        any::{Any, record_node},
+        error::InternalError,
+    },
     impl_track_caller_fn_any,
     ir::{
         self,
-        expr::type_check::SignatureStrings,
         recording::{Context, NodeRecordingError},
     },
 };
-use std::{fmt::Display, ops::*};
+
+use super::{operation::*, Decomposition, Expr, NoMatchingSignature, TypeCheck};
 
 /// wgsl operators
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -210,14 +213,14 @@ impl TypeCheck for Operator {
     #[rustfmt::skip]
     fn infer_type(&self, args: &[ir::Type]) -> Result<ir::Type, NoMatchingSignature> {
         // this function tries all of the `Operation`s for this `Operator`.
-        // If none of them has a signature that matches `args`, 
+        // If none of them has a signature that matches `args`,
         // all the mismatching signatures are combined into one large
         // `NoMatchingSignature` error.
 
         let push_conflict_err = |op, args, a, b| Context::try_with(call_info!(), |ctx|
             ctx.push_error(InternalError::new(true,
                 format!("at least two matching operations for operator `{:?}` with arguments {:?} \
-                which have conflicting inferred return types ({:?} vs {:?}).", 
+                which have conflicting inferred return types ({:?} vs {:?}).",
                 self, args, a, b)
             ).into()));
 

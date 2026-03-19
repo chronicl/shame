@@ -1,43 +1,43 @@
-use crate::common::marker::{Unsend, Unsync};
-use crate::frontend::any::render_io::{VertexBufferLookupIndex, Location};
-use crate::frontend::any::{Any, InvalidReason};
-use crate::frontend::rust_types::array::{Array, Size, UpTo8};
-use crate::frontend::rust_types::error::FrontendError;
-use crate::frontend::rust_types::len::{x1, x2, x3, x4, Len};
-use crate::frontend::rust_types::vec::IsVec;
-use crate::frontend::rust_types::{AsAny, GpuType, To, ToGpuType};
-use crate::frontend::texture::texture_traits::{
-    CubeDir, DepthFormat, DepthStencilFormat, Multi, Single, StencilFormat, TextureCoords, TextureFormat,
-};
-use crate::frontend::texture::MipFn;
-use crate::ir::pipeline::{PipelineError, WipDepthStencilState};
-use crate::ir::recording::{BlockError, Context};
-use crate::ir::{self, CallInfo, GradPrecision, FragmentShadingRate, SamplesPerPixel, TextureFormatWrapper};
+use std::{cell::Cell, marker::PhantomData};
+
 use crate::{
-    call_info,
+    DepthBias, DepthLhs, boolx1, call_info,
+    common::marker::{Unsend, Unsync},
+    f32x1, f32x2, f32x4, f64x1,
     frontend::{
-        any::record_node, encoding::EncodingErrorKind, error::InternalError, rust_types::scalar_type::ScalarType,
-        texture::texture_traits::Spp,
+        any::{
+            Any, record_node,
+            render_io::{Location, VertexBufferLookupIndex},
+        },
+        rust_types::{
+            AsAny, ToGpuType,
+            array::{Array, Size, UpTo8},
+            len::{Len, x1, x2, x4},
+            vec::vec,
+        },
+        texture::{
+            MipFn,
+            texture_traits::{
+                DepthFormat, DepthStencilFormat, Multi, Single, Spp, StencilFormat, TextureCoords, TextureFormat,
+            },
+        },
     },
+    i32x1,
     ir::{
-        expr::{BuiltinShaderOut, Expr, NoMatchingSignature, ShaderIo},
-        recording::NodeRecordingError,
+        self, FragmentShadingRate, GradPrecision, SamplesPerPixel, TextureFormatWrapper,
+        expr::BuiltinShaderOut,
+        pipeline::{PipelineError, WipDepthStencilState},
+        recording::Context,
     },
-    sig, try_ctx_track_caller,
+    u32x1,
 };
 
-use crate::frontend::rust_types::vec::vec;
-use crate::{boolx1, f32x1, f32x2, f32x4, f64x1, i32x1, u32x1, u32x2, DepthBias, DepthLhs};
-use std::cell::Cell;
-use std::marker::PhantomData;
-use std::num::{NonZeroU8, NonZeroUsize};
-use std::ops::Deref;
-
-use super::color_target::ColorTargetIter;
-use super::features::Wave;
-use super::fragment_test::{DepthTest, StencilTest};
-use super::io_iter::VertexBufferIter;
-use super::mask::BitVec64;
+use super::{
+    color_target::ColorTargetIter,
+    fragment_test::{DepthTest, StencilTest},
+    io_iter::VertexBufferIter,
+    mask::BitVec64,
+};
 
 /// (no documentation yet)
 pub struct VertexStage<'a> {

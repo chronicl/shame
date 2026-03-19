@@ -1,7 +1,5 @@
 use std::fmt::Display;
 
-use crate::ir::ir_type::Type;
-
 // https://www.w3.org/TR/WGSL/#address-space
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[allow(missing_docs)] // runtime api

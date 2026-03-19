@@ -3,7 +3,7 @@ use super::{
     pools::{GetPool, Pools},
     thread_local::CONTEXT,
     AllocStmt, Block, BlockError, BlockKind, CallInfo, CellNonZeroU32Ext, ExecutionState, ExprStmt, FlowStmt, Node,
-    NodeRecordingError, RecordTime, Stmt, TimeInstant,
+    NodeRecordingError, RecordTime, TimeInstant,
 };
 use crate::{
     frontend::any::shared_io::BindPath, ir::pipeline::InsufficientVisibilityError, results::LanguageCode, ShaderStage,

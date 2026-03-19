@@ -1,32 +1,21 @@
-use crate::frontend::any::Any;
-use crate::frontend::any::{shared_io::BufferBindingType, InvalidReason};
-use crate::frontend::rust_types::layout_traits::GpuLayout;
-use crate::frontend::rust_types::reference::Ref;
-use crate::frontend::rust_types::reference::{AccessMode, AccessModeReadable, Read};
-use crate::frontend::rust_types::type_traits::BindingArgs;
-use crate::frontend::rust_types::{reference::ReadWrite, struct_::SizedFields, type_traits::NoBools};
-use crate::frontend::texture::storage_texture::StorageTexture;
-use crate::frontend::texture::texture_array::{StorageTextureArray, TextureArray};
-use crate::frontend::texture::texture_traits::{SamplingFormat, Spp, StorageTextureFormat};
-use crate::frontend::texture::{Sampler, Texture};
-use crate::ir::pipeline::StageMask;
-use crate::ir::HandleType;
+use std::num::NonZeroU32;
+
 use crate::{
-    frontend::any::{shared_io::BindPath, shared_io::BindingType},
     frontend::{
-        rust_types::reference::AccessModeWritable,
+        any::{Any, InvalidReason, shared_io::BindingType},
+        rust_types::{reference::AccessMode, type_traits::BindingArgs},
         texture::{
+            Sampler, Texture, TextureKind,
+            storage_texture::StorageTexture,
+            texture_array::{StorageTextureArray, TextureArray},
             texture_traits::{
-                LayerCoords, SamplingMethod, StorageTextureCoords, SupportsCoords, SupportsSpp, TextureCoords,
+                LayerCoords, SamplingFormat, SamplingMethod, Spp, StorageTextureCoords, StorageTextureFormat,
+                SupportsCoords, SupportsSpp, TextureCoords,
             },
-            TextureKind,
         },
     },
-    ir::{self, TextureFormatWrapper},
-    mem::{self, AddressSpace, SupportsAccess},
+    ir::{self, HandleType, TextureFormatWrapper},
 };
-use std::marker::PhantomData;
-use std::num::NonZeroU32;
 
 /// Types of resources that can be bound as part of a bind-group and accessed in Gpu pipelines.
 ///

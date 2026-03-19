@@ -1,25 +1,32 @@
-use std::fmt::Display;
-use std::num::{NonZeroU32, NonZeroU64};
-use std::rc::Rc;
+use std::{
+    collections::btree_map::Entry,
+    fmt::Display,
+    num::{NonZeroU32},
+    rc::Rc,
+};
 
-use crate::backend::language::Language;
-use crate::{call_info, mem, BufferAddressSpace};
-use crate::common::po2::U32PowerOf2;
-use crate::frontend::any::Any;
-use crate::frontend::any::{record_node, InvalidReason};
-use crate::frontend::encoding::buffer::BufferAddressSpaceEnum;
-use crate::frontend::encoding::{EncodingErrorKind, EncodingGuard};
-use crate::frontend::error::InternalError;
-use crate::ir::type_layout::compatible_with::{self, AddressSpaceError, RequirementsNotSatisfied, TypeLayoutCompatibleWith};
-use crate::ir::expr::Binding;
-use crate::ir::expr::Expr;
-use crate::ir::ir_type::{AccessModeReadable, HandleType, SamplesPerPixel};
-use crate::ir::pipeline::{PipelineError, StageMask, WipBinding, WipPushConstantsField};
-use crate::ir::recording::{Context, MemoryRegion};
-use crate::ir::{self, AddressSpace, LayoutType, SizedType, StoreType, TextureFormatWrapper, TextureSampleUsageType, Type};
-use crate::ir::{ir_type::TextureShape, AccessMode};
-use std::collections::btree_map::Entry;
 use thiserror::Error;
+
+use crate::{
+    BufferAddressSpace,
+    backend::language::Language,
+    call_info,
+    common::po2::U32PowerOf2,
+    frontend::{
+        any::{Any, InvalidReason, record_node},
+        encoding::{EncodingErrorKind, buffer::BufferAddressSpaceEnum},
+        error::InternalError,
+    },
+    ir::{
+        self, AccessMode, LayoutType, SizedType, StoreType, TextureFormatWrapper, TextureSampleUsageType, Type,
+        expr::{Binding, Expr},
+        ir_type::{AccessModeReadable, HandleType, SamplesPerPixel, TextureShape},
+        pipeline::{PipelineError, StageMask, WipBinding, WipPushConstantsField},
+        recording::{Context, MemoryRegion},
+        type_layout::compatible_with::TypeLayoutCompatibleWith,
+    },
+    mem,
+};
 
 use super::expr::{PipelineIo, PushConstantsField};
 

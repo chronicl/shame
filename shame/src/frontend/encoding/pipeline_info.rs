@@ -1,26 +1,16 @@
-use std::{
-    collections::BTreeMap,
-    num::{IntErrorKind, NonZeroU32},
-    ops::Range,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, num::NonZeroU32, ops::Range, sync::Arc};
 
 use crate::{
-    backend::shader_code::ShaderCode,
-    common::small_vec::SmallVec,
     frontend::any::{
         render_io::{ColorTarget, VertexBufferLayout},
         shared_io::BindingType,
     },
-    ir::{
-        pipeline::{ShaderStage, StageMask},
-        StoreType, TextureFormatWrapper,
-    },
+    ir::{pipeline::StageMask, StoreType},
     results::LanguageCode,
     Winding,
 };
 
-use super::{features::Indexing, fragment_test::DepthStencilState, mask::BitVec64, rasterizer::Draw, IsPipelineKind};
+use super::{features::Indexing, fragment_test::DepthStencilState, mask::BitVec64, rasterizer::Draw};
 
 /// shaders and pipeline info for creating a render pipeline using a graphics api
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

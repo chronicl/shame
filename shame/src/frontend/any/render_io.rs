@@ -1,28 +1,19 @@
-use std::{fmt::Display, rc::Rc};
+use std::fmt::Display;
 
 use thiserror::Error;
 
-use crate::frontend::any::Any;
-use crate::ir::type_layout::{TypeLayout};
-use crate::ir::{self, Vector, Repr};
-use crate::ir::LayoutType;
 use crate::{
     call_info,
-    common::iterator_ext::try_collect,
     frontend::{
-        encoding::{
-            fill::{Fill, PickVertex},
-            io_iter::LocationCounter,
-            EncodingErrorKind,
-        },
+        any::Any,
+        encoding::fill::{Fill, PickVertex},
     },
     ir::{
-        CanonName, LenEven,
+        self, LayoutType, Len, PackedVector, ScalarType, SizedType, StoreType, TextureFormatWrapper, Type, Vector,
         expr::{BuiltinShaderIn, BuiltinShaderIo, Expr, Interpolator, ShaderIo},
-        ir_type::{TextureFormatId},
+        ir_type::TextureFormatId,
         pipeline::{PipelineError, RecordedWithIndex},
         recording::Context,
-        Len, PackedVector, ScalarType, SizedType, StoreType, TextureFormatWrapper, Type,
     },
 };
 

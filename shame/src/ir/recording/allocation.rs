@@ -10,10 +10,9 @@ use crate::{
     ir::{
         self,
         ir_type::{self, StoreType},
-        pipeline::{self, PossibleStages},
+        pipeline::PossibleStages,
         Type,
     },
-    mem::{self, SupportsAccess},
 };
 use std::{cell::RefCell, rc::Rc};
 

@@ -4,19 +4,18 @@ use super::{
     type_check::{NoMatchingSignature, SigFormatting, TypeCheck, SizedTypeShorthand::*},
     BuiltinFn, Expr,
 };
-use crate::frontend::any::Any;
 use crate::{
+    frontend::any::Any,
     impl_track_caller_fn_any,
     ir::{
+        self,
         Len::*,
-        Len2,
         ScalarType::{self, *},
-        ir_type::{AccessMode, AddressSpace, Indirection, StoreType::*},
+        Type,
         recording::{BuiltinTemplateStructs, FrexpGenerics, ModfGenerics},
     },
+    same, sig,
 };
-use crate::{ir, ir::ir_type::StoreType, same};
-use crate::{ir::Type, sig};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// the Numeric functions from the WGSL spec, split up into subcategories

@@ -3,12 +3,10 @@ use std::marker::PhantomData;
 use crate::frontend::any::Any;
 use crate::{
     call_info,
-    common::{pool::Key, small_vec::SmallVec},
-    frontend::error::InternalError,
     ir::recording::{
-        Block, BlockKind, BlockSeriesRecorder, BodyKind,
+        BlockKind, BlockSeriesRecorder, BodyKind,
         ConditionKind::{self, *},
-        Context, Control, ExprStmt, FlowStmt, Stmt, ThenOrElse, TimeInstant,
+        Context, Control, ExprStmt, FlowStmt, TimeInstant,
     },
 };
 

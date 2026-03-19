@@ -1,6 +1,5 @@
 use crate::call_info;
 use crate::common::pool::{Key, Pool};
-use crate::ir::pipeline::PossibleStages;
 use crate::ir::recording::Node;
 use std::fmt::Display;
 use std::num::NonZeroU32;

@@ -1,43 +1,47 @@
-use crate::ir::ir_type::layout_type::array_stride;
-use crate::ir::{LayoutType, Repr, SizedType, UnsizedStruct};
-use crate::call_info;
-use crate::common::po2::U32PowerOf2;
-use crate::common::proc_macro_utils::{self, repr_c_struct_layout, ReprCError, ReprCField};
-use crate::frontend::any::render_io::{
-    VertexAttributeCooked, VertexBufferLookupIndex, Location, VertexAttribFormat, VertexBufferLayout, VertexLayoutError,
+use std::{
+    borrow::{Borrow, Cow},
+    mem::size_of,
 };
-use crate::frontend::any::{Any, InvalidReason};
-use crate::frontend::encoding::buffer::{BufferAddressSpace};
-use crate::frontend::encoding::io_iter::LocationCounter;
-use crate::frontend::encoding::{EncodingError, EncodingErrorKind};
-use crate::frontend::error::InternalError;
-use crate::frontend::rust_types::len::*;
-use crate::ir::type_layout::eq::{CheckEqLayoutMismatch, LayoutMismatch};
-use crate::ir::type_layout::{ArrayLayout, VectorLayout};
-use crate::ir::{CanonName, ScalarTypeFp, ScalarTypeInteger};
-use crate::ir::pipeline::StageMask;
-use crate::ir::recording::Context;
 
-use super::array::{Array, Size};
-use super::error::FrontendError;
-use super::mem::AddressSpace;
-use super::reference::{AccessMode, AccessModeReadable};
-use super::struct_::{BufferFields, SizedFields, Struct};
-use super::ir::{Vector, ScalarType};
-use super::ir::type_layout::{self, FieldLayout, StructLayout, TypeLayout};
-use super::type_traits::{
-    BindingArgs, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles, VertexAttribute,
+use crate::{
+    call_info,
+    common::{
+        po2::U32PowerOf2,
+        proc_macro_utils::{ReprCError, ReprCField, repr_c_struct_layout},
+    },
+    frontend::{
+        any::{
+            Any, InvalidReason,
+            render_io::{VertexAttribFormat, VertexAttributeCooked},
+        },
+        encoding::io_iter::LocationCounter,
+        error::InternalError,
+        rust_types::{len::*, reference::Ref},
+    },
+    ir::{
+        self, LayoutType, Repr, SizedStruct, SizedType, UnsizedStruct,
+        ir_type::layout_type::array_stride,
+        recording::Context,
+        type_layout::{ArrayLayout, VectorLayout, eq::CheckEqLayoutMismatch},
+    },
 };
-use super::{len::Len, vec::vec};
-use super::{AsAny, GpuType, ToGpuType};
-use crate::frontend::any::{shared_io::BindPath, shared_io::BindingType};
-use crate::frontend::rust_types::reference::Ref;
-use crate::ir::{self, AlignedType, PackedVector, ScalarType as ST, SizedStruct, StoreType};
-use std::borrow::{Borrow, Cow};
-use std::iter::Empty;
-use std::mem::size_of;
-use std::ops::Deref;
-use std::rc::Rc;
+
+use super::{
+    AsAny, GpuType, ToGpuType,
+    array::{Array, Size},
+    error::FrontendError,
+    ir::{
+        ScalarType, Vector,
+        type_layout::{self, TypeLayout},
+    },
+    mem::AddressSpace,
+    reference::AccessMode,
+    struct_::{BufferFields, SizedFields, Struct},
+    type_traits::{
+        GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles, VertexAttribute,
+    },
+    vec::vec,
+};
 
 /// Types that have a defined memory layout on the Gpu.
 ///

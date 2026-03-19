@@ -1,10 +1,6 @@
-use super::{mask::BitVec64, rasterizer::Winding};
-use crate::{
-    f32x1,
-    frontend::{any::blend::Blend, error::InternalError, texture::texture_traits::Spp},
-    ir::{recording::Context, TextureFormatWrapper},
-    ToGpuType,
-};
+use crate::{f32x1, frontend::error::InternalError, ir::TextureFormatWrapper, ToGpuType};
+
+use super::rasterizer::Winding;
 
 /// ## remove fragments based on their depth compared to the depth buffer
 ///
@@ -284,11 +280,11 @@ pub struct StencilState {
     /// the stencil test applied to counter-clockwise faces.
     pub ccw: StencilFace,
     /// the stencil test applied to clockwise faces.
-    pub cw: StencilFace, 
+    pub cw: StencilFace,
     /// Stencil values are AND'd with this mask when reading and writing the stencil buffer. Only low 8 bits are used.
-    pub rw_mask: u32, 
-    /// Stencil values are AND'd with this mask when writing the stencil buffer. Only low 8 bits are used. 
-    pub w_mask: u32, 
+    pub rw_mask: u32,
+    /// Stencil values are AND'd with this mask when writing the stencil buffer. Only low 8 bits are used.
+    pub w_mask: u32,
 }
 
 /// see https://www.w3.org/TR/webgpu/#dictdef-gpustencilfacestate

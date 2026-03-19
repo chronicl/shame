@@ -1,17 +1,8 @@
 //! Everything related to type layouts.
 
-use std::{
-    fmt::{Debug, Display, Write},
-    hash::Hash,
-    rc::Rc,
-};
+use std::{fmt::Debug, hash::Hash, rc::Rc};
 
-use crate::{
-    any::U32PowerOf2,
-    call_info,
-    common::{ignore_eq::IgnoreInEqOrdHash, prettify::set_color},
-    ir::{self, CanonName, recording::Context},
-};
+use crate::{any::U32PowerOf2, common::ignore_eq::IgnoreInEqOrdHash, ir::CanonName};
 use super::{Matrix, Vector, Repr};
 
 pub(crate) mod compatible_with;

@@ -1,8 +1,7 @@
-use std::rc::Rc;
 use super::{TypeLayout, ArrayLayout, FieldLayout, MatrixLayout, Repr, StructLayout, VectorLayout};
 use crate::ir::{
-    self, Atomic, LayoutType, Matrix, PackedVector, RuntimeSizedArray, SizedArray, SizedField, SizedStruct, SizedType,
-    UnsizedStruct, Vector,
+    self, Atomic, LayoutType, Matrix, RuntimeSizedArray, SizedArray, SizedField, SizedStruct, SizedType, UnsizedStruct,
+    Vector,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,16 +1,13 @@
 use thiserror::Error;
 
-use super::{len::x1, vec::ToVec, vec_range_traits::*};
+use super::{len::x1, vec::ToVec};
 use crate::frontend::rust_types::vec::vec;
 use crate::{
     call_info,
     frontend::{
         any::{Any, InvalidReason},
         encoding::EncodingErrorKind,
-        rust_types::{
-            len::{Len, OneOr},
-            scalar_type::ScalarType,
-        },
+        rust_types::{len::Len, scalar_type::ScalarType},
     },
     ir::{self, recording::Context},
 };

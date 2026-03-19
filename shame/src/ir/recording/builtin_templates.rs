@@ -9,10 +9,10 @@ use crate::{
         self,
         expr::{
             type_check::{SigFormatting},
-            AtomicFn, BuiltinFn, Expr, NoMatchingSignature, NumericFn,
+            AtomicFn, BuiltinFn, NoMatchingSignature, NumericFn,
         },
         recording::Context,
-        SizedStruct, SizedType, StoreType, StructureFieldNamesMustBeUnique, Type, ScalarType,
+        SizedStruct, SizedType, StoreType, Type, ScalarType,
     },
     same, sig,
 };

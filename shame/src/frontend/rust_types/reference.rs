@@ -1,36 +1,17 @@
-use std::marker::PhantomData;
-
 use super::{
     array::{Array, ArrayLen},
-    atomic::Atomic,
     error::FrontendError,
     layout_traits::{FromAnys, GetAllFields},
     mem::{self, AddressSpace},
-    scalar_type::ScalarTypeInteger,
-    struct_::{SizedFields, Struct},
     type_traits::{GpuSized, GpuStore, NoAtomics},
     typecheck_downcast,
     vec::ToInteger,
     AsAny, GpuType, To,
 };
 use crate::{
-    Cell, Len, ScalarTypeNumber, ToGpuType,
-    common::proc_macro_reexports::GpuStoreImplCategory,
-    frontend::any::Any,
-    ir::{SizedStruct, SizedType, StoreType},
-};
-use crate::frontend::rust_types::len::x1;
-use crate::frontend::rust_types::vec::vec;
-use crate::{
-    boolx1, call_info,
-    frontend::any::InvalidReason,
-    frontend::error::InternalError,
-    ir::{
-        self,
-        recording::{AtomicCompareExchangeWeakGenerics, Context},
-        Type,
-    },
-    mem::SupportsAccess,
+    Len, ScalarTypeNumber, SizedFields, ToGpuType, call_info,
+    frontend::{any::Any, rust_types::vec::vec},
+    ir::{self, StoreType, Type, recording::Context},
 };
 use std::borrow::Borrow;
 
@@ -407,7 +388,6 @@ fn test_ref_ops() {
         };
     }
 
-    use crate::ToScalar;
     test_ops!(0u32.to_gpu(), crate::vec![1u32, 2u32]);
-    test_ops!(Cell::new(0u32), Cell::new(crate::vec![1u32, 2u32]));
+    test_ops!(crate::Cell::new(0u32), crate::Cell::new(crate::vec![1u32, 2u32]));
 }

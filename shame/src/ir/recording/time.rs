@@ -1,9 +1,6 @@
 use std::{fmt::Display, num::NonZeroU32, rc::Rc};
 
-use crate::{
-    call_info,
-    common::{pool::Key, small_vec_actual::SmallVec},
-};
+use crate::call_info;
 
 use super::{Block, BlockKind, Context, FunctionDef};
 

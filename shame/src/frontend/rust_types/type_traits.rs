@@ -1,21 +1,14 @@
 use super::{
-    array::{Array, RuntimeSize},
-    layout_traits::{FromAnys, GetAllFields, GpuLayout},
-    mem::{self, AddressSpace},
-    reference::{AccessMode, AccessModeReadable},
-    ir::type_layout,
-    AsAny, GpuType, ToGpuType,
+    layout_traits::{FromAnys, GetAllFields},
+    mem::AddressSpace,
+    reference::AccessMode,
+    AsAny, GpuType,
 };
-use crate::{
-    frontend::any::shared_io::{BindPath, BindingType},
-    TypeLayout,
-};
+use crate::frontend::any::shared_io::BindPath;
 use crate::{
     call_info,
-    common::proc_macro_utils::push_wrong_amount_of_args_error,
     frontend::{
-        any::{render_io::VertexAttribFormat, Any, InvalidReason},
-        encoding::buffer::{BufferAddressSpace},
+        any::{render_io::VertexAttribFormat, Any},
         error::InternalError,
     },
     ir::{

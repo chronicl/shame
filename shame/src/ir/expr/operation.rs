@@ -9,7 +9,6 @@ use crate::{
 };
 use ir::Len::*;
 use ir::ScalarType::*;
-use ir::StoreType::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// the `Operator`s' expressions, as listed in the WGSL spec.

@@ -1,5 +1,4 @@
 #![allow(non_camel_case_types)]
-use std::marker::PhantomData;
 
 use super::{
     layout_traits::FromAnys, mem::AddressSpace, reference::AccessMode, scalar_type::ScalarType,

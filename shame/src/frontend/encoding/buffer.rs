@@ -1,31 +1,33 @@
-use crate::any::TypeLayoutCompatibleWith;
-use crate::common::proc_macro_reexports::{GpuLayoutField, GpuStoreImplCategory};
-use crate::frontend::any::shared_io::{BindPath, BindingType, BufferBindingType};
-use crate::frontend::any::{Any, InvalidReason};
-use crate::frontend::rust_types::array::{Array, ArrayLen, ArrayRef, RuntimeSize, Size};
-use crate::frontend::rust_types::atomic::Atomic;
-use crate::frontend::rust_types::layout_traits::{get_layout_compare_with_cpu_push_error, FromAnys, GetAllFields};
-use crate::frontend::rust_types::len::{Len, Len2, LenEven};
-use crate::frontend::rust_types::mem::{self, AddressSpace, SupportsAccess};
-use crate::frontend::rust_types::packed_vec::PackedScalarType;
-use crate::frontend::rust_types::reference::{Ref};
-use crate::frontend::rust_types::reference::{AccessMode, Read, ReadWrite};
-use crate::frontend::rust_types::scalar_type::{ScalarType, ScalarTypeFp, ScalarTypeNumber};
-use crate::frontend::rust_types::struct_::{BufferFields, SizedFields, Struct};
-use crate::frontend::rust_types::type_traits::{BindingArgs, GpuSized, GpuStore, NoAtomics, NoBools, NoHandles};
-use crate::frontend::rust_types::AsAny;
-use crate::frontend::rust_types::vec::vec;
-use crate::frontend::rust_types::{mat::mat, GpuType};
-use crate::frontend::rust_types::{reference::AccessModeReadable, scalar_type::ScalarTypeInteger};
-use crate::ir::pipeline::StageMask;
-use crate::ir::recording::{Context, MemoryRegion};
-use crate::ir::Type;
-use crate::packed::PackedVec;
-use crate::{self as shame, call_info, ir, GpuLayout};
+use std::{marker::PhantomData, ops::Deref, borrow::Borrow};
 
-use std::borrow::Borrow;
-use std::marker::PhantomData;
-use std::ops::{Deref, Mul};
+use crate::{
+    GpuLayout,
+    any::{TypeLayoutCompatibleWith, AsAny},
+    call_info,
+    frontend::{
+        any::{
+            Any, InvalidReason,
+            shared_io::{BindingType, BufferBindingType},
+        },
+        rust_types::{
+            GpuType,
+            array::{Array, ArrayRef, RuntimeSize, Size},
+            atomic::Atomic,
+            layout_traits::{FromAnys, GetAllFields, get_layout_compare_with_cpu_push_error},
+            len::{Len, Len2, LenEven},
+            mat::mat,
+            mem::{self, AddressSpace, SupportsAccess},
+            packed_vec::PackedScalarType,
+            reference::{AccessModeReadable, Read, ReadWrite, Ref},
+            scalar_type::{ScalarType, ScalarTypeFp, ScalarTypeInteger},
+            struct_::{BufferFields, SizedFields, Struct},
+            type_traits::{BindingArgs, GpuSized, GpuStore, NoAtomics, NoBools, NoHandles},
+            vec::vec,
+        },
+    },
+    ir::{self, recording::Context},
+    packed::PackedVec,
+};
 
 use super::binding::Binding;
 

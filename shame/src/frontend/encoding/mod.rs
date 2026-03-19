@@ -1,24 +1,14 @@
-use features::{ComputeGridInner, WorkGroup, GridSize};
-use io_iter::PushConstants;
-use pipeline_info::{ComputePipeline, PipelineDefinition, RenderPipeline};
+use std::{fmt::Display, marker::PhantomData};
 
-use self::{
-    features::{DispatchContext, DrawContext, Indexing},
-    pipeline_kind::*,
-};
 use crate::{
-    backend::{language::Language, shader_code::ShaderCode, wgsl::WgslErrorKind},
+    backend::{language::Language, wgsl::WgslErrorKind},
     call_info,
     common::{
         marker::{Unsend, Unsync},
         proc_macro_utils::CpuLayoutImplMismatch,
     },
     frontend::{
-        encoding::{
-            features::ComputeGrid,
-            io_iter::{BindGroupIter, VertexBufferIter},
-            rasterizer::{PrimitiveAssembly, VertexStage},
-        },
+        encoding::{features::ComputeGrid, io_iter::BindGroupIter, rasterizer::VertexStage},
         rust_types::layout_traits::CpuLayoutCompareError,
     },
     ir::{
@@ -33,12 +23,19 @@ use crate::{
     try_ctx_track_caller,
 };
 
-use std::{cell::Cell, fmt::Display, marker::PhantomData, rc::Rc};
-
 use super::{
-    any::{render_io::VertexLayoutError, shared_io::BindingError, ArgumentNotAvailable, InvalidReason},
+    any::{render_io::VertexLayoutError, shared_io::BindingError, InvalidReason},
     error::InternalError,
-    rust_types::{error::FrontendError, len::x3},
+    rust_types::error::FrontendError,
+};
+
+use features::{GridSize};
+use io_iter::PushConstants;
+use pipeline_info::{ComputePipeline, PipelineDefinition, RenderPipeline};
+
+use self::{
+    features::{DispatchContext, DrawContext, Indexing},
+    pipeline_kind::*,
 };
 
 pub mod binding;

@@ -1,14 +1,11 @@
 use std::fmt::Display;
 
-use crate::{call_info, StageMask};
 use crate::frontend::any::shared_io::BindPath;
-use crate::frontend::error::InternalError;
 use crate::ir::pipeline::PossibleStages;
-use crate::ir::recording::Context;
 use crate::ir::{self, Type};
 
 use super::type_check::{SignatureStrings, TypeCheck, TypeShorthandLevel};
-use super::{Expr, NoMatchingSignature};
+use super::NoMatchingSignature;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PipelineIo {

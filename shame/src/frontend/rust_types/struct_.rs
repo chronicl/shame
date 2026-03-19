@@ -1,35 +1,24 @@
-use crate::common::small_vec::SmallVec;
-use crate::frontend::any::shared_io::{BindPath, BindingType};
-use crate::frontend::any::{Any, InvalidReason};
-use crate::frontend::encoding::buffer::{BufferContent, StructField};
 use crate::{
     call_info,
     frontend::{
-        encoding::{
-            buffer::{BufferAddressSpace},
-            EncodingErrorKind,
-        },
-        error::InternalError,
+        any::{Any, InvalidReason},
+        encoding::buffer::StructField,
     },
-    ir::{self, pipeline::StageMask, recording::Context, SizedStruct},
+    ir::{self, recording::Context, type_layout::TypeLayout},
 };
 
 use std::{
-    array::from_ref,
     borrow::{Borrow, Cow},
     ops::Deref,
-    rc::Rc,
 };
 
 use super::layout_traits::{GetAllFields, GpuLayout};
-use crate::ir::type_layout::{self, TypeLayout};
 use super::type_traits::{GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoBools};
 use super::{
-    error::FrontendError,
     layout_traits::{ArrayElementsUnsizedError, FromAnys},
     mem::AddressSpace,
-    reference::{AccessMode, AccessModeReadable},
-    type_traits::{BindingArgs, NoAtomics, NoHandles},
+    reference::AccessMode,
+    type_traits::{NoAtomics, NoHandles},
     typecheck_downcast, AsAny,
 };
 use super::{GpuType, ToGpuType};

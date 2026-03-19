@@ -1,7 +1,7 @@
 use crate::{
     common::pool::PoolRef,
     ir::{
-        recording::{AllocStmt, Block, ExprStmt, MemoryRegion, Stmt, TimeInstant},
+        recording::{AllocStmt, Block, ExprStmt, MemoryRegion, Stmt},
         CallInfo, Node,
     },
 };

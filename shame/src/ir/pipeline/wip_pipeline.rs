@@ -11,7 +11,7 @@ use thiserror::Error;
 
 use super::{PossibleStages, ShaderStage, StageMask};
 use crate::{
-    BindingIter, DepthLhs, StencilMasking, Test, TypeLayout,
+    BindingIter, DepthLhs, StencilMasking, Test,
     ir::Repr,
     call_info,
     common::{
@@ -29,15 +29,12 @@ use crate::{
             features::{DrawContext, Indexing},
             fragment_test::{DepthTest, StencilState, StencilTest},
             mask::BitVec64,
-            pipeline_info::Dict,
             rasterizer::{Draw, FragmentQuad, FragmentStage, PrimitiveAssembly},
         },
         error::InternalError,
-        rust_types::{len::x3},
     },
     ir::{
-        self, FragmentShadingRate, Node, SizedField, SizedStruct, SizedType, StoreType, StructDefinitionError,
-        StructureFieldNamesMustBeUnique, TextureFormatWrapper, Type,
+        self, FragmentShadingRate, Node, SizedField, SizedStruct, SizedType, StoreType, TextureFormatWrapper, Type,
         expr::{BuiltinShaderIo, Interpolator, ShaderIo},
         recording::{BuiltinTemplateStructs, CallInfo, Context, NodeRecordingError},
     },

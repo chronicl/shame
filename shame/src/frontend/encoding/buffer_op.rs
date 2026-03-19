@@ -1,16 +1,19 @@
 // convenience implementations of `std::ops` (+ - * ...) for
 // `Buffer<vec>` and `Buffer<mat>`
 
-use std::ops::{Add, BitAnd, BitOr, BitXor, Deref, Div, Mul, Rem, Shl, Shr, Sub};
+use std::ops::{Add, BitAnd, BitOr, BitXor, Deref, Div, Mul, Rem, Sub};
+
+use crate::{
+    NoBools,
+    frontend::rust_types::{
+        len::{Len, Len2, x1},
+        mat::mat,
+        scalar_type::{ScalarTypeFp, ScalarTypeInteger, ScalarTypeNumber},
+        vec::vec,
+    },
+};
 
 use super::buffer::Buffer;
-use crate::frontend::rust_types::vec::vec;
-use crate::frontend::rust_types::{
-    len::{x1, Len, Len2},
-    mat::mat,
-    scalar_type::{ScalarType, ScalarTypeFp, ScalarTypeInteger, ScalarTypeNumber},
-    type_traits::{NoAtomics, NoBools, NoHandles},
-};
 
 // // Buf<mat> * vec
 // impl<T: ScalarTypeFp, C: Len2, R: Len2, L: Len> Mul<vec<T, L>> for Buffer<mat<T, C, R>>

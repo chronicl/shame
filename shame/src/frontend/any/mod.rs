@@ -1,7 +1,7 @@
 //! type erased runtime api of the shader generator
 //!
 //! see the documentation of [`Any`] for more information
-use std::{cell::Cell, fmt::Display};
+use std::{fmt::Display};
 
 use crate::{
     call_info,
@@ -12,7 +12,7 @@ use crate::{
     frontend::encoding::EncodingErrorKind,
     ir::{
         self,
-        expr::{self, BuiltinShaderIn, ShaderIo},
+        expr::{self},
         recording::{CallInfo, Context, Ident, Node, Priority},
     },
     try_ctx_track_caller,

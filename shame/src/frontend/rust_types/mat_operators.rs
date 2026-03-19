@@ -1,20 +1,6 @@
-use super::{
-    mat::mat,
-    reference::{AccessModeReadable, ReadWrite, ReadableRef},
-    scalar_type::{ScalarTypeFp, ScalarTypeInteger, ScalarTypeNumber, ScalarTypeSigned},
-    vec::ToVec,
-    AsAny, GpuType, ToGpuType,
-};
-use crate::{
-    common::floating_point::f16,
-    frontend::rust_types::{len::*, scalar_type::ScalarType},
-    impl_ops, ir,
-    mem::AddressSpace,
-};
+use super::{mat::mat, scalar_type::ScalarTypeFp, AsAny};
+use crate::{frontend::rust_types::len::*, impl_ops, frontend::rust_types::vec::vec};
 use std::ops::*;
-
-use crate::frontend::any::Any;
-use crate::frontend::rust_types::vec::vec;
 
 impl_ops! {
     <T: ScalarTypeFp, C: Len2, R: Len2> Add !op: add(l: mat<T, C, R>, r: mat<T, C, R>) -> mat<T, C, R>: {op(l.as_any(), r.as_any()).into()};

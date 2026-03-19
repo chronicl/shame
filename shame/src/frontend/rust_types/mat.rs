@@ -1,31 +1,27 @@
-use std::{borrow::Cow, marker::PhantomData, ops::Deref};
+use std::{borrow::Cow, marker::PhantomData};
 
 use super::{
     index::GpuIndex,
     layout_traits::{ArrayElementsUnsizedError, FromAnys, GetAllFields, GpuLayout},
-    len::{x1, x2, x3, x4, AtLeastLen, Len, Len2},
+    len::{x1, x2, x3, x4, Len2},
     mem::AddressSpace,
-    reference::{AccessMode, AccessModeReadable},
-    scalar_type::{ScalarType, ScalarTypeFp},
-    ir::type_layout::{self, TypeLayout},
+    reference::AccessMode,
+    scalar_type::{ScalarTypeFp},
+    ir::type_layout::TypeLayout,
     type_traits::{
-        BindingArgs, EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools,
-        NoHandles,
+        EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles,
     },
     vec::{scalar, vec, ToInteger},
     AsAny, GpuType, To, ToGpuType,
 };
-use crate::{frontend::rust_types::reference::Ref, ir::recording::CallInfoScope};
+use crate::{
+    frontend::rust_types::reference::Ref,
+    ir::{Comp4, recording::CallInfoScope},
+};
 use crate::{
     call_info,
-    frontend::{
-        any::{
-            shared_io::{BindPath, BindingType},
-            Any, InvalidReason,
-        },
-        encoding::buffer::{BufferAddressSpace},
-    },
-    ir::{self, pipeline::StageMask, recording::Context, Comp4, VectorAccess},
+    frontend::any::{Any, InvalidReason},
+    ir::{self, recording::Context},
 };
 
 /// A column major matrix with between 2 and 4 columns/rows
@@ -279,7 +275,6 @@ impl<Cols: Len2, Rows: Len2, T: ScalarTypeFp> mat<T, Cols, Rows> {
     #[track_caller]
     pub fn resize<NewCols: Len2, NewRows: Len2>(&self) -> mat<T, NewCols, NewRows> {
         use ir::VectorAccess::*;
-        use std::cmp::Ordering::*;
         use Comp4::*;
         let call_info_scope = CallInfoScope::new(call_info!());
 

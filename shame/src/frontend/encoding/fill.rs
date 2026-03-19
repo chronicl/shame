@@ -6,13 +6,12 @@ use crate::{
             Any, InvalidReason,
         },
         error::InternalError,
-        rust_types::{layout_traits::VertexLayout, len::Len, scalar_type::ScalarType, vec::vec, AsAny, GpuType},
-        texture::texture_traits::{Multi, Single, Spp},
+        rust_types::{len::Len, scalar_type::ScalarType, vec::vec, AsAny},
+        texture::texture_traits::{Multi, Spp},
     },
     ir::{
         self,
         recording::{CallInfoScope, Context},
-        FragmentShadingRate,
     },
     Ref,
 };
@@ -164,7 +163,7 @@ impl FragmentStage<Multi> {
     /// The centroid is
     /// - the pixel center if the pixel is fully covered by the primitive
     /// - A point that lies both within the pixel square and the primitive.
-    ///   
+    ///
     /// > Some Graphics APIs define the centroid is the average
     /// > of all covered samples in a pixel, which leads to the unclear case
     /// > in conservative rasterization, when no sample is covered but the primitive

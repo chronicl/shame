@@ -1,5 +1,4 @@
-use crate::frontend::any::Any;
-use crate::{common::floating_point::f16, ir};
+use crate::{common::floating_point::f16, frontend::any::Any, ir};
 
 /// (no documentation yet)
 #[diagnostic::on_unimplemented(message = "`{Self}` is not a shader scalar type")]

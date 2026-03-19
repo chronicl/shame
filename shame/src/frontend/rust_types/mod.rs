@@ -1,6 +1,4 @@
-use layout_traits::GpuLayout;
 use mem::Cell;
-use reference::{Read, ReadWrite};
 use type_traits::{GpuSized, GpuStore};
 
 use self::error::FrontendError;

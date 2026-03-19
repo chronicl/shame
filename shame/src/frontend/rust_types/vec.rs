@@ -1,13 +1,12 @@
 use super::{
-    error::FrontendError,
     index::GpuIndex,
     ir,
     layout_traits::from_single_any,
     len::*,
     mem::AddressSpace,
-    reference::{AccessMode, AccessModeReadable},
-    scalar_type::{dtype_as_scalar_from_f64, ScalarType, ScalarTypeInteger, ScalarTypeNumber},
-    type_traits::{BindingArgs, GpuAligned, GpuStoreImplCategory, NoAtomics, NoHandles, VertexAttribute},
+    reference::AccessMode,
+    scalar_type::{dtype_as_scalar_from_f64, ScalarType, ScalarTypeNumber},
+    type_traits::{GpuAligned, GpuStoreImplCategory, NoAtomics, NoHandles, VertexAttribute},
     AsAny, GpuType, To, ToGpuType,
 };
 use crate::{
@@ -16,20 +15,17 @@ use crate::{
         proc_macro_utils::{collect_into_array_exact, push_wrong_amount_of_args_error},
         small_vec::SmallVec,
     },
-    frontend::encoding::{buffer::BufferAddressSpace, rasterizer::Gradient},
     ir::{
-        Comp4, GradPrecision, LayoutType, Vector, VectorAccess,
-        pipeline::StageMask,
-        recording::{CallInfoScope, Context, NodeRecordingError},
+        Comp4, LayoutType, Vector, VectorAccess,
+        recording::{Context, NodeRecordingError},
         type_layout::TypeLayout,
     },
 };
 
 use super::{
-    layout_traits::{CpuLayout, FromAnys, GetAllFields, GpuLayout},
+    layout_traits::{FromAnys, GetAllFields, GpuLayout},
     type_traits::{GpuSized, GpuStore, NoBools},
 };
-use crate::frontend::any::shared_io::{BindPath, BindingType};
 use crate::frontend::rust_types::reference::Ref;
 use crate::{
     common::floating_point::f16,

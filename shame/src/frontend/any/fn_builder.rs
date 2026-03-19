@@ -1,17 +1,15 @@
-use thiserror::Error;
-
 pub use crate::frontend::any::Any;
 use crate::{
     call_info,
     common::{pool::Key, small_vec::SmallVec},
     frontend::{encoding::EncodingErrorKind, error::InternalError},
     ir::{
-        self, AccessMode, Node, SizedType, Type,
+        self, AccessMode, Node,
         expr::{ArgViewKind, Expr, FnRelated},
         LayoutType,
         recording::{
-            AllocError, BlockKind, BlockSeriesRecorder, BodyKind, CallInfo, Context, Dependence, FlowStmt, FnError,
-            FunctionDef, Ident, Jump, MemoryRegion, Priority, Stmt, TimeInstant,
+            BlockKind, BlockSeriesRecorder, BodyKind, CallInfo, Context, Dependence, FlowStmt, FnError, FunctionDef,
+            Ident, Jump, MemoryRegion, Priority, TimeInstant,
         },
     },
 };

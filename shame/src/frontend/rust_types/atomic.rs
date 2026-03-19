@@ -1,31 +1,23 @@
 use std::marker::PhantomData;
 
+use crate::{
+    boolx1,
+    frontend::{any::Any, rust_types::reference::Ref},
+    ir::{self, recording::AtomicCompareExchangeWeakGenerics},
+};
+
 use super::{
     layout_traits::{ArrayElementsUnsizedError, FromAnys, GetAllFields, GpuLayout},
     len::x1,
     mem::{AddressSpace, AddressSpaceAtomic},
-    reference::{AccessMode, AccessModeReadable, ReadWrite},
-    scalar_type::{ScalarType, ScalarTypeInteger},
-    ir::type_layout::{self, TypeLayout},
-    type_traits::{
-        BindingArgs, EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools,
-        NoHandles,
-    },
+    reference::{AccessMode, ReadWrite},
+    scalar_type::ScalarTypeInteger,
+    ir::type_layout::TypeLayout,
+    type_traits::{EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoBools, NoHandles},
     vec::vec,
     AsAny, GpuType, To, ToGpuType,
 };
-use crate::frontend::rust_types::{reference::Ref};
-use crate::{
-    boolx1,
-    frontend::{
-        any::{
-            shared_io::{BindPath, BindingType},
-            Any, InvalidReason,
-        },
-        encoding::buffer::{BufferAddressSpace},
-    },
-    ir::{self, pipeline::StageMask, recording::AtomicCompareExchangeWeakGenerics},
-};
+
 
 /// see https://www.w3.org/TR/WGSL/#atomic-types
 ///

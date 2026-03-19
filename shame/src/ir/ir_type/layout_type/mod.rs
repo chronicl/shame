@@ -7,11 +7,8 @@ use std::{
 };
 
 use crate::{
-    GpuSized,
     any::U32PowerOf2,
-    call_info,
-    common::prettify::set_color,
-    ir::{self, CallInfo, recording::Context},
+    ir::{CallInfo, recording::Context},
 };
 
 pub(crate) mod align_size;

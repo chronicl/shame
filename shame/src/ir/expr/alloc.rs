@@ -1,28 +1,20 @@
 use std::rc::Rc;
 
-use crate::frontend::any::Any;
-use crate::ir::recording::NodeRecordingError;
 use crate::{
     call_info,
-    common::option_ext::slice_from_opt,
-    frontend::any::{ArgumentNotAvailable, InvalidReason},
-    impl_track_caller_fn_any,
+    frontend::any::{Any, InvalidReason},
     ir::{
+        LayoutType, SizedType,
+        Type::{self, *},
         expr::Expr,
-        Len::*,
-        Len2,
-        ScalarType::{self, *},
-        LayoutType,
-        ir_type::{AccessMode, AddressSpace, Indirection, StoreType::*},
+        ir_type::{AddressSpace, StoreType},
         recording::{
-            AllocError, AllocStmt, Context, ExprStmt, Ident, InteractionKind, MemoryInteractionEvent, MemoryRegion,
-            Priority, Stmt, TimeInstant,
+            AllocError, AllocStmt, Context, Ident, InteractionKind, MemoryInteractionEvent, MemoryRegion, Priority,
+            TimeInstant,
         },
-        Len, SizedType,
     },
-    try_ctx_track_caller,
+    sig,
 };
-use crate::{ir, ir::ir_type::StoreType, ir::Type, ir::Type::*, same, sig};
 
 use super::{type_check::SigFormatting, NoMatchingSignature, TypeCheck};
 

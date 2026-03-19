@@ -1,7 +1,4 @@
-use crate::{
-    frontend::any::shared_io::BufferBindingType,
-    ir::{Type, LayoutType, SizedType, ScalarType},
-};
+use crate::ir::{Type, LayoutType, SizedType, ScalarType};
 
 use super::{StoreType};
 

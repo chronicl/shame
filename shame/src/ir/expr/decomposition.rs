@@ -1,21 +1,12 @@
-use std::{borrow::Cow, fmt::Display, num::NonZeroU32, ops::Deref, rc::Rc};
+use std::{fmt::Display, ops::Deref};
 
-use crate::frontend::any::Any;
-use crate::TextureSampleUsageType;
-use crate::ir::StructKindRef;
-use crate::ir::expr::type_check;
-use crate::ir::{LayoutType, Vector};
 use crate::{
-    call_info,
-    common::small_vec::SmallVec,
-    frontend::any::record_node,
+    TextureSampleUsageType,
+    frontend::any::Any,
     impl_track_caller_fn_any,
     ir::{
-        self,
-        expr::type_check::{SigFormatting, SignatureStrings},
-        CanonName, Len, Len2, ScalarType, SizedType, StoreType,
-        recording::CallInfo,
-        Type,
+        self, CanonName, LayoutType, Len, ScalarType, SizedType, StoreType, StructKindRef, Type, Vector,
+        expr::type_check::{self, SigFormatting, SignatureStrings},
     },
     sig,
 };

@@ -1,26 +1,19 @@
-use std::{marker::PhantomData, ops::Deref};
+use std::ops::Deref;
 
-use super::{
-    io_iter::{BindGroupIter, PushConstants, VertexBufferIter},
-    pipeline_kind::{Compute, Render},
-    rasterizer::{PrimitiveAssembly, VertexStage},
-    EncodingGuard,
-};
-use crate::frontend::rust_types::vec::vec;
 use crate::{
-    call_info,
-    common::marker::*,
     frontend::{
         any::Any,
         rust_types::{
-            len::{x1, x2, x3, GridDim},
-            reference::{AccessModeReadable, Ref},
-            type_traits::GpuStore,
-            AsAny, GpuType,
+            len::{GridDim, x1, x2, x3},
+            vec::vec,
         },
     },
-    ir::recording::Context,
-    mem, u32x1,
+    u32x1,
+};
+
+use super::{
+    io_iter::{BindGroupIter, PushConstants},
+    rasterizer::VertexStage,
 };
 
 /// The sequence of vertex-indices as they are assigned to each thread of a drawcall

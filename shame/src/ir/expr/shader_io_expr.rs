@@ -1,25 +1,31 @@
-use std::fmt::Display;
-use std::num::NonZeroU32;
-use std::rc::Rc;
+use std::{fmt::Display, num::NonZeroU32};
+
+use crate::{
+    TextureSampleUsageType, call_info,
+    frontend::{
+        any::{
+            Any,
+            render_io::{FragmentSampleMethod, Location, VertexAttributeCooked},
+        },
+        encoding::EncodingErrorKind,
+        error::InternalError,
+    },
+    impl_track_caller_fn_any,
+    ir::{
+        self, ChannelFormatShaderType,
+        Len::{self, *},
+        ScalarConstant,
+        ScalarType::{self, *},
+        SizedType,
+        Type::Unit,
+        expr::type_check::{SigFormatting, SizedTypeShorthand::*},
+        pipeline::{PossibleStages, StageMask},
+        recording::{Context, NodeRecordingError},
+    },
+    sig,
+};
 
 use super::{Comp4, Expr, NoMatchingSignature, TypeCheck};
-use crate::frontend::any::render_io::{VertexAttributeCooked, FragmentSampleMethod, Location};
-use crate::frontend::any::shared_io::BindPath;
-use crate::frontend::any::Any;
-use crate::frontend::encoding::fill::{Fill, PickVertex};
-use crate::frontend::encoding::EncodingErrorKind;
-use crate::frontend::error::InternalError;
-use crate::frontend::texture::texture_traits::StorageTextureFormat;
-use crate::ir::expr::type_check::{SigFormatting, SizedTypeShorthand::*};
-use crate::ir::ir_type::{self, TextureAspect, TextureSampleUsageType};
-use crate::ir::pipeline::{PipelineError, PossibleStages, ShaderStage, StageMask};
-use crate::ir::recording::{Context, NodeRecordingError};
-use crate::ir::Len::*;
-use crate::ir::ScalarType::*;
-use crate::ir::StoreType::*;
-use crate::ir::Type::Unit;
-use crate::ir::{self, ChannelFormatShaderType, Len, ScalarConstant, ScalarType, SizedType, StoreType};
-use crate::{call_info, impl_track_caller_fn_any, sig};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShaderIo {

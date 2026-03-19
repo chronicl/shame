@@ -7,7 +7,7 @@
     clippy::match_like_matches_macro,
     clippy::diverging_sub_expression
 )]
-#![allow(unused)]
+// #![allow(unused)]
 
 mod backend;
 mod common;

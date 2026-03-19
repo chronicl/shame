@@ -1,5 +1,5 @@
 #![allow(clippy::let_and_return)]
-use std::{cell::Cell, iter, marker::PhantomData, rc::Rc};
+use std::{cell::Cell, marker::PhantomData, rc::Rc};
 
 use crate::{
     call_info,
@@ -10,32 +10,17 @@ use crate::{
     frontend::{
         any::{
             Any, InvalidReason,
-            render_io::{VertexAttributeCooked, Location, VertexAttribFormat, VertexBufferLayout},
-            shared_io::{BindPath, BindingType},
+            render_io::{VertexAttributeCooked, Location, VertexBufferLayout},
+            shared_io::BindPath,
         },
-        error::InternalError,
         rust_types::{
-            GpuType,
             error::FrontendError,
-            layout_traits::{
-                ArrayElementsUnsizedError, FromAnys, GpuLayout, VertexLayout, cpu_type_name_and_layout,
-                get_layout_compare_with_cpu_push_error,
-            },
-            reference::AccessMode,
-            struct_::SizedFields,
-            type_traits::{BindingArgs, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools},
-        },
-        texture::{
-            Sampler, Texture, TextureKind,
-            texture_array::{StorageTextureArray, TextureArray},
-            texture_traits::{
-                LayerCoords, SamplingFormat, SamplingMethod, Spp, StorageTextureCoords, StorageTextureFormat,
-                SupportsCoords, SupportsSpp, TextureCoords,
-            },
+            layout_traits::{GpuLayout, VertexLayout, get_layout_compare_with_cpu_push_error},
+            type_traits::{BindingArgs, GpuSized, GpuStore, NoAtomics, NoBools},
         },
     },
     ir::{
-        self, SizedStruct, TextureFormatWrapper,
+        self,
         pipeline::{PipelineError, StageMask},
         recording::Context,
     },

@@ -2,11 +2,10 @@
 use std::cmp::Ordering;
 
 use super::{
-    len::{AtLeastLen, Len, Len2},
+    len::{AtLeastLen, Len},
     scalar_type::{ScalarType, ScalarType32Bit, ScalarTypeFp, ScalarTypeNumber},
-    type_traits::NoBools,
-    vec::{scalar, IsVec, ToInteger, ToScalar, ToVec},
-    AsAny, GpuType, To, ToGpuType,
+    vec::{scalar, ToScalar, ToVec},
+    AsAny, To, ToGpuType,
 };
 use crate::{common::floating_point::f16, frontend::encoding::flow::discard_if, ScalarTypeInteger, ScalarTypeSigned};
 use crate::frontend::rust_types::len::{x1, x2, x3, x4};
@@ -18,13 +17,12 @@ use crate::{
         encoding::flow::FlowFn,
         rust_types::{
             vec_range::{VecBounds, VecBoundsByLen},
-            vec_range_traits::{VecRange, VecRangeBounds, VecRangeInclusive, VecRangeBoundsInclusive},
+            vec_range_traits::{VecRange, VecRangeBoundsInclusive},
         },
     },
     ir::{
         self,
         recording::{Context, FrexpGenerics, ModfGenerics},
-        ScalarConstant,
     },
 };
 

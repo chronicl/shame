@@ -3,9 +3,6 @@ use std::{cell::Cell, collections::HashMap, fmt::Display, num::NonZeroU32, ops::
 use crate::{
     call_info,
     common::pool::{Key, PoolRefMut},
-    frontend::{encoding::EncodingError, error::InternalError},
-    ir::expr::Expr,
-    try_ctx_track_caller,
 };
 
 use super::{Context, NodeRecordingError};

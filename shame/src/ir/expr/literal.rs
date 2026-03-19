@@ -5,10 +5,8 @@ use super::{
     BuiltinFn, Constructor,
 };
 use crate::frontend::any::Any;
-use crate::{
-    impl_track_caller_fn_any, ir, ir::expr::type_check::NoMatchingSignature, ir::expr::Expr, ir::ir_type, ir::Type, sig,
-};
-use ir::{Len::*, StoreType::*};
+use crate::{impl_track_caller_fn_any, ir, ir::expr::type_check::NoMatchingSignature, ir::expr::Expr, ir::Type, sig};
+use ir::Len::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Literal(pub ir::ScalarConstant);

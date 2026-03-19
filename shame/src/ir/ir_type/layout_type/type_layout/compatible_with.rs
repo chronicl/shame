@@ -2,24 +2,18 @@ use std::fmt::Write;
 
 use crate::{
     BufferAddressSpace, Language, call_info,
-    common::{
-        format::display,
-        prettify::{UnwrapDisplayOr, set_color},
-    },
+    common::{format::display, prettify::set_color},
     frontend::{encoding::buffer::BufferAddressSpaceEnum},
     ir::{recording::Context, LayoutType},
-    mem,
+    mem::{Storage, Uniform},
 };
 
 use super::{
     TypeLayout, Repr, StructLayout,
     from_ir::RecipeContains,
-    ArrayLayout,
-    display::{self, LayoutInfoFlags},
+    display::LayoutInfoFlags,
     eq::{LayoutMismatch, StructMismatch, TopLevelMismatch, try_find_mismatch},
 };
-
-pub use mem::{Storage, Uniform};
 
 /// `TypeLayoutCompatibleWith<AddressSpace>` is a [`LayoutType`] with the additional
 /// guarantee that the [`TypeLayout`] it produces is compatible with the specified `AddressSpace`.

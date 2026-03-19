@@ -1,22 +1,20 @@
 use std::{fmt::Display, num::NonZeroU32, ops::Not, rc::Rc};
 
-use super::{type_check::*, type_check::SizedTypeShorthand::*, Comp4, ExponentFn, Expr, NumericFn, TextureFn};
+use super::{type_check::*, type_check::SizedTypeShorthand::*, ExponentFn, Expr, NumericFn, TextureFn};
 use crate::{
     call_info,
-    common::integer::i4,
     frontend::{
-        any::{Any, ArgumentNotAvailable, InvalidReason, record_node, shared_io::SamplingMethod},
-        encoding::EncodingErrorKind,
+        any::{Any, InvalidReason, record_node},
     },
     impl_track_caller_fn_any,
     ir::{
-        HandleType, SamplesPerPixel, SizedType, StructureFieldNamesMustBeUnique, LayoutType,
+        SizedType, LayoutType,
         Len::*,
         Len2,
         ScalarType::{self, *},
         ScalarTypeFp, SizedArray, SizedStruct,
-        ir_type::{self, AccessMode, AddressSpace, Indirection, StoreType::*, TextureShape, Type::Unit},
-        pipeline::{PossibleStages, ShaderStage, StageMask},
+        ir_type::{AccessMode, AddressSpace, Type::Unit},
+        pipeline::{PossibleStages, StageMask},
         recording::{
             AtomicCompareExchangeWeakGenerics, BuiltinTemplateStructs, Context, InteractionKind, MemoryRegion,
             NodeRecordingError, TemplateStructParams,

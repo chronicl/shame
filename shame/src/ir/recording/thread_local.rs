@@ -1,8 +1,5 @@
 use std::{cell::RefCell, marker::PhantomData};
-use std::{
-    cell::{Cell, Ref, RefMut},
-    num::NonZeroU32,
-};
+use std::{cell::Cell, num::NonZeroU32};
 
 use super::context::Context;
 use crate::common::marker::{Unsend, Unsync};

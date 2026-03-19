@@ -4,7 +4,6 @@ use crate::backend::language::Language;
 use crate::ir::{Len, ScalarType, SizedType, Vector};
 
 use super::{AccessMode, StoreType};
-use std::any::Any;
 use std::borrow::Cow;
 use std::cmp::PartialEq;
 use std::rc::Rc;

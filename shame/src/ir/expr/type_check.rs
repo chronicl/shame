@@ -1,12 +1,12 @@
+use std::{borrow::Cow, fmt::Display, num::NonZeroU32, rc::Rc};
+
 use crate::{
     common::small_vec_actual::SmallVec,
     ir::{
-        self, ScalarTypeFp, ScalarTypeInteger, Type, Atomic, LayoutType, Len, Len2, Matrix, ScalarType, SizedArray,
-        SizedType, StoreType, Vector,
+        self, Atomic, LayoutType, Len, Len2, Matrix, ScalarType, ScalarTypeFp, ScalarTypeInteger, SizedArray,
+        SizedType, StoreType, Type, Vector,
     },
 };
-use std::{fmt::Write, num::NonZeroU32, rc::Rc};
-use std::{borrow::Cow, fmt::Display};
 
 pub trait TypeCheck {
     fn infer_type(&self, args: &[Type]) -> Result<Type, NoMatchingSignature>;

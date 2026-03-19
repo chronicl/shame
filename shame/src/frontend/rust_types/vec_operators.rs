@@ -1,11 +1,10 @@
 #![allow(clippy::identity_op)]
 
 use super::{
-    reference::{AccessModeReadable, ReadWrite, ReadableRef},
+    reference::ReadWrite,
     scalar_type::{ScalarTypeInteger, ScalarTypeNumber, ScalarTypeSigned},
-    type_traits::NoBools,
     vec::ToVec,
-    AsAny, GpuType, To, ToGpuType,
+    AsAny, To, ToGpuType,
 };
 use crate::common::floating_point::f16;
 use crate::frontend::rust_types::reference::Ref;

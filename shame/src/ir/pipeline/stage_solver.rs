@@ -1,6 +1,5 @@
 use std::{
-    borrow::BorrowMut,
-    cell::{Cell, RefCell},
+    cell::RefCell,
     collections::BTreeSet,
     fmt::{Display, Write},
     rc::Rc,
