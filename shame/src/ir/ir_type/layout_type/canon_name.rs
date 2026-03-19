@@ -1,7 +1,6 @@
-use std::{borrow::Cow, fmt::Display, sync::Arc};
+use std::{borrow::Cow, fmt::Display};
 
 use crate::common::ignore_eq::IgnoreInEqOrdHash;
-
 
 /// canonical name of something, as opposed to `Ident` which would be an
 /// identifier that changes between creation and final appearance in a shader.
