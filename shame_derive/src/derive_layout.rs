@@ -599,8 +599,6 @@ pub fn impl_vertex_layout(input: DeriveInput) -> Result<TokenStream2, syn::Error
     };
 
     let derive_struct_ident = &input.ident;
-    let vis = &input.vis;
-    let derive_struct_ref_ident = format_ident!("{derive_struct_ident}_ref");
 
     let re: TokenStream2 = quote!(shame::__private::proc_macro_reexports);
 
@@ -638,18 +636,8 @@ pub fn impl_vertex_layout(input: DeriveInput) -> Result<TokenStream2, syn::Error
     let field_vec = |f: fn(&Field) -> _| fields.named.iter().map(f).collect::<Vec<_>>();
 
     // &vecs for repetitions
-    let field_vis = &field_vec(|f @ Field { vis, .. }| quote_spanned!(f.span() => #vis));
     let field_ident = &field_vec(|f @ Field { ident, .. }| quote_spanned!(f.span() => #ident));
     let field_type = &field_vec(|f @ Field { ty, .. }| quote_spanned!(f.span() => #ty   ));
-
-    // parse/validate attributes
-    // #[cpu(T)]
-    let cpu_attr = util::find_literal_list_attr::<syn::Type>("cpu", &input.attrs)?;
-    let cpu_equivalent_type = cpu_attr
-        .clone()
-        .map(|(span, ty)| quote_spanned! { span => #ty })
-        .into_iter();
-    let none_if_no_cpu_equivalent_type = cpu_attr.is_none().then_some(quote! { None }).into_iter();
 
     let gpu_repr = util::try_find_gpu_repr(&input.attrs)?;
     // if no `#[gpu_repr(_)]` attribute was explicitly specified, we default to `Repr::Wgsl`

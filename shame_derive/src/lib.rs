@@ -8,7 +8,6 @@ use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
 use syn::spanned::*;
-use syn::token::Semi;
 use syn::Data;
 use syn::Fields;
 
