@@ -47,7 +47,7 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> Default for mat<T, C, R> {
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuLayout for mat<T, C, R> {
-    fn layout_recipe() -> ir::LayoutType {
+    fn layout_type() -> ir::LayoutType {
         ir::Matrix {
             columns: C::LEN2,
             rows: R::LEN2,

@@ -549,7 +549,7 @@ impl<T: ScalarType, L: Len> GpuLayout for vec<T, L>
 where
     vec<T, L>: NoBools,
 {
-    fn layout_recipe() -> LayoutType {
+    fn layout_type() -> LayoutType {
         ir::Vector::new(
             T::SCALAR_TYPE
                 .try_into()

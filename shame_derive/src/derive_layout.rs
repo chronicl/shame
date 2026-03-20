@@ -221,7 +221,7 @@ pub fn impl_for_struct(
                     #last_field_type: #re::NoBools + #re::NoHandles + #re::GpuLayout,
                     #where_clause_predicates
                 {
-                    fn layout_recipe() -> #re::LayoutType {
+                    fn layout_type() -> #re::LayoutType {
                         let result = #re::LayoutType::struct_from_parts(
                             std::stringify!(#derive_struct_ident),
                             [
@@ -231,7 +231,7 @@ pub fn impl_for_struct(
                                         #field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")).into(),
                                         #field_size.into(),
                                     ),
-                                    <#field_type as #re::GpuLayout>::layout_recipe()
+                                    <#field_type as #re::GpuLayout>::layout_type()
                                 ),)*
                             ],
                             #gpu_repr_shame,

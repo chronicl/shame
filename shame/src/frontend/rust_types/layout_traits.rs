@@ -141,14 +141,14 @@ use super::{
 ///
 pub trait GpuLayout {
     /// Returns a [`TypeLayoutRecipe`] that describes how a layout algorithm (repr) should layout this type in memory.
-    fn layout_recipe() -> LayoutType;
+    fn layout_type() -> LayoutType;
 
     /// For `GpuSized` types, this returns the [`SizedType`] that describes the type's layout.
-    fn layout_recipe_sized() -> SizedType
+    fn layout_sized() -> SizedType
     where
         Self: GpuSized,
     {
-        match Self::layout_recipe() {
+        match Self::layout_type() {
             LayoutType::Sized(s) => s,
             LayoutType::RuntimeSizedArray(_) | LayoutType::UnsizedStruct(_) => {
                 unreachable!("Self is GpuSized, which these TypeLayoutRecipe variants aren't.")
@@ -196,7 +196,7 @@ pub trait GpuLayout {
 /// println!("OnCpu:\n{}\n", OnCpu::cpu_layout());
 /// ```
 #[track_caller]
-pub fn gpu_layout<T: GpuLayout + ?Sized>() -> TypeLayout { T::layout_recipe().layout() }
+pub fn gpu_layout<T: GpuLayout + ?Sized>() -> TypeLayout { T::layout_type().layout() }
 
 /// (no documentation yet)
 // `CpuLayout::cpu_layout` exists, but this function exists for consistency with
@@ -671,7 +671,7 @@ where
 }
 
 impl GpuLayout for GpuT {
-    fn layout_recipe() -> LayoutType { todo!() }
+    fn layout_type() -> LayoutType { todo!() }
 
     fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
         Some(Ok((

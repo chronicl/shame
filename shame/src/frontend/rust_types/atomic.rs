@@ -103,7 +103,7 @@ impl<T: ScalarTypeInteger> GetAllFields for Atomic<T> {
 }
 
 impl<T: ScalarTypeInteger> GpuLayout for Atomic<T> {
-    fn layout_recipe() -> ir::LayoutType {
+    fn layout_type() -> ir::LayoutType {
         ir::Atomic {
             scalar: T::SCALAR_TYPE_INTEGER,
         }

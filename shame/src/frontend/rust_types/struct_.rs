@@ -107,7 +107,7 @@ impl<T: SizedFields + GpuStore> Deref for Struct<T> {
 }
 
 impl<T: SizedFields + GpuStore + NoBools + GpuLayout> GpuLayout for Struct<T> {
-    fn layout_recipe() -> ir::LayoutType { T::layout_recipe() }
+    fn layout_type() -> ir::LayoutType { T::layout_type() }
 
     fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
         T::cpu_type_name_and_layout().map(|x| x.map(|(name, l)| (format!("Struct<{name}>").into(), l)))

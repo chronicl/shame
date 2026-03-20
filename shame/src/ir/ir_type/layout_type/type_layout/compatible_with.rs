@@ -574,12 +574,12 @@ mod tests {
         // The error variant is NotRepresentable, because there is no way to represent it in wgsl,
         // because an offset of 4 is not possible for f32x3, because needs to be 16 byte aligned.
         assert!(is_struct_mismatch!(
-            TypeLayoutCompatibleWith::<Storage>::try_from(Language::Wgsl, A::layout_recipe()),
+            TypeLayoutCompatibleWith::<Storage>::try_from(Language::Wgsl, A::layout_type()),
             NotRepresentable,
             StructMismatch::FieldOffset { .. }
         ));
         assert!(is_struct_mismatch!(
-            TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, A::layout_recipe()),
+            TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, A::layout_type()),
             NotRepresentable,
             StructMismatch::FieldOffset { .. }
         ));
@@ -601,7 +601,7 @@ mod tests {
         // The error variant is RequirementsNotSatisfied, because the array has a stride of 4 in Repr::Packed,
         // but wgsl's uniform address space requires a stride of 16.
         assert!(is_struct_mismatch!(
-            TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, A::layout_recipe()),
+            TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, A::layout_type()),
             RequirementsNotSatisfied,
             StructMismatch::FieldLayout {
                 mismatch: TopLevelMismatch::ArrayStride { .. },
@@ -615,7 +615,7 @@ mod tests {
             a: sm::Struct<A>,
         }
         assert!(is_struct_mismatch!(
-            TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, B::layout_recipe()),
+            TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, B::layout_type()),
             RequirementsNotSatisfied,
             StructMismatch::FieldLayout {
                 mismatch: TopLevelMismatch::ArrayStride { .. },
@@ -627,7 +627,7 @@ mod tests {
         assert!(is_struct_mismatch!(
             TypeLayoutCompatibleWith::<Uniform>::try_from(
                 Language::Wgsl,
-                <sm::Array<sm::Struct<A>, sm::Size<1>>>::layout_recipe()
+                <sm::Array<sm::Struct<A>, sm::Size<1>>>::layout_type()
             ),
             RequirementsNotSatisfied,
             StructMismatch::FieldLayout {
@@ -654,7 +654,7 @@ mod tests {
         // The error variant is RequirementsNotSatisfied, because the array has a stride of 4 in Repr::Packed,
         // but wgsl's uniform address space requires a stride of 16.
         assert!(is_struct_mismatch!(
-            TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, A::layout_recipe()),
+            TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, A::layout_type()),
             RequirementsNotSatisfied,
             StructMismatch::FieldOffset { .. }
         ));
@@ -665,7 +665,7 @@ mod tests {
             a: sm::Struct<A>,
         }
         assert!(is_struct_mismatch!(
-            TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, C::layout_recipe()),
+            TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, C::layout_type()),
             RequirementsNotSatisfied,
             StructMismatch::FieldOffset { .. }
         ));
@@ -674,7 +674,7 @@ mod tests {
         assert!(is_struct_mismatch!(
             TypeLayoutCompatibleWith::<Uniform>::try_from(
                 Language::Wgsl,
-                <sm::Array<sm::Struct<A>, sm::Size<1>>>::layout_recipe()
+                <sm::Array<sm::Struct<A>, sm::Size<1>>>::layout_type()
             ),
             RequirementsNotSatisfied,
             StructMismatch::FieldOffset { .. }
@@ -690,7 +690,7 @@ mod tests {
             a: sm::Array<f32x1>,
         }
 
-        let e = TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, A::layout_recipe()).unwrap_err();
+        let e = TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, A::layout_type()).unwrap_err();
         if PRINT {
             println!("{e}");
         }
@@ -704,7 +704,7 @@ mod tests {
         ));
 
         // Storage address space should allow unsized types
-        assert!(TypeLayoutCompatibleWith::<Storage>::try_from(Language::Wgsl, A::layout_recipe()).is_ok());
+        assert!(TypeLayoutCompatibleWith::<Storage>::try_from(Language::Wgsl, A::layout_type()).is_ok());
     }
 }
 

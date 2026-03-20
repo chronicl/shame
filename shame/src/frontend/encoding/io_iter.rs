@@ -587,6 +587,6 @@ impl PushConstants<'_> {
             let _ = get_layout_compare_with_cpu_push_error::<T>(ctx, None);
         });
 
-        T::from_anys(Any::get_immediates(T::layout_recipe(), T::expected_num_anys(), None, None).into_iter())
+        T::from_anys(Any::get_immediates(T::layout_type(), T::expected_num_anys(), None, None).into_iter())
     }
 }

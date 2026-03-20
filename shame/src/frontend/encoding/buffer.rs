@@ -238,7 +238,7 @@ where
 
         // Check that the layout of `T` is compatible with the address space
         // and if it is, create the binding.
-        let recipe = T::layout_recipe();
+        let recipe = T::layout_type();
         match AS::BUFFER_ADDRESS_SPACE {
             // Bad duplication in match arms, but not worth abstracting away
             BufferAddressSpaceEnum::Uniform => {

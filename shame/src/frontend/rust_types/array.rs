@@ -139,10 +139,10 @@ impl<T: GpuType + GpuStore + GpuSized, N: ArrayLen> ToGpuType for Array<T, N> {
 }
 
 impl<T: GpuType + GpuSized + GpuLayout, N: ArrayLen> GpuLayout for Array<T, N> {
-    fn layout_recipe() -> ir::LayoutType {
+    fn layout_type() -> ir::LayoutType {
         match N::LEN {
-            Some(n) => ir::SizedArray::new(Rc::new(T::layout_recipe_sized()), n).into(),
-            None => ir::RuntimeSizedArray::new(T::layout_recipe_sized()).into(),
+            Some(n) => ir::SizedArray::new(Rc::new(T::layout_sized()), n).into(),
+            None => ir::RuntimeSizedArray::new(T::layout_sized()).into(),
         }
     }
 
