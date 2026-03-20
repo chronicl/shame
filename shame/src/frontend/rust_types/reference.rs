@@ -67,22 +67,6 @@ pub trait AccessModeWritable: AccessMode {} // TODO(release) seal this trait
 impl AccessModeWritable for ReadWrite {}
 impl AccessModeWritable for Write {}
 
-#[diagnostic::on_unimplemented(
-    message = "cannot read from a `shame::Ref<_, _, Write>` which only provides `Write` access"
-)]
-/// A [`Ref`] with an [`AccessMode`] that is either [`Read`] or [`ReadWrite`]
-pub trait ReadableRef {} // TODO(release) seal this trait
-impl<T: GpuStore, AS: AddressSpace> ReadableRef for Ref<T, AS, ReadWrite> {}
-impl<T: GpuStore, AS: AddressSpace> ReadableRef for Ref<T, AS, Read> {}
-
-#[diagnostic::on_unimplemented(
-    message = "cannot write to a `shame::Ref<_, _, Read>` which only provides `Read` access"
-)]
-/// A [`Ref`] with an [`AccessMode`] that is either [`Read`] or [`ReadWrite`]
-pub trait WritableRef {} // TODO(release) seal this trait
-impl<T: GpuStore, AS: AddressSpace> WritableRef for Ref<T, AS, ReadWrite> {}
-impl<T: GpuStore, AS: AddressSpace> WritableRef for Ref<T, AS, Write> {}
-
 // TODO(docs) Docs: mention that this has broadly same interface as `Cell`
 /// (no documentation yet)
 pub struct Ref<T, AS = mem::Fn, AM = ReadWrite>
@@ -161,8 +145,7 @@ impl<T, AS, AM> Ref<T, AS, AM>
 where
     T: GpuType + GpuStore + NoAtomics,
     AS: AddressSpace,
-    AM: AccessMode,
-    Self: WritableRef,
+    AM: AccessModeWritable,
 {
     /// (no documentation yet)
     #[track_caller]
@@ -238,8 +221,7 @@ where
 impl<T, AM> Ref<T, mem::WorkGroup, AM>
 where
     T: GpuType + GpuStore + NoAtomics,
-    AM: AccessMode,
-    Self: ReadableRef,
+    AM: AccessModeReadable,
 {
     // see WGSL https://www.w3.org/TR/WGSL/#workgroupUniformLoad-builtin
     /// (no documentation yet)

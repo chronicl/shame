@@ -243,8 +243,6 @@ pub use frontend::rust_types::reference::ReadWrite;
 pub use frontend::rust_types::reference::AccessMode;
 pub use crate::frontend::rust_types::reference::AccessModeReadable;
 pub use crate::frontend::rust_types::reference::AccessModeWritable;
-pub use frontend::rust_types::reference::ReadableRef;
-pub use frontend::rust_types::reference::WritableRef;
 
 /// traits, types and functions related to address spaces and memory allocation
 pub mod mem {
