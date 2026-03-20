@@ -85,7 +85,7 @@ pub struct Output(());
 /// - [mem::Storage] (for buffer bindings)
 /// - [mem::Handle] (for texture/sampler bindings)
 /// - [mem::Output] (for color targets)
-pub trait AddressSpace: Copy {
+pub trait AddressSpace: Copy + 'static {
     /// enum variant representing `Self`
     const ADDRESS_SPACE: ir::AddressSpace;
     /// the default [`AccessMode`] of memory in this address space

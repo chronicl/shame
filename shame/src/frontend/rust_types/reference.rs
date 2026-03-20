@@ -24,7 +24,7 @@ use std::borrow::Borrow;
 /// - [`ReadWrite`] for both read and write access
 ///
 /// see https://www.w3.org/TR/WGSL/#memory-access-mode
-pub trait AccessMode: Copy {
+pub trait AccessMode: Copy + 'static {
     #[doc(hidden)] // runtime api
     const ACCESS: ir::AccessMode;
 }
