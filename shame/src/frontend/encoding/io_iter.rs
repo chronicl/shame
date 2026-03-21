@@ -511,6 +511,9 @@ impl BindingIter<'_> {
     /// Index of the next binding in the bind group. Does not advance the iterator.
     pub fn next_binding_index(&self) -> u32 { self.next.1 }
 
+    /// Advances the binding iter counter without creating a new binding.
+    pub fn advance(&mut self) -> BindPath { self.post_inc_path() }
+
     /// Returned iter can panic if used outside of an encoding guard.
     #[doc(hidden)]
     pub fn make_static(self) -> BindingIter<'static> {
