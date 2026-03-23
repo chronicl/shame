@@ -140,8 +140,8 @@ impl AlignedType {
     pub fn align(&self) -> u64 {
         // TODO(chronicl)
         match self {
-            AlignedType::Sized(sized) => sized.align(Repr::Wgsl).as_u64(),
-            AlignedType::RuntimeSizedArray(a) => a.align(Repr::Wgsl).as_u64(),
+            AlignedType::Sized(sized) => sized.align(Repr::Wgsl) as u64,
+            AlignedType::RuntimeSizedArray(a) => a.align(Repr::Wgsl) as u64,
         }
     }
 }

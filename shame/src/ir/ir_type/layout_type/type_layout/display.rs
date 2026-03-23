@@ -131,7 +131,7 @@ impl LayoutInfoFlags {
     pub fn format(&self, offset: Option<u64>, align: U32PowerOf2, size: Option<u64>, stride: Option<u64>) -> String {
         let infos: [(Self, &'static str, &dyn Display); 4] = [
             (Self::OFFSET, "offset", &UnwrapDisplayOr(offset, "")),
-            (Self::ALIGN, "align", &align.as_u32()),
+            (Self::ALIGN, "align", &(align as u32)),
             (Self::SIZE, "size", &UnwrapDisplayOr(size, "")),
             (Self::STRIDE, "stride", &UnwrapDisplayOr(stride, "")),
         ];

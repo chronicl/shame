@@ -72,10 +72,7 @@ where
             },
             L::LEN,
         );
-        Layout::from_align_size(
-            v.align(Repr::Wgsl).as_u32() as usize,
-            Some(v.byte_size(Repr::Wgsl) as usize),
-        )
+        Layout::from_align_size(v.align(Repr::Wgsl) as usize, Some(v.byte_size(Repr::Wgsl) as usize))
     };
 }
 
@@ -86,10 +83,7 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> NoPadding for shame::mat<T, C, R> {
             rows: R::LEN2,
             scalar: T::SCALAR_TYPE_FP,
         };
-        Layout::from_align_size(
-            m.align(Repr::Wgsl).as_u32() as usize,
-            Some(m.byte_size(Repr::Wgsl) as usize),
-        )
+        Layout::from_align_size(m.align(Repr::Wgsl) as usize, Some(m.byte_size(Repr::Wgsl) as usize))
     };
 }
 
@@ -98,7 +92,7 @@ impl<T: ScalarTypeInteger> NoPadding for shame::Atomic<T> {
         let a = any::Atomic {
             scalar: T::SCALAR_TYPE_INTEGER,
         };
-        Layout::from_align_size(a.align(Repr::Wgsl).as_u32() as usize, Some(a.byte_size() as usize))
+        Layout::from_align_size(a.align(Repr::Wgsl) as usize, Some(a.byte_size() as usize))
     };
 }
 

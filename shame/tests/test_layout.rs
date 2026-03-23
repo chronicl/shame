@@ -362,9 +362,9 @@ fn unsized_struct_vec3_align_layout_eq() {
     }
     assert_ne!(gpu_layout::<OnGpu>(), cpu_layout::<OnCpu>());
     assert!(gpu_layout::<OnGpu>().byte_size() == Some(16));
-    assert!(gpu_layout::<OnGpu>().align().as_u32() == 16);
+    assert!(gpu_layout::<OnGpu>().align() as u32 == 16);
     assert!(cpu_layout::<OnCpu>().byte_size() == Some(12));
-    assert!(cpu_layout::<OnCpu>().align().as_u32() == 4);
+    assert!(cpu_layout::<OnCpu>().align() as u32 == 4);
 }
 
 #[test]
@@ -603,7 +603,7 @@ pub fn rust_layout_with_shame_semantics<CpuType, GpuSemantics: sm::GpuLayout>() 
     layout.set_byte_size(size_of::<CpuType>() as u64);
 
     // these are just here because we are testing
-    assert_eq!(layout.align().as_u32(), align_of::<CpuType>() as u32);
+    assert_eq!(layout.align() as u32, align_of::<CpuType>() as u32);
     assert_eq!(layout.byte_size().map(|x| x as _), CpuType::CPU_SIZE);
 
     layout

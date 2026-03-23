@@ -401,7 +401,7 @@ fn write_struct_mismatch(
         } => {
             let field_name = &field_left.name;
             let offset = field_left.rel_byte_offset;
-            let expected_align = field_right.ty.align().as_u64();
+            let expected_align = field_right.ty.align() as u64;
             let actual_align = max_u64_po2_dividing(field_left.rel_byte_offset);
 
             writeln!(
@@ -428,7 +428,7 @@ fn write_struct_mismatch(
             writeln!(
                 f,
                 "- add an #[align({})] attribute to the definition of `{}`",
-                field_right.ty.align().as_u32(),
+                field_right.ty.align() as u32,
                 field_name
             )?;
             writeln!(

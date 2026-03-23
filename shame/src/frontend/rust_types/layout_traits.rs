@@ -452,7 +452,7 @@ impl VertexAttributeCooked {
                 }
                 VertexAttribFormat::Coarse(packed_vec) => (packed_vec.byte_size().as_u64(), packed_vec.align(repr)),
             };
-            let offset = next_min_offset.next_multiple_of(align.as_u64());
+            let offset = next_min_offset.next_multiple_of(align as u64);
             attribs.push(VertexAttributeCooked {
                 offset,
                 location: location_counter.next(),

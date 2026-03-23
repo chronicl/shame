@@ -468,7 +468,7 @@ fn write_push_constant_var_def(
             write!(code, "@size({size}) ")?;
         }
         if let Some(align) = field.custom_min_align {
-            write!(code, "@align({}) ", u32::from(align))?;
+            write!(code, "@align({}) ", align as u32)?;
         }
         write!(code, "_{i}: ")?; // ident is made up on the spot, maybe we should give the user a way to give us ident info
         write_sized_type(&mut code, &field.ty, field.call_info, ctx)?;
@@ -487,7 +487,7 @@ fn write_struct_definition(code: &mut CodeWriteSpan, def: &StructDef, ctx: &Wgsl
         for (ident, custom_min_align, custom_min_size, ty) in def.fields() {
             write!(code, "{indent}")?;
             if let Some(align) = custom_min_align {
-                write!(code, "@align({}) ", u64::from(align))?;
+                write!(code, "@align({}) ", align as u64)?;
             }
             if let Some(size) = custom_min_size {
                 write!(code, "@size({size}) ")?;

@@ -367,7 +367,7 @@ mod tests {
 
         let layout = recipe.layout();
         assert_eq!(layout.byte_size(), None);
-        assert!(layout.align().as_u64() == 8); // align of vec2<f32>
+        assert!(layout.align() as u64 == 8); // align of vec2<f32>
         match &layout {
             TypeLayout::Struct(struct_layout) => {
                 assert_eq!(struct_layout.fields.len(), 3);
@@ -398,7 +398,7 @@ mod tests {
         assert_eq!(layout.byte_size(), None);
         // Struct alignmment has to be a multiple of 16, but the runtime sized array
         // also has an alignment of 16, which transfers to the struct alignment.
-        assert!(layout.align().as_u64() == 16);
+        assert!(layout.align() as u64 == 16);
         match &layout {
             TypeLayout::Struct(struct_layout) => {
                 assert_eq!(struct_layout.fields[0].rel_byte_offset, 0); // vec2<f32>

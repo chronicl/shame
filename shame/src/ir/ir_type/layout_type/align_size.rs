@@ -246,7 +246,7 @@ impl Vector {
                     Len::X3 => 4,
                 };
                 let po2_align = self.scalar.align(repr);
-                U32PowerOf2::try_from_u32(po2_len * po2_align.as_u32()).expect(
+                U32PowerOf2::try_from_u32(po2_len * po2_align as u32).expect(
                     "power of 2 * power of 2 = power of 2. Highest operands are around 4 * 16 so overflow is unlikely",
                 )
             }
@@ -306,7 +306,7 @@ impl Matrix {
         let (vec, array_len) = self.as_vector_array();
         // According to https://www.w3.org/TR/WGSL/#alignment-and-size
         // SizeOf(matCxR) = SizeOf(array<vecR, C>) = C × roundUp(AlignOf(vecR), SizeOf(vecR))
-        array_len.get() as u64 * round_up(vec.align(repr).as_u64(), vec.byte_size(repr))
+        array_len.get() as u64 * round_up(vec.align(repr) as u64, vec.byte_size(repr))
     }
 
     pub const fn align(&self, repr: Repr) -> U32PowerOf2 {
@@ -391,7 +391,7 @@ pub const fn array_stride(element_align: U32PowerOf2, element_size: u64, repr: R
         Repr::WgslUniform => round_up_align(U32PowerOf2::_16, element_align),
     };
 
-    round_up(element_align.as_u64(), element_size)
+    round_up(element_align as u64, element_size)
 }
 
 #[allow(missing_docs)]
@@ -438,7 +438,7 @@ pub const fn round_up(multiple_of: u64, n: u64) -> u64 {
 }
 
 pub const fn round_up_align(multiple_of: U32PowerOf2, n: U32PowerOf2) -> U32PowerOf2 {
-    let rounded_up = round_up(multiple_of.as_u64(), n.as_u64());
+    let rounded_up = round_up(multiple_of as u64, n as u64);
     // n <= multiple_of  ->  rounded_up = multiple_of
     // n > multiple_of   ->  rounded_up = n, since both are powers of 2, n must already
     //                                       be a multiple of multiple_of
@@ -536,7 +536,7 @@ impl StructLayoutCalculator {
     //   where justPastLastMember = OffsetOfMember(S,N) + SizeOfMember(S,N)
     //
     // self.next_offset_min is justPastLastMember already.
-    pub const fn byte_size(&self) -> u64 { round_up(self.align().as_u64(), self.next_offset_min) }
+    pub const fn byte_size(&self) -> u64 { round_up(self.align() as u64, self.next_offset_min) }
 
     /// Returns the align of the struct.
     pub const fn align(&self) -> U32PowerOf2 { Self::adjust_struct_alignment_for_repr(self.align, self.repr) }
@@ -546,7 +546,7 @@ impl StructLayoutCalculator {
         match (self.repr, field_custom_min_align) {
             // Packed always returns self.next_offset_min regardless of custom_min_align
             (Repr::Packed, _) => self.next_offset_min,
-            (Repr::Wgsl | Repr::WgslUniform, _) => round_up(field_align.as_u64(), self.next_offset_min),
+            (Repr::Wgsl | Repr::WgslUniform, _) => round_up(field_align as u64, self.next_offset_min),
         }
     }
 

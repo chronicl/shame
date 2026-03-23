@@ -40,19 +40,6 @@ pub enum U32PowerOf2 {
 }
 
 impl U32PowerOf2 {
-    /// Returns the corresponding u32.
-    pub const fn as_u32(self) -> u32 { self as u32 }
-
-    /// Returns the corresponding u64.
-    pub const fn as_u64(self) -> u64 { self.as_u32() as u64 }
-}
-
-
-impl From<U32PowerOf2> for u32 {
-    fn from(value: U32PowerOf2) -> Self { value.as_u32() }
-}
-
-impl U32PowerOf2 {
     /// Returns the maximum between `self` and `other`.
     pub const fn max(self, other: Self) -> Self { if self as u32 > other as u32 { self } else { other } }
 }
@@ -70,6 +57,9 @@ impl Display for NotAU32PowerOf2 {
 impl std::error::Error for NotAU32PowerOf2 {}
 
 impl U32PowerOf2 {
+    /// Creates a new U32PowerOf2 and panics if the value is not a power of two.
+    pub const fn new_unchecked(value: u32) -> Self { Self::try_from_u32(value).unwrap() }
+
     /// Tries to convert a u32 to U32PowerOf2.
     pub const fn try_from_u32(value: u32) -> Option<Self> {
         Some(match value {
@@ -119,8 +109,4 @@ impl TryFrom<u32> for U32PowerOf2 {
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         U32PowerOf2::try_from_u32(value).ok_or(NotAU32PowerOf2(value))
     }
-}
-
-impl From<U32PowerOf2> for u64 {
-    fn from(value: U32PowerOf2) -> Self { u32::from(value) as u64 }
 }

@@ -154,7 +154,7 @@ pub fn repr_c_struct_layout(
                 return Err(ReprCError::SecondLastElementIsUnsized);
             };
             round_up(
-                last_field.alignment.as_u64(),
+                last_field.alignment as u64,
                 *_2nd_last_offset as u64 + *_2nd_last_size as u64,
             )
         }
@@ -175,7 +175,7 @@ pub fn repr_c_struct_layout(
     let last_field_trait_size = last_field_trait_size.map(|s| s as u64);
 
     let total_struct_size =
-        last_field_trait_size.map(|last_size| round_up(struct_alignment.as_u64(), last_field_offset + last_size));
+        last_field_trait_size.map(|last_size| round_up(struct_alignment as u64, last_field_offset + last_size));
 
     let mut fields = first_fields_with_offsets_and_sizes
         .iter()
