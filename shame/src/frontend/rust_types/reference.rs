@@ -210,7 +210,7 @@ impl<T, AS, AM, N> Ref<Array<T, N>, AS, AM>
 where
     T: GpuType + GpuSized + GpuStore + 'static,
     AS: AddressSpace + 'static,
-    AM: AccessModeReadable + 'static,
+    AM: AccessMode + 'static,
     N: ArrayLen,
 {
     /// (no documentation yet)
