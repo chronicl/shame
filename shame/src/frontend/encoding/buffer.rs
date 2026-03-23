@@ -2,7 +2,7 @@ use std::{marker::PhantomData, ops::Deref, borrow::Borrow};
 
 use crate::{
     GpuLayout,
-    any::{TypeLayoutCompatibleWith, AsAny},
+    any::{AsAny, TypeLayoutCompatibleWith},
     call_info,
     frontend::{
         any::{
@@ -25,7 +25,7 @@ use crate::{
             vec::vec,
         },
     },
-    ir::{self, recording::Context},
+    ir::{self, LayoutType, recording::Context},
     packed::PackedVec,
 };
 
@@ -221,12 +221,34 @@ where
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
 {
-    let any = Context::try_with(call_info!(), |ctx| {
+    Context::try_with(call_info!(), |ctx| {
         get_layout_compare_with_cpu_push_error::<T>(ctx, None);
+    });
 
-        let access = AM::ACCESS_MODE_READABLE;
+    let ty = T::layout_type();
+    Ref::from(create_ref_any_for_buffer_binding(
+        args,
+        has_dynamic_offset,
+        ty,
+        AS::BUFFER_ADDRESS_SPACE,
+        AM::ACCESS_MODE_READABLE,
+    ))
+}
+
+/// Bind a new buffer with the binding arguments provided. Returns an Any, which is Ref<T, AS, AM>,
+/// where T corresponds to `ty`, AS to `address_space` and AM to `access`.
+/// This skips a lot of static type checks that [`Buffer`] performs.
+/// Those type checks instead are runtime errors.
+pub fn create_ref_any_for_buffer_binding(
+    args: BindingArgs,
+    has_dynamic_offset: bool,
+    ty: LayoutType,
+    address_space: BufferAddressSpaceEnum,
+    access: crate::ir::AccessModeReadable,
+) -> crate::any::Any {
+    Context::try_with(call_info!(), |ctx| {
         let bind_ty = BindingType::Buffer {
-            ty: match AS::BUFFER_ADDRESS_SPACE {
+            ty: match address_space {
                 BufferAddressSpaceEnum::Storage => BufferBindingType::Storage(access),
                 BufferAddressSpaceEnum::Uniform => BufferBindingType::Uniform,
             },
@@ -238,11 +260,10 @@ where
 
         // Check that the layout of `T` is compatible with the address space
         // and if it is, create the binding.
-        let recipe = T::layout_type();
-        match AS::BUFFER_ADDRESS_SPACE {
+        match address_space {
             // Bad duplication in match arms, but not worth abstracting away
             BufferAddressSpaceEnum::Uniform => {
-                match TypeLayoutCompatibleWith::<mem::Uniform>::try_from(crate::Language::Wgsl, recipe) {
+                match TypeLayoutCompatibleWith::<mem::Uniform>::try_from(crate::Language::Wgsl, ty) {
                     Ok(l) => Any::buffer_binding(args.path, vis, l, access, has_dynamic_offset),
                     Err(e) => {
                         ctx.push_error(e.into());
@@ -251,7 +272,7 @@ where
                 }
             }
             BufferAddressSpaceEnum::Storage => {
-                match TypeLayoutCompatibleWith::<mem::Storage>::try_from(crate::Language::Wgsl, recipe) {
+                match TypeLayoutCompatibleWith::<mem::Storage>::try_from(crate::Language::Wgsl, ty) {
                     Ok(layout) => Any::buffer_binding(args.path, vis, layout, access, has_dynamic_offset),
                     Err(e) => {
                         ctx.push_error(e.into());
@@ -261,10 +282,10 @@ where
             }
         }
     })
-    .unwrap_or_else(|| Any::new_invalid(InvalidReason::CreatedWithNoActiveEncoding));
-
-    Ref::from(any)
+    .unwrap_or_else(|| Any::new_invalid(InvalidReason::CreatedWithNoActiveEncoding))
 }
+
+
 
 /// TODO(chronicl)
 pub trait BufferContent<AS: BufferAddressSpace, AM: AccessModeReadable>: GpuStore + Sized {

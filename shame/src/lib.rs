@@ -449,6 +449,7 @@ pub mod any {
 
     // Helper for buffer creation
     pub use crate::frontend::encoding::buffer::create_ref_for_buffer_binding;
+    pub use crate::frontend::encoding::buffer::create_ref_any_for_buffer_binding;
 
     // runtime types
     pub use crate::ir::ir_type::AccessMode;
