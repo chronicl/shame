@@ -60,6 +60,11 @@ impl U32PowerOf2 {
     /// Creates a new U32PowerOf2 and panics if the value is not a power of two.
     pub const fn new_unchecked(value: u32) -> Self { Self::try_from_u32(value).unwrap() }
 
+
+    /// Gets the exponent of the power of two.
+    #[inline]
+    pub const fn exponent(self) -> u32 { (self as u32).trailing_zeros() }
+
     /// Tries to convert a u32 to U32PowerOf2.
     pub const fn try_from_u32(value: u32) -> Option<Self> {
         Some(match value {
