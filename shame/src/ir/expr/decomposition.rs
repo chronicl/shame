@@ -107,7 +107,7 @@ pub enum Decomposition {
     // (no test case yet)
     BindingArrayIndexConst(u32),
 
-    StructureAccess(CanonName),
+    StructureAccess(FieldAccess),
 }
 
 impl Display for Decomposition {
@@ -128,7 +128,10 @@ impl Display for Decomposition {
             Decomposition::ArrayIndexConst(i) => write!(f, "array[const {}]", i),
             Decomposition::BindingArrayIndex => write!(f, "binding-array[_]"),
             Decomposition::BindingArrayIndexConst(i) => write!(f, "binding-array[const {}]", i),
-            Decomposition::StructureAccess(canon_name) => write!(f, "struct.{}", canon_name),
+            Decomposition::StructureAccess(field_access) => match field_access {
+                FieldAccess::ByName(name) => write!(f, "struct.{}", name),
+                FieldAccess::ByIndex(i) => write!(f, "struct.{}", i),
+            },
         }
     }
 }
@@ -212,12 +215,18 @@ impl TypeCheck for Decomposition {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum FieldAccess {
+    ByName(CanonName),
+    ByIndex(u32),
+}
+
 impl Decomposition {
     #[rustfmt::skip]
     fn infer_type_of_structure_access(
         &self,
         args: &[Type],
-        field_name: &CanonName,
+        field_access: &FieldAccess
     ) -> Result<Type, NoMatchingSignature> {
         use SizedType::*;
         use StoreType::*;
@@ -259,7 +268,11 @@ impl Decomposition {
             }
         };
 
-        match struct_.find_field(field_name) {
+        let field = match field_access {
+            FieldAccess::ByName(name) => struct_.find_field(name),
+            FieldAccess::ByIndex(index) => struct_.get_field(*index),
+        };
+        match field {
             Some(field) => Ok(match single_arg {
                 Ref(alloc, _, am) => Type::Ref(alloc.clone(), StoreType::Layout(field), *am),
                 Ptr(alloc, _, am) => Type::Ref(alloc.clone(), StoreType::Layout(field), *am),
@@ -267,7 +280,11 @@ impl Decomposition {
             }),
             None => Err(no_matching_sig_with_comment({
                 let mut s = String::new();
-                writeln!(s, "struct `{}` has no field named `{}`.", struct_.name(), field_name);
+                match field_access {
+                    FieldAccess::ByName(name) => writeln!(s, "struct `{}` has no field named `{}`.", struct_.name(), name),
+                    FieldAccess::ByIndex(index) => writeln!(s, "struct `{}` has no field at index {}.", struct_.name(), index)
+                };
+
 
                 if struct_.is_empty() {
                     writeln!(s, "this struct has no fields.");
@@ -289,7 +306,8 @@ impl Any {
         pub fn vector_index(&self, i: Any)        -> Any => [*self, i] Expr::Decomposition(Decomposition::VectorIndex);
         pub fn matrix_index(&self, i: Any)        -> Any => [*self, i] Expr::Decomposition(Decomposition::MatrixIndex);
         pub fn binding_array_index(&self, i: Any) -> Any => [*self, i] Expr::Decomposition(Decomposition::BindingArrayIndex);
-        pub fn get_field(&self, name: CanonName)  -> Any => [*self]    Expr::Decomposition(Decomposition::StructureAccess(name));
+        pub fn get_field(&self, name: CanonName)  -> Any => [*self]    Expr::Decomposition(Decomposition::StructureAccess(FieldAccess::ByName(name)));
+        pub fn get_field_by_index(&self, index: u32)  -> Any => [*self]    Expr::Decomposition(Decomposition::StructureAccess(FieldAccess::ByIndex(index)));
         pub fn swizzle(&self, xyzw: VectorAccess) -> Any => [*self]    Expr::Decomposition(Decomposition::VectorAccess(xyzw));
     }
 

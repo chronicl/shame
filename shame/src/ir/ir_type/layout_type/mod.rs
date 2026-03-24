@@ -346,7 +346,7 @@ impl StructKindRef<'_> {
         }
     }
 
-    /// (no documentation yet)
+    /// Gets the type of the field with the given name.
     pub fn find_field(&self, name: &CanonName) -> Option<LayoutType> {
         self.sized_fields()
             .iter()
@@ -357,6 +357,19 @@ impl StructKindRef<'_> {
                     .filter(|f| &f.name == name)
                     .map(|f| LayoutType::RuntimeSizedArray(f.array.clone()))
             })
+    }
+
+    /// Gets the type of the field at the given index.
+    pub fn get_field(&self, index: u32) -> Option<LayoutType> {
+        let index = index as usize;
+        if index < self.sized_fields().len() {
+            Some(LayoutType::Sized(self.sized_fields()[index].ty.clone()))
+        } else if index == self.sized_fields().len() {
+            self.last_unsized()
+                .map(|f| LayoutType::RuntimeSizedArray(f.array.clone()))
+        } else {
+            None
+        }
     }
 
     /// (no documentation yet)

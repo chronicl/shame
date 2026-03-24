@@ -11,13 +11,13 @@ use crate::{
     common::pool::Key,
     frontend::any::shared_io::{BindPath, SamplingMethod},
     ir::{
-        CanonName, LayoutType, Matrix, SizedArray, StructKindRef, Vector, self, Comp4, CompoundOp, HandleType, Len,
-        Node, ScalarConstant, ScalarType, SizedType, StoreType, Type,
+        self, CanonName, Comp4, CompoundOp, HandleType, LayoutType, Len, Matrix, Node, ScalarConstant, ScalarType,
+        SizedArray, SizedType, StoreType, StructKindRef, Type, Vector,
         expr::{
-            Assign, Binding, BuiltinFn, Decomposition, Expr, FnRelated, Literal, Operator, PipelineIo,
+            Assign, Binding, BuiltinFn, Decomposition, Expr, FieldAccess, FnRelated, Literal, Operator, PipelineIo,
             PushConstantsField, RefLoad, Show, TextureFn,
         },
-        ir_type::{TextureShape},
+        ir_type::TextureShape,
         recording::{CallInfo, FunctionDef, TemplateStructParams},
     },
 };
@@ -149,8 +149,8 @@ fn write_expr(code: &mut CodeWriteSpan, node: &Node, ctx: &WgslContext) -> Resul
                         });
                     }
                 }
-                D::StructureAccess(field_canon_name) => {
-                    write_field_access(code, node, field_canon_name, ctx)?;
+                D::StructureAccess(field_access) => {
+                    write_field_access(code, node, field_access, ctx)?;
                 }
             }
         }
@@ -243,7 +243,7 @@ pub(super) fn write_binding_ident(
 pub(super) fn write_field_access(
     code: &mut CodeWriteSpan,
     node: &Node,
-    field_name: &CanonName,
+    field_access: &FieldAccess,
     ctx: &WgslContext,
 ) -> Result<(), WgslError> {
     let arg = get_single_arg(node)?;
@@ -254,7 +254,7 @@ pub(super) fn write_field_access(
         Type::Ref(_, StoreType::Layout(LayoutType::Sized(SizedType::Struct(s))), _) => Ok(s.into()),
         Type::Store(StoreType::Layout(LayoutType::UnsizedStruct(s))) |
         Type::Ref(_, StoreType::Layout(LayoutType::UnsizedStruct(s)), _) => Ok(s.into()),
-        _ => Err(WgslErrorKind::FieldAccessOnNonStruct(ty.clone(), field_name.clone())
+        _ => Err(WgslErrorKind::FieldAccessOnNonStruct(ty.clone(), field_access.clone())
             .at_level(node.call_info, WgslErrorLevel::InternalPleaseReport)),
     }?;
 
@@ -264,8 +264,12 @@ pub(super) fn write_field_access(
             .at_level(node.call_info, WgslErrorLevel::InternalPleaseReport)
     })?;
 
-    let ident = def.get_field_ident(field_name).ok_or_else(|| {
-        WgslErrorKind::UnknownFieldForStruct(ty.clone(), field_name.clone())
+    let ident = match field_access {
+        FieldAccess::ByName(field_name) => def.get_field_ident(field_name),
+        FieldAccess::ByIndex(i) => def.get_field_ident_by_index(*i),
+    }
+    .ok_or_else(|| {
+        WgslErrorKind::UnknownFieldForStruct(ty.clone(), field_access.clone())
             .at_level(node.call_info, WgslErrorLevel::InternalPleaseReport)
     })?;
 

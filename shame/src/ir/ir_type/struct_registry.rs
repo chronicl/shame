@@ -198,6 +198,18 @@ impl StructDef {
             })
     }
 
+    /// (no documentation yet)
+    pub fn get_field_ident_by_index(&self, index: u32) -> Option<&Key<Ident>> {
+        let index = index as usize;
+        if index < self.sized_fields.len() {
+            Some(&self.sized_fields[index].0)
+        } else if index == self.sized_fields.len() {
+            self.last_unsized.as_ref().map(|(ident, _)| ident)
+        } else {
+            None
+        }
+    }
+
     /// Iterator over (ident, align, size, ty).
     /// Clones each LayoutType, so this is relatively expensive.
     pub fn fields(&self) -> impl Iterator<Item = (&Key<Ident>, Option<U32PowerOf2>, Option<u64>, LayoutType)> + '_ {

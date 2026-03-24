@@ -9,8 +9,8 @@ use crate::{
         error::InternalError,
     },
     ir::{
-        self, AccessMode, CanonName, AddressSpace, StructKind, TextureFormatWrapper, TextureSampleUsageType, Type,
-        expr::{Expr, ShaderIo},
+        self, AccessMode, AddressSpace, CanonName, StructKind, TextureFormatWrapper, TextureSampleUsageType, Type,
+        expr::{Expr, FieldAccess, ShaderIo},
         pipeline::ShaderStage,
         recording::{CallInfo, MemoryRegion, Stmt, TemplateStructParams},
     },
@@ -104,10 +104,10 @@ pub enum WgslErrorKind {
     TextureFormatUnsupported(Expr),
     #[error("WGSL output does not support the {0} shader stage")]
     UnsupportedStage(ShaderStage),
-    #[error("trying to generate code for access of field `{1}` on non-struct type `{0}`")]
-    FieldAccessOnNonStruct(Type, CanonName),
-    #[error("trying to generate code for access of unknown field `{1}` on structure `{0:?}`")]
-    UnknownFieldForStruct(Type, CanonName),
+    #[error("trying to generate code for access of field `{1:?}` on non-struct type `{0}`")]
+    FieldAccessOnNonStruct(Type, FieldAccess),
+    #[error("trying to generate code for access of unknown field `{1:?}` on structure `{0:?}`")]
+    UnknownFieldForStruct(Type, FieldAccess),
     #[error("`{0:?}` has no identifier deduplication entry")]
     UnregisteredStruct(StructKind),
     #[error("trying to generate code for texture format `{0:?}` which cannot be represented in wgsl code.")]
