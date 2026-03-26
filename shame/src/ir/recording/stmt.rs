@@ -242,7 +242,7 @@ impl FlowStmt {
         let possible_stages = match self {
             FlowStmt::Control(control) => PossibleStages::all(),
             FlowStmt::Jump(jump) => match jump {
-                Jump::Continue | Jump::Break | Jump::Return(_) => PossibleStages::all(),
+                Jump::Continue | Jump::Break | Jump::Return(_) => PossibleStages::all_and_must_appear(),
                 Jump::Discard => PossibleStages::new(true, StageMask::frag(), StageMask::frag(), true),
             },
         };

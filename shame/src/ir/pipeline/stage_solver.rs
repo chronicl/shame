@@ -266,6 +266,15 @@ impl PossibleStages {
         }))
     }
 
+    pub fn all_and_must_appear() -> Self {
+        Self(RefCell::new(Inner {
+            must_appear_at_all: true,
+            must_appear_in: StageMask::empty(),
+            can_appear_in: StageMask::all(),
+            cannot_appear_twice: false,
+        }))
+    }
+
     pub fn empty() -> Self {
         Self(RefCell::new(Inner {
             must_appear_at_all: false,
