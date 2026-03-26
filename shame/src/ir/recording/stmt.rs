@@ -439,11 +439,11 @@ impl Stmt {
 
             // =================================================================
             // function-exclusive statements
-            (_, Stmt::Flow(FlowStmt::Jump(j @ Jump::Return(_)), _)) => {
-                Block::find_in_stack(block_key, &blocks, |b| matches!(b.kind, B::Body(BK::Function)))
-                    .map(|_| ())
-                    .ok_or(E::OnlyAllowedInFnBody(*j))
-            }
+            (_, Stmt::Flow(FlowStmt::Jump(j @ Jump::Return(_)), _)) => Block::find_in_stack(block_key, &blocks, |b| {
+                matches!(b.kind, B::Body(BK::Function) | B::EntryPoint)
+            })
+            .map(|_| ())
+            .ok_or(E::OnlyAllowedInFnBody(*j)),
 
             // =================================================================
             // variable/value definition/declaration
