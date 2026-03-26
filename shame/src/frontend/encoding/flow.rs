@@ -351,6 +351,7 @@ pub fn discard_if(cond: boolx1) {
     r.finish()
 }
 
+/// (no documentation yet)
 #[track_caller]
 pub fn return_value(value: impl ToGpuType) {
     if let Some(node) = value.to_any().node() {
@@ -358,6 +359,7 @@ pub fn return_value(value: impl ToGpuType) {
     }
 }
 
+/// (no documentation yet)
 #[track_caller]
 pub fn return_() {
     Context::try_with(call_info!(), |ctx| {

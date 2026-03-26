@@ -149,6 +149,8 @@ pub use frontend::encoding::flow::break_;
 pub use frontend::encoding::flow::break_if;
 pub use frontend::encoding::flow::continue_;
 pub use frontend::encoding::flow::continue_if;
+pub use frontend::encoding::flow::return_;
+pub use frontend::encoding::flow::return_value;
 
 // # `GpuType`s
 pub use frontend::rust_types::GpuType;
