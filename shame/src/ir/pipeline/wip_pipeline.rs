@@ -271,44 +271,6 @@ pub struct WipPushConstantsField {
     pub node: Key<Node>,
 }
 
-#[derive(Default, Debug, Clone)]
-pub struct ByteRangesPerStage {
-    pub comp: Option<Range<u32>>,
-    pub task: Option<Range<u32>>,
-    pub mesh: Option<Range<u32>>,
-    pub vert: Option<Range<u32>>,
-    pub frag: Option<Range<u32>>,
-}
-
-impl ByteRangesPerStage {
-    fn range_for_stage_mut(&mut self, stage: ShaderStage) -> &mut Option<Range<u32>> {
-        match stage {
-            ShaderStage::Comp => &mut self.comp,
-            ShaderStage::Task => &mut self.task,
-            ShaderStage::Mesh => &mut self.mesh,
-            ShaderStage::Vert => &mut self.vert,
-            ShaderStage::Frag => &mut self.frag,
-        }
-    }
-
-    fn range_for_stage(&self, stage: ShaderStage) -> &Option<Range<u32>> {
-        match stage {
-            ShaderStage::Comp => &self.comp,
-            ShaderStage::Task => &self.task,
-            ShaderStage::Mesh => &self.mesh,
-            ShaderStage::Vert => &self.vert,
-            ShaderStage::Frag => &self.frag,
-        }
-    }
-
-    fn stages_with_some(&self) -> StageMask {
-        ShaderStage::all()
-            .into_iter()
-            .filter(|stage| self.range_for_stage(*stage).is_some())
-            .fold(StageMask::empty(), |mask, stage| mask | stage.into())
-    }
-}
-
 impl WipPushConstantsField {
     pub(crate) fn new(
         ty: SizedType,
@@ -326,64 +288,17 @@ impl WipPushConstantsField {
         }
     }
 
-    #[rustfmt::skip]
-    fn extend_range(src_range: &mut Option<Range<u32>>, extend_by: Range<u32>) {
-        let range = src_range.get_or_insert(extend_by.clone());
-        range.start = range.start.min(extend_by.start);
-        range.end   = range.end  .max(extend_by.end  );
-    }
-
     /// returns a pair of `Ok((extract_ranges_per_stage, byte_size))` where
     /// `byte_size` is the size of the struct of all push constant fields.
     pub(crate) fn extract_ranges_per_stage(
         allowed_stages: StageMask,
         fields: &[WipPushConstantsField],
         nodes: &PoolRef<Node>,
-    ) -> Result<(ByteRangesPerStage, u64), InternalError> {
-        let sized_struct = match fields {
-            [] => return Ok((ByteRangesPerStage::default(), 0)),
-            fields => Self::fields_as_sized_struct(fields),
-        };
-
-        // TODO(chronicl)
-        let (byte_size, _) = sized_struct.byte_size_and_align();
-
-        // TODO(release) the `.expect()` calls here can be removed by building a `std::alloc::Layout`-like builder for struct layouts.
-        let sized_struct: ir::SizedStruct = sized_struct
-            .try_into()
-            .map_err(|e| InternalError::new(true, format!("{e}")))?;
-        let layout = sized_struct.layout();
-
-        let mut ranges = ByteRangesPerStage::default();
-
-        for (field, node) in layout.fields.iter().zip(fields.iter().map(|f| f.node)) {
-            let stages = nodes[node].stages.must_appear_in();
-            let field_size = field.ty.byte_size().expect("SizedStruct type enforces Some(size)");
-            let start = field.rel_byte_offset;
-            let end = start + field_size;
-
-            let start = u32::try_from(start)
-                .map_err(|e| InternalError::new(true, format!("push constant field start {start} out of u32 range")))?;
-            let end = u32::try_from(end)
-                .map_err(|e| InternalError::new(true, format!("push constant field start {end} out of u32 range")))?;
-
-            for stage in stages {
-                Self::extend_range(ranges.range_for_stage_mut(stage), start..end);
-            }
+    ) -> u64 {
+        match fields {
+            [] => 0,
+            fields => Self::fields_as_sized_struct(fields).byte_size_and_align().0,
         }
-
-        let disallowed_stages = StageMask::all() & !allowed_stages;
-        let occured_stages = ranges.stages_with_some();
-        if (occured_stages & disallowed_stages) != StageMask::empty() {
-            return Err(InternalError::new(
-                true,
-                format!(
-                    "disallowed stage in inferred `push constant` ranges for pipeline.\nallowed stages: {allowed_stages},\noccured stages: {occured_stages}"
-                ),
-            ));
-        }
-
-        Ok((ranges, byte_size))
     }
 
     fn fields_as_sized_struct(fields: &[WipPushConstantsField]) -> SizedStruct {

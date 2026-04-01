@@ -420,13 +420,12 @@ impl Context {
             dict
         };
 
-        let (push_constant_ranges, push_constants_byte_size) = {
+        let push_constants_byte_size = {
             WipPushConstantsField::extract_ranges_per_stage(
                 StageMask::pipeline(pipeline_kind),
                 &pipeline_layout.push_constants,
                 &self.pool(),
             )
-            .map_err(|err| into_err(call_info, err.into()))?
         };
 
         macro_rules! get_late_recorded {
@@ -461,8 +460,8 @@ impl Context {
                             .collect(),
                         bind_groups,
                         push_constants: RenderPipelinePushConstantRanges {
-                            vert: push_constant_ranges.vert.filter(|r| !r.is_empty()),
-                            frag: push_constant_ranges.frag.filter(|r| !r.is_empty()),
+                            vert: (push_constants_byte_size > 0).then(|| 0..push_constants_byte_size as u32),
+                            frag: (push_constants_byte_size > 0).then(|| 0..push_constants_byte_size as u32),
                             push_constants_byte_size,
                         },
                         rasterizer: RasterizerState {
@@ -520,7 +519,7 @@ impl Context {
                             expected_threads_per_wave: compute.expected_threads_per_wave,
                         },
                         bind_groups,
-                        push_constant_range: push_constant_ranges.comp,
+                        push_constant_range: (push_constants_byte_size > 0).then(|| 0..push_constants_byte_size as u32),
                     },
                 })
             }
