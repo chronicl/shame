@@ -12,6 +12,7 @@ use crate::{
     Len, ScalarTypeNumber, SizedFields, ToGpuType, call_info,
     frontend::{any::Any, rust_types::vec::vec},
     ir::{self, StoreType, Type, recording::Context},
+    x1,
 };
 use std::borrow::Borrow;
 
@@ -216,6 +217,11 @@ where
     /// (no documentation yet)
     #[track_caller]
     pub fn at(&self, index: impl ToInteger) -> Ref<T, AS, AM> { self.as_any().array_index(index.to_any()).into() }
+}
+
+impl<T: GpuStore + GpuSized + GpuType + 'static, AS: AddressSpace, AM: AccessMode> Ref<Array<T>, AS, AM> {
+    /// (no documentation yet)
+    pub fn len(&self) -> vec<u32, x1> { self.any.address().array_length().into() }
 }
 
 impl<T, AM> Ref<T, mem::WorkGroup, AM>
