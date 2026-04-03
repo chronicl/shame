@@ -357,8 +357,11 @@ where
     }
 }
 
+/// (no documentation yet)
 pub trait StructField {
+    /// (no documentation yet)
     type StructDerefTarget<T: GpuStore, AS: BufferAddressSpace>;
+    /// (no documentation yet)
     fn struct_ref_to_deref_target<T, AS>(r: Ref<T, AS, Read>) -> Self::StructDerefTarget<T, AS>
     where
         T: GpuStore + BufferFields + GetAllFields + FromAnys,

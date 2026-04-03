@@ -32,6 +32,7 @@ pub use crate::frontend::rust_types::type_traits::NoBools;
 pub use crate::frontend::rust_types::type_traits::NoHandles;
 pub use crate::frontend::rust_types::type_traits::VertexAttribute;
 pub use crate::frontend::rust_types::type_traits::GpuLayoutField;
+pub use crate::frontend::encoding::buffer::StructField;
 pub use crate::ir::StructKind;
 pub use crate::ir::SizedStruct;
 pub use crate::ir::RuntimeSizedArray;

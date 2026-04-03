@@ -73,10 +73,14 @@ impl<const N: usize> ArrayLen for Size<N> {
 // | `[T; N]` | `shame::Array<T, shame::Size<N>>` | yes
 // |          |                                   |
 /// (no documentation yet)
-#[derive(Clone, Copy)]
 pub struct Array<T, N = RuntimeSize> {
     any: Any,
     phantom: PhantomData<(T, N)>,
+}
+
+impl<T, N> Copy for Array<T, N> {}
+impl<T, N> Clone for Array<T, N> {
+    fn clone(&self) -> Self { *self }
 }
 
 impl<T: GpuType + GpuStore + GpuSized, N: ArrayLen> GpuType for Array<T, N> {

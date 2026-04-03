@@ -160,6 +160,7 @@ pub enum BindingError {
     NonRefBufferRequiresReadOnlyAndConstructible,
 }
 
+#[track_caller]
 fn record_and_register_binding(
     ctx: &Context,
     path: BindPath,
