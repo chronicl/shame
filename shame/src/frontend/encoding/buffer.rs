@@ -431,7 +431,7 @@ where
     fn new_invalid(reason: InvalidReason) -> Self { Self::new_invalid(reason) }
     #[track_caller]
     fn new_binding(args: BindingArgs) -> Self { Self::new(args) }
-    fn store_ty() -> ir::StoreType { T::impl_category().to_store_ty() }
+    fn store_ty() -> ir::StoreType { <T as GpuStore>::store_ty() }
 }
 
 #[diagnostic::on_unimplemented(message = "atomics can only be used in read-write storage buffers`.")]

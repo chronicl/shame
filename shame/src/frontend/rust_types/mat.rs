@@ -97,8 +97,6 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> AsAny for mat<T, C, R> {
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuStore for mat<T, C, R> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
     fn store_ty() -> ir::StoreType { <Self as GpuSized>::sized_ty().into() }
-
-    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> ToGpuType for mat<T, C, R> {

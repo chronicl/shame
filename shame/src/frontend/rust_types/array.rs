@@ -105,8 +105,6 @@ impl<const N: usize> Size<N> {
 impl<T: GpuType + GpuSized + GpuStore, N: ArrayLen> GpuStore for Array<T, N> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
     fn store_ty() -> ir::StoreType { Self::array_store_ty() }
-
-    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
 }
 
 impl<T: GpuType + GpuSized, const N: usize> GpuSized for Array<T, Size<N>> {
@@ -274,7 +272,7 @@ impl<T: GpuType + GpuStore + GpuSized + NoAtomics, const N: usize> Array<T, Size
     pub fn map<R>(self, f: impl FnOnce(T) -> R + FlowFn) -> Array<R, Size<N>>
     where
         T: 'static,
-        R: GpuType + GpuStore + GpuSized + NoAtomics + 'static,
+        R: GpuType + GpuStore + GpuSized + NoAtomics + ToGpuType<Gpu = R> + 'static,
     {
         let result = Array::<R, _>::zero().cell();
         for_range_impl(0..N as u32, move |i| {

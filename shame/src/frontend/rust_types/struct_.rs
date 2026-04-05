@@ -85,8 +85,6 @@ impl<T: SizedFields + GpuStore + Copy> std::marker::Copy for Struct<T> {}
 impl<T: SizedFields + GpuStore> GpuStore for Struct<T> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = T::RefFields<AS, AM>;
     fn store_ty() -> ir::StoreType { <Self as GpuSized>::sized_ty().into() }
-
-    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
 }
 
 impl<T: SizedFields + GpuStore> GpuSized for Struct<T> {

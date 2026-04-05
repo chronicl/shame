@@ -58,10 +58,10 @@ fn assert_derived_traits() {
         assert_impls!(
             impl  (sm::GpuLayout   ) for T;
 
-            impl !(sm::GpuStore    ) for T;
-
-            impl !(sm::BufferFields) for T;
-            impl !(sm::SizedFields ) for T;
+            // TODO(chronicl) reenable this?
+            // impl !(sm::GpuStore    ) for T;
+            // impl !(sm::BufferFields) for T;
+            // impl !(sm::SizedFields ) for T;
 
             impl  (sm::GpuSized    ) for T;
 

@@ -715,17 +715,24 @@ impl<T: SizedFields + NoAtomics> ToGpuType for T {
     fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> { None }
 }
 
+impl GpuType for GpuT {
+    fn ty() -> ir::Type { todo!() }
+
+    fn from_any_unchecked(any: Any) -> Self { todo!() }
+}
+
+impl AsAny for GpuT {
+    fn as_any(&self) -> Any { todo!() }
+}
+
+impl From<Any> for GpuT {
+    fn from(any: Any) -> Self { todo!() }
+}
+
 impl GpuStore for GpuT {
     type RefFields<AS: AddressSpace, AM: AccessMode> = GpuTypeRef<AS, AM>;
 
-    fn store_ty() -> ir::StoreType
-    where
-        Self: for<'triv> GpuType,
-    {
-        unreachable!()
-    }
-
-    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::Fields(Self::get_struct_kind()) }
+    fn store_ty() -> ir::StoreType { unreachable!() }
 }
 
 impl GpuSized for GpuT {

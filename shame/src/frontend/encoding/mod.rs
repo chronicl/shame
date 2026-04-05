@@ -12,6 +12,7 @@ use crate::{
         rust_types::layout_traits::CpuLayoutCompareError,
     },
     ir::{
+        LayoutType,
         ir_type::StructDefinitionError,
         pipeline::{PipelineError, PipelineKind, StageSolverErrorKind},
         recording::{
@@ -290,6 +291,8 @@ pub enum EncodingErrorKind {
     LayoutError(#[from] CpuLayoutImplMismatch),
     #[error("{0}")]
     StructDefinitionError(#[from] StructDefinitionError),
+    #[error("Unexpected type for struct construction: {0}. Expected a sized struct type.")]
+    UnexpectedTypeForStructConstruction(LayoutType),
     #[error("`shame::any::Any` instance is not available. reason: {0}")]
     ValueUnavailable(InvalidReason),
     #[error("{0}")]

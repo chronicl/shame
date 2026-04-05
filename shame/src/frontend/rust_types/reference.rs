@@ -165,7 +165,7 @@ where
     AM: AccessMode,
 {
     #[track_caller]
-    fn from(any: Any) -> Self { ref_from_any_and_store_type(any, T::impl_category().to_store_ty()) }
+    fn from(any: Any) -> Self { ref_from_any_and_store_type(any, <T as GpuStore>::store_ty()) }
 }
 
 fn ref_from_any_and_store_type<T, AS, AM>(any: Any, expected_store_ty: StoreType) -> Ref<T, AS, AM>

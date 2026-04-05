@@ -537,8 +537,6 @@ impl<T: ScalarType, L: Len> GpuSized for vec<T, L> {
 impl<T: ScalarType, L: Len> GpuStore for vec<T, L> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = L::VecComponentsRef<T, AS, AM>;
     fn store_ty() -> ir::StoreType { <Self as GpuSized>::sized_ty().into() }
-
-    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
 }
 
 impl<T: ScalarType, L: Len> GpuLayout for vec<T, L>

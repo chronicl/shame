@@ -208,6 +208,21 @@ impl Any {
             _ => None,
         }
     }
+
+    #[doc(hidden)]
+    pub fn get_struct_parent(self) -> Option<Any> {
+        let key = self.node.ok()?;
+        Context::try_with(call_info!(), |ctx| {
+            let node = &ctx.pool()[key];
+            match &node.expr {
+                expr::Expr::Decomposition(expr::Decomposition::StructureAccess(_)) => {
+                    node.args.first().copied().map(|k| Any::from_parts(Ok(k)))
+                }
+                _ => None,
+            }
+        })
+        .flatten()
+    }
 }
 
 /// an argument of an expression is not a valid [`Any`] object

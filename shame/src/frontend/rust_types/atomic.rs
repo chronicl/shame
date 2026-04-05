@@ -67,8 +67,6 @@ impl<T: ScalarTypeInteger> GpuSized for Atomic<T> {
 impl<T: ScalarTypeInteger> GpuStore for Atomic<T> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
     fn store_ty() -> ir::StoreType { <Self as GpuSized>::sized_ty().into() }
-
-    fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
 }
 
 impl<T: ScalarTypeInteger> NoBools for Atomic<T> {}

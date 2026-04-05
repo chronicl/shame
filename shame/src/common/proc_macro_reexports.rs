@@ -45,6 +45,11 @@ pub use crate::ir::type_layout::FieldLayout;
 pub use crate::ir::type_layout::StructLayout;
 pub use crate::frontend::rust_types::AsAny;
 pub use crate::frontend::rust_types::GpuType;
+pub use crate::frontend::rust_types::ToGpuType;
+pub use crate::frontend::rust_types::typecheck_downcast;
+pub use crate::any::Context;
+pub use crate::EncodingErrorKind;
+
 #[allow(missing_docs)]
 pub mod ir {
     pub use crate::ir::*;

@@ -49,7 +49,7 @@ pub mod vec_range_traits;
 //[old-doc] - `StorageTexture<…>`
 /// (no documentation yet)
 ///
-pub trait GpuType: ToGpuType<Gpu = Self> + From<Any> + AsAny + Clone {
+pub trait GpuType: From<Any> + AsAny {
     /// (no documentation yet)
     #[doc(hidden)] // returns a type from the `any` api
     fn ty() -> ir::Type;
@@ -69,8 +69,9 @@ pub trait AsAny {
     fn as_any(&self) -> Any;
 }
 
+/// (no documentation yet)
 #[track_caller]
-pub(crate) fn typecheck_downcast<T>(any: Any, expected_ty: Type, from_any_unchecked: impl Fn(Any) -> T) -> T {
+pub fn typecheck_downcast<T>(any: Any, expected_ty: Type, from_any_unchecked: impl Fn(Any) -> T) -> T {
     let call_info = call_info!();
     match any.ty() {
         Some(dynamic_type) => match dynamic_type == expected_ty {

@@ -57,7 +57,7 @@ pub struct BindingArgs {
 //[old-doc]
 //[old-doc] corresponds to WGSL "Storable type" https://www.w3.org/TR/WGSL/#storable-types
 /// (no documentation yet)
-pub trait GpuStore: GetAllFields + FromAnys {
+pub trait GpuStore: GpuType + GetAllFields + FromAnys {
     /// the type whose public immutable interface is exposed by [`shame::Ref<Self>`]:
     ///
     /// `<shame::Ref<Self, _, _> as std::ops::Deref>::Target`
@@ -93,23 +93,15 @@ pub trait GpuStore: GetAllFields + FromAnys {
     type RefFields<AS: AddressSpace, AM: AccessMode>: FromAnys + Copy;
 
     #[doc(hidden)] // runtime api
-    fn store_ty() -> ir::StoreType
-    where
-        Self: GpuType;
+    fn store_ty() -> ir::StoreType;
 
     #[doc(hidden)] // unstable
     #[track_caller]
     /// forces `self` to appear in the generated shader code. No dead code elimination can remove it.
-    fn show(&self) -> &Self
-    where
-        Self: GpuType,
-    {
+    fn show(&self) -> &Self {
         self.as_any().show();
         self
     }
-
-    #[doc(hidden)] // proc macro detail
-    fn impl_category() -> GpuStoreImplCategory;
 }
 
 #[doc(hidden)] // proc macro detail
