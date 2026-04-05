@@ -739,7 +739,7 @@ mod tests {
     fn test_struct_in_struct_mismatch() {
         let _guard = enable_color();
 
-        #[derive(GpuLayout)]
+        #[derive(GpuLayout, Clone)]
         pub struct Inner {
             x: f32x1,
             y: f32x1,
@@ -747,7 +747,7 @@ mod tests {
 
         #[derive(GpuLayout)]
         pub struct Outer {
-            inner: sm::Struct<Inner>,
+            inner: Inner,
             z: u32x1,
         }
 

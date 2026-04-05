@@ -21,7 +21,7 @@ pub trait AsBindingResource: sm::Binding {
 
 impl<T, AS, AM, const DYNAMIC_OFFSET: bool> AsBindingResource for sm::Buffer<T, AS, AM, DYNAMIC_OFFSET>
 where
-    T: sm::BufferContent<AS, AM> + sm::GpuStore + sm::NoHandles + sm::NoBools,
+    T: sm::GpuStore + sm::NoHandles + sm::NoBools,
     AS: sm::BufferAddressSpace,
     AM: sm::AccessModeReadable,
     Self: sm::Binding,
@@ -36,7 +36,7 @@ where
 impl<T, AS, AM, L, const DYNAMIC_OFFSET: bool> AsBindingResource
     for sm::BindingArray<sm::Buffer<T, AS, AM, DYNAMIC_OFFSET>, L>
 where
-    T: sm::BufferContent<AS, AM> + sm::GpuStore + sm::NoHandles + sm::NoBools,
+    T: sm::GpuStore + sm::NoHandles + sm::NoBools,
     AS: sm::BufferAddressSpace,
     AM: sm::AccessModeReadable,
     L: sm::ArrayLen,

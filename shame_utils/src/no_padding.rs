@@ -1,7 +1,7 @@
 use any::Repr;
 use shame::{
     any::{self},
-    ArrayLen, GpuSized, GpuType, Len, Len2, NoBools, ScalarType, ScalarTypeFp, ScalarTypeInteger, SizedFields,
+    ArrayLen, GpuSized, GpuType, Len, Len2, NoBools, ScalarType, ScalarTypeFp, ScalarTypeInteger,
 };
 
 use crate::{const_len, const_write, StrBuf, ToStr};
@@ -108,10 +108,6 @@ impl<T: GpuType + GpuSized + NoPadding, N: ArrayLen> NoPadding for shame::Array<
         };
         Layout::from_align_size(T::LAYOUT.align, size)
     };
-}
-
-impl<T: SizedFields + NoPadding> NoPadding for shame::Struct<T> {
-    const LAYOUT: Layout = T::LAYOUT;
 }
 
 pub const fn padding_to_padding_field_count<const N: usize>() -> usize {

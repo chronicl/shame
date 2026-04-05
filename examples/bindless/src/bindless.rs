@@ -60,7 +60,7 @@ impl BindlessExample {
         let mut group = fullscreen.bind_groups.next();
         let bindings = Bindless2::from(group);
 
-        let (is_tex, tex_index, tex_uv) = bindings.texture_grid.texture_index_from_uv(fullscreen.uv);
+        let (is_tex, tex_index, tex_uv) = bindings.texture_grid.get().texture_index_from_uv(fullscreen.uv);
 
         // If the fragment is within the bounds of a texture, sample it.
         // The texture index is remapped by tex_indices.
@@ -68,7 +68,7 @@ impl BindlessExample {
 
         if is_tex {
             let tex_index = *bindings.tex_indices.at(tex_index);
-            let texture = bindings.textures.at(tex_index);
+            let texture = bindings.textures.at(tex_index.get());
             let sample = bindings.sampler.sample(texture, MipFn::zero(), tex_uv);
             color.set(sample);
         }

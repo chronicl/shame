@@ -221,9 +221,6 @@ pub use aliases::*;
 // `mat`
 pub use frontend::rust_types::mat::mat;
 
-// `Struct`
-pub use frontend::rust_types::struct_::Struct;
-
 // `Array`
 pub use frontend::rust_types::array::Array;
 pub use frontend::rust_types::array::ArrayLen;
@@ -274,7 +271,6 @@ pub use frontend::encoding::binding::TextureHandle;
 
 // Buffer
 pub use frontend::encoding::buffer::Buffer;
-pub use frontend::encoding::buffer::BufferContent;
 pub use frontend::encoding::buffer::BufferAddressSpace;
 pub use frontend::encoding::buffer::BufferAddressSpaceEnum;
 
@@ -340,7 +336,6 @@ pub use frontend::rust_types::type_traits::GpuStore;
 pub use frontend::rust_types::type_traits::GpuSized;
 
 pub use frontend::rust_types::struct_::BufferFields;
-pub use frontend::rust_types::struct_::SizedFields;
 
 pub use frontend::rust_types::type_traits::NoBools;
 pub use frontend::rust_types::type_traits::NoAtomics;

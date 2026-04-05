@@ -1,4 +1,4 @@
-use shame::{aliases::*, Array, GpuSized, GpuType, SizedFields, Struct};
+use shame::{aliases::*, Array, GpuSized, GpuType};
 
 use crate::NoPadding;
 
@@ -42,8 +42,4 @@ impl<T: GpuType + GpuSized + NoPadding + ToGlam, const N: usize> ToGlam for Arra
 
 impl<T: GpuType + GpuSized + NoPadding + ToGlam> ToGlam for Array<T> {
     type GlamType = Vec<T::GlamType>;
-}
-
-impl<T: SizedFields + NoPadding + ToGlam> ToGlam for Struct<T> {
-    type GlamType = T::GlamType;
 }

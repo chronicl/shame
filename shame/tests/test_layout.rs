@@ -386,7 +386,7 @@ fn unsized_struct_nested_vec3_align_layout_eq() {
     struct OnGpu {
         a: f32x1,
         b: u32x1,
-        c: sm::Array<sm::Struct<InnerGpu>>,
+        c: sm::Array<InnerGpu>,
     }
 
     #[derive(sm::CpuLayout)]
@@ -570,7 +570,7 @@ fn test_set_align_size() {
         gpu_layout::<f32x4>(),
         gpu_layout::<f32x4x4>(),
         gpu_layout::<sm::Array<f32x3>>(),
-        gpu_layout::<sm::Struct<OnGpu>>(),
+        gpu_layout::<OnGpu>(),
     ];
 
     for (i, lay) in layouts.iter_mut().enumerate() {

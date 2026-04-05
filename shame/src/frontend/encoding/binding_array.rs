@@ -2,8 +2,8 @@
 use std::rc::Rc;
 
 use crate::{
-    AccessModeReadable, ArrayLen, Binding, Buffer, BufferAddressSpace, BufferContent, GpuIndex, GpuLayout, GpuStore,
-    NoBools, NoHandles, RuntimeSize,
+    AccessModeReadable, ArrayLen, Binding, Buffer, BufferAddressSpace, GpuIndex, GpuLayout, GpuStore, NoBools,
+    NoHandles, RuntimeSize,
     any::{Any, BindingType},
     call_info,
     common::proc_macro_reexports::BindingArgs,
@@ -45,7 +45,7 @@ impl<T, L> BindingArray<T, L> {
 
 impl<T, L, AS, AM, const DO: bool> Binding for BindingArray<Buffer<T, AS, AM, DO>, L>
 where
-    T: BufferContent<AS, AM> + GpuStore + GpuLayout + NoHandles + NoBools,
+    T: GpuStore + GpuLayout + NoHandles + NoBools,
     Buffer<T, AS, AM, DO>: Binding,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
@@ -132,7 +132,7 @@ where
 
 impl<T, AS, AM, L, const DO: bool> BindingArray<Buffer<T, AS, AM, DO>, L>
 where
-    T: BufferContent<AS, AM> + GpuStore + GpuLayout + NoHandles + NoBools,
+    T: GpuStore + GpuLayout + NoHandles + NoBools,
     Buffer<T, AS, AM, DO>: Binding,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
@@ -150,7 +150,7 @@ where
 
 impl<Idx: ToInteger, T, AS, AM, L, const DO: bool> GpuIndex<Idx> for BindingArray<Buffer<T, AS, AM, DO>, L>
 where
-    T: BufferContent<AS, AM> + GpuStore + GpuLayout + NoHandles + NoBools,
+    T: GpuStore + GpuLayout + NoHandles + NoBools,
     Buffer<T, AS, AM, DO>: Binding,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,

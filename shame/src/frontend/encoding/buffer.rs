@@ -20,7 +20,7 @@ use crate::{
             packed_vec::PackedScalarType,
             reference::{AccessModeReadable, Read, ReadWrite, Ref},
             scalar_type::{ScalarType, ScalarTypeFp, ScalarTypeInteger},
-            struct_::{BufferFields, SizedFields, Struct},
+            struct_::{BufferFields},
             type_traits::{BindingArgs, GpuSized, GpuStore, NoAtomics, NoBools, NoHandles},
             vec::vec,
         },
@@ -171,27 +171,27 @@ impl std::fmt::Display for BufferAddressSpaceEnum {
 /// > the precise trait bounds of buffer bindings are found in the `Binding` impl blocks.
 pub struct Buffer<T, AS = mem::Storage, AM = Read, const DYNAMIC_OFFSET: bool = false>
 where
-    T: BufferContent<AS, AM> + NoBools + NoHandles,
+    T: GpuStore + NoBools + NoHandles,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
 {
-    content: T::DerefTarget,
+    content: Ref<T, AS, AM>,
     _phantom: PhantomData<(T, AS, AM)>,
 }
 
 impl<T, AS, AM, const DYNAMIC_OFFSET: bool> Deref for Buffer<T, AS, AM, DYNAMIC_OFFSET>
 where
-    T: BufferContent<AS, AM> + NoBools + NoHandles,
+    T: GpuStore + NoBools + NoHandles,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
 {
-    type Target = T::DerefTarget;
+    type Target = Ref<T, AS, AM>;
     fn deref(&self) -> &Self::Target { &self.content }
 }
 
 impl<T, AS, AM, const DYNAMIC_OFFSET: bool> Buffer<T, AS, AM, DYNAMIC_OFFSET>
 where
-    T: BufferContent<AS, AM> + NoBools + NoHandles,
+    T: GpuStore + NoBools + NoHandles,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
 {
@@ -207,7 +207,7 @@ where
     /// TODO(chronicl)
     pub fn from_ref(r: Ref<T, AS, AM>) -> Self {
         Self {
-            content: T::ref_to_deref_target(r),
+            content: r,
             _phantom: PhantomData,
         }
     }
@@ -285,134 +285,9 @@ pub fn create_ref_any_for_buffer_binding(
     .unwrap_or_else(|| Any::new_invalid(InvalidReason::CreatedWithNoActiveEncoding))
 }
 
-
-
-/// TODO(chronicl)
-pub trait BufferContent<AS: BufferAddressSpace, AM: AccessModeReadable>: GpuStore + Sized {
-    /// TODO(chronicl)
-    type DerefTarget;
-    /// TODO(chronicl)
-    fn ref_to_deref_target(r: Ref<Self, AS, AM>) -> Self::DerefTarget;
-}
-
-// Read-write buffers are simple, their deref target is always Ref<T>
-impl<T: GpuStore, AS: BufferAddressSpace> BufferContent<AS, ReadWrite> for T {
-    type DerefTarget = Ref<Self, AS, ReadWrite>;
-    fn ref_to_deref_target(r: Ref<Self, AS, ReadWrite>) -> Self::DerefTarget { r }
-}
-
-// Construcible types T can be dereferenced to themselves from Buffer<T, Read>.
-// This is simple to implement for all constructible T that aren't structs.
-macro_rules! default_buffer_content_read {
-    () => {
-        type DerefTarget = Self;
-        fn ref_to_deref_target(r: Ref<Self, AS, Read>) -> Self::DerefTarget {
-            r.get()
-        }
-    };
-}
-impl<T: ScalarTypeFp, C: Len2, R: Len2, AS: BufferAddressSpace> BufferContent<AS, Read> for mat<T, C, R> {
-    default_buffer_content_read!();
-}
-impl<T: ScalarType, L: Len, AS: BufferAddressSpace> BufferContent<AS, Read> for vec<T, L> {
-    default_buffer_content_read!();
-}
-impl<T: GpuType + SizedFields + NoAtomics, AS: BufferAddressSpace> BufferContent<AS, Read> for Struct<T> {
-    default_buffer_content_read!();
-}
-impl<T: GpuStore + GpuType + GpuSized + NoAtomics, const N: usize, AS: BufferAddressSpace> BufferContent<AS, Read>
-    for Array<T, Size<N>>
-{
-    default_buffer_content_read!();
-}
-
-// Array<T> is not constructible, because it's unsized, so we can only deref to Ref<Array<T>>
-impl<T: GpuType + GpuSized + GpuStore + NoAtomics + 'static, AS: BufferAddressSpace + 'static> BufferContent<AS, Read>
-    for Array<T>
-{
-    type DerefTarget = ArrayRef<T, AS, Read>;
-    fn ref_to_deref_target(r: Ref<Self, AS, Read>) -> Self::DerefTarget { ArrayRef::new(r) }
-}
-
-// Sized structs T should allow to deref Buffer<T, Read> to T, but
-// unsized structs T must deref to Ref<T, AS, Read>, because they aren't constructible.
-//
-// Wether a struct is sized is determined by it's last field, so we implement a
-// StructField trait for all types that can be used as struct fields and by
-// accessing the type of the last field of the struct we can use StructField
-// to determine whether Buffer<T, Read> should deref to T or Ref<T, AS, Read>.
-//
-// Note, that currently being constructible means to not be unsized nor contain
-// an atomic type. Since Buffer<T, Read> can't contain atomics, we only need
-// to handle unsizedness for structs here.
-// impl for structs not wrapped in `shame::Struct`
-impl<T, AS> BufferContent<AS, Read> for T
-where
-    T: GpuStore + BufferFields + NoAtomics,
-    AS: BufferAddressSpace,
-{
-    type DerefTarget = <T::LastField as StructField>::StructDerefTarget<T, AS>;
-    fn ref_to_deref_target(r: Ref<Self, AS, Read>) -> Self::DerefTarget {
-        <T::LastField as StructField>::struct_ref_to_deref_target(r)
-    }
-}
-
-/// (no documentation yet)
-pub trait StructField {
-    /// (no documentation yet)
-    type StructDerefTarget<T: GpuStore, AS: BufferAddressSpace>;
-    /// (no documentation yet)
-    fn struct_ref_to_deref_target<T, AS>(r: Ref<T, AS, Read>) -> Self::StructDerefTarget<T, AS>
-    where
-        T: GpuStore + BufferFields + GetAllFields + FromAnys,
-        AS: BufferAddressSpace;
-}
-
-macro_rules! default_struct_field {
-    () => {
-        type StructDerefTarget<T_: GpuStore, AS: BufferAddressSpace> = T_;
-        fn struct_ref_to_deref_target<T_, AS>(r: Ref<T_, AS, Read>) -> Self::StructDerefTarget<T_, AS>
-        where
-            T_: GpuStore + BufferFields + GetAllFields + FromAnys,
-            AS: BufferAddressSpace,
-        {
-            let field_anys_refs = <T_ as GetAllFields>::fields_as_anys_unchecked(r.as_any());
-            FromAnys::from_anys((field_anys_refs.borrow() as &[Any]).iter().map(|a| a.ref_load()))
-        }
-    };
-}
-impl<T: ScalarType, L: Len> StructField for vec<T, L> {
-    default_struct_field!();
-}
-impl<T: ScalarTypeFp, C: Len2, R: Len2> StructField for mat<T, C, R> {
-    default_struct_field!();
-}
-impl<T: SizedFields> StructField for Struct<T> {
-    default_struct_field!();
-}
-impl<T: ScalarTypeInteger> StructField for Atomic<T> {
-    default_struct_field!();
-}
-impl<T: PackedScalarType, L: LenEven> StructField for PackedVec<T, L> {
-    default_struct_field!();
-}
-impl<T: GpuType + GpuSized, const N: usize> StructField for Array<T, Size<N>> {
-    default_struct_field!();
-}
-impl<T: GpuType + GpuSized> StructField for Array<T, RuntimeSize> {
-    type StructDerefTarget<T_: GpuStore, AS: BufferAddressSpace> = Ref<T_, AS, Read>;
-    fn struct_ref_to_deref_target<T_, AS>(r: Ref<T_, AS, Read>) -> Self::StructDerefTarget<T_, AS>
-    where
-        T_: GpuStore + BufferFields + GetAllFields + FromAnys,
-        AS: BufferAddressSpace,
-    {
-        r
-    }
-}
-
 impl<T, AS, AM, const DYNAMIC_OFFSET: bool> Binding for Buffer<T, AS, AM, DYNAMIC_OFFSET>
 where
-    T: BufferContent<AS, AM> + GpuLayout + GpuStore + NoBools + NoHandles,
+    T: GpuLayout + GpuStore + NoBools + NoHandles,
     AS: BufferAddressSpace + SupportsAccess<AM>,
     AM: AccessModeReadable,
     (AS, T): AtomicsInStorageOnly,
@@ -461,13 +336,13 @@ mod tests {
         let mut drawcall = encoder.new_render_pipeline(sm::Indexing::BufferU16);
         let mut group = drawcall.bind_groups.next();
 
-        let f: f32x1 = *group.next::<Buffer<f32x1>>();
+        let f: Ref<f32x1, _, _> = *group.next::<Buffer<f32x1>>();
 
         #[derive(GpuLayout)]
         struct A {
             a: f32x4x4,
         }
-        let a: &A = &group.next::<Buffer<A>>();
+        let a: &A = &group.next::<Buffer<A>>().get();
         let a: &Ref<A, Storage, ReadWrite> = &group.next::<Buffer<A, Storage, ReadWrite>>();
 
         #[derive(GpuLayout)]
@@ -478,12 +353,12 @@ mod tests {
         let a_unsized: &Ref<AUnsized, Storage, Read> = &group.next::<Buffer<AUnsized>>();
         let a_unsized: &Ref<AUnsized, Storage, ReadWrite> = &group.next::<Buffer<AUnsized, Storage, ReadWrite>>();
 
-        let array: &Array<f32x1, sm::Size<4>> = &group.next::<Buffer<Array<f32x1, sm::Size<4>>>>();
+        let array: Array<f32x1, sm::Size<4>> = group.next::<Buffer<Array<f32x1, sm::Size<4>>>>().get();
         let array: &Ref<Array<f32x1, sm::Size<4>>, Storage, ReadWrite> =
             &group.next::<Buffer<Array<f32x1, sm::Size<4>>, Storage, ReadWrite>>();
 
-        let unsized_array: &ArrayRef<f32x1, Storage, Read> = &group.next::<Buffer<Array<f32x1>>>();
-        let f: f32x1 = group.next::<Buffer<Array<f32x1>>>().at(0);
+        let unsized_array: Ref<Array<f32x1>, Storage, Read> = *group.next::<Buffer<Array<f32x1>>>();
+        let f: f32x1 = group.next::<Buffer<Array<f32x1>>>().at(0).get();
         let unsized_array: &Ref<Array<f32x1>, Storage, ReadWrite> =
             &group.next::<Buffer<Array<f32x1>, Storage, ReadWrite>>();
         let f: Ref<f32x1, Storage, ReadWrite> = group.next::<Buffer<Array<f32x1>, Storage, ReadWrite>>().at(0);

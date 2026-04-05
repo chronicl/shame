@@ -1,5 +1,5 @@
 #![allow(dead_code, unused)]
-use shame::{aliases::*, Array, GpuLayout, Size, Struct};
+use shame::{aliases::*, Array, GpuLayout, Size};
 use shame_utils::{Layout, NoPadding, ToGlam, gpu_code};
 use bytemuck::{Pod, Zeroable};
 
@@ -41,7 +41,7 @@ struct Unsized {
 #[rustfmt::skip]
 struct A {
     a: f32x3,      _0: f32x1,
-    b: Struct<B>,
+    b: B,
 }
 
 #[derive(GpuLayout, NoPadding, ToGlam, Clone, Copy)]

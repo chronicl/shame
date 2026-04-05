@@ -87,7 +87,7 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     let xforms_uni: sm::Buffer<Transforms, sm::mem::Uniform> = group0.next();
     let ts: sm::BindingArray<sm::Buffer<f32x4x4>> = group0.next();
     let ts: sm::BindingArray<sm::Buffer<f32x1>> = group0.next();
-    let t = ts.at(0);
+    let t = ts.at(0).get();
 
     let textures: sm::BindingArray<sm::Texture<sm::tf::Rgba8Unorm>> = group0.next();
     let texture = textures.at(0);
@@ -100,7 +100,7 @@ fn make_pipeline(some_param: u32) -> Result<sm::results::RenderPipeline, sm::Enc
     }
 
     // result types of matrix multiplications are inferred
-    let xform = t * xforms_sto.view * xforms_sto.world;
+    let xform = t * xforms_sto.view * xforms_sto.world.get();
 
     // here are some examples of how vector and matrix types behave
     let my_vec3 = sm::vec!(1.0, 2.0, 3.0);
@@ -453,7 +453,7 @@ fn make_compute_pipeline(side_len: u32) -> Result<sm::results::ComputePipeline, 
     wg_atomic_u32.store(4u32);
     let before = wg_atomic_u32.fetch_add(1u32);
 
-    let wg_data = sm::mem::workgroup_local::<sm::Struct<DataWithAtomics>>();
+    let wg_data = sm::mem::workgroup_local::<DataWithAtomics>();
     wg_data.b.store(1u32);
 
     // rusts `if/while/for` means conditional code generation and loop-unrolling,

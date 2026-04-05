@@ -9,7 +9,7 @@ use super::{
     AsAny, GpuType, To,
 };
 use crate::{
-    Len, ScalarTypeNumber, SizedFields, ToGpuType, call_info,
+    Len, ScalarTypeNumber, ToGpuType, call_info,
     frontend::{any::Any, rust_types::vec::vec},
     ir::{self, StoreType, Type, recording::Context},
     x1,
@@ -317,17 +317,17 @@ macro_rules! impl_ref_binop {
             fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
         }
 
-        impl<S, T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for crate::Struct<S>
-        where
-            S: SizedFields,
-            T: GpuType + GpuStore + GpuSized + NoAtomics,
-            AS: AddressSpace,
-            AM: AccessModeReadable,
-            crate::Struct<S>: std::ops::$trait<T>,
-        {
-            type Output = <crate::Struct<S> as std::ops::$trait<T>>::Output;
-            fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
-        }
+        // impl<S, T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for crate::Struct<S>
+        // where
+        //     S: SizedFields,
+        //     T: GpuType + GpuStore + GpuSized + NoAtomics,
+        //     AS: AddressSpace,
+        //     AM: AccessModeReadable,
+        //     crate::Struct<S>: std::ops::$trait<T>,
+        // {
+        //     type Output = <crate::Struct<S> as std::ops::$trait<T>>::Output;
+        //     fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
+        // }
 
         // This probably doesn't really implement much
         impl<A, T, AS, AM, const N: usize> std::ops::$trait<Ref<T, AS, AM>> for crate::Array<A, crate::Size<N>>

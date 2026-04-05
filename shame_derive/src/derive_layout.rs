@@ -320,7 +320,10 @@ pub fn impl_for_struct(
                     #where_clause_predicates
                 {
                     fn sized_ty() -> #re::ir::SizedType where #triv Self: #re::GpuType {
-                        <Self as #re::SizedFields>::get_sizedstruct_type().into()
+                        match <Self as #re::GpuLayout>::layout_type() {
+                            #re::LayoutType::Sized(s) => s,
+                            _ => unreachable!("All fields are sized."),
+                        }
                     }
                 }
             };
@@ -410,95 +413,12 @@ pub fn impl_for_struct(
                     #triv #last_field_type:     #re::GpuLayout,
                     #where_clause_predicates
                 {
-                    type LastField = #last_field_type;
-
-                    fn as_anys(&self) -> impl std::borrow::Borrow<[#re::Any]> {
-                        use #re::AsAny;
-                        [
-                            #(self.#field_ident.as_any()),*
-                        ]
-                    }
-
                     fn clone_fields(&self) -> Self {
                         Self {
                             #(#field_ident: std::clone::Clone::clone(&self.#field_ident)),*
                         }
                     }
-
-                    fn get_struct_kind() -> #re::ir::StructKind {
-                        let mut fields = std::vec::Vec::from([
-                            #(
-                                #re::ir::SizedField {
-                                    name: std::stringify!(#first_fields_ident).into(),
-                                    custom_min_size: #first_fields_size,
-                                    custom_min_align: #first_fields_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")),
-                                    ty: <#first_fields_type as #re::GpuSized>::sized_ty(),
-                                }
-                            ),*
-                        ]);
-
-                        let mut last_unsized = None::<#re::ir::RuntimeSizedArrayField>;
-                        #[allow(clippy::no_effect)]
-                        {
-                            // this part is only here to force a compiler error if the last field
-                            // uses the #[size(n)] attribute but the type is not shame::GpuSized.
-                            #(#enable_if_last_field_has_size_attribute; // only generate the line below if the last field has a #[size(n)] attribute
-                                // compiler error if not shame::GpuSized
-                                fn __() where #last_field_type: #re::GpuSized {}
-                            )*
-
-                            match <#last_field_type as #re::GpuLayout>::layout_type() {
-                                #re::ir::LayoutType::Sized(ty) =>
-                                    fields.push(#re::ir::SizedField {
-                                        name: std::stringify!(#last_field_ident).into(),
-                                        custom_min_size: #last_field_size,
-                                        custom_min_align: #last_field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")),
-                                        ty
-                                    }),
-                                #re::ir::LayoutType::RuntimeSizedArray(array) =>
-                                    last_unsized = Some(#re::ir::RuntimeSizedArrayField {
-                                        name: std::stringify!(#last_field_ident).into(),
-                                        custom_min_align: #last_field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")),
-                                        array
-                                    }),
-                                // TODO(chronicl)
-                                #re::ir::LayoutType::UnsizedStruct(_) => panic!("This will be const checked")
-                            }
-                        }
-
-                        #re::StructKind::new(
-                            std::stringify!(#derive_struct_ident),
-                            fields,
-                            last_unsized,
-                            #gpu_repr_shame
-                        )
-                    }
                 }
-
-
-                impl<#generics_decl> #re::SizedFields for #derive_struct_ident<#(#idents_of_generics),*>
-                where
-                    #(#triv #field_type:  #re::GpuSized + #re::GpuStore + #re::GpuType,)*
-                    #where_clause_predicates
-                {
-                    fn get_sizedstruct_type() -> #re::ir::SizedStruct {
-                        #re::ir::SizedStruct::new(
-                            std::stringify!(#derive_struct_ident),
-                            std::vec::Vec::from([
-                                #(
-                                    #re::ir::SizedField {
-                                        name: std::stringify!(#field_ident).into(),
-                                        custom_min_size: #field_size,
-                                        custom_min_align: #field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")),
-                                        ty: <#field_type as #re::GpuSized>::sized_ty(),
-                                    }
-                                ),*
-                            ]),
-                            #gpu_repr_shame
-                        )
-                    }
-                }
-
 
                 impl<#generics_decl> #re::GpuStore for #derive_struct_ident<#(#idents_of_generics),*>
                 where
@@ -567,21 +487,21 @@ pub fn impl_for_struct(
                     )*
                 }
 
-                // impl<#generics_decl> #re::ToGpuType for #derive_struct_ident<#(#idents_of_generics),*>
-                // where
-                //     #(#triv #field_type: #re::GpuSized + #re::GpuStore + #re::GpuType,)*
-                //     #where_clause_predicates
-                // {
-                //     type Gpu = Self;
+                impl<#generics_decl> #re::ToGpuType for #derive_struct_ident<#(#idents_of_generics),*>
+                where
+                    #(#triv #field_type: #re::GpuStore + #re::GpuType,)*
+                    #where_clause_predicates
+                {
+                    type Gpu = Self;
 
-                //     fn to_gpu(&self) -> Self {
-                //         <Self as #re::BufferFields>::clone_fields(self)
-                //     }
+                    fn to_gpu(&self) -> Self {
+                        <Self as #re::BufferFields>::clone_fields(self)
+                    }
 
-                //     fn as_gpu_type_ref(&self) -> Option<&Self> {
-                //         Some(self)
-                //     }
-                // }
+                    fn as_gpu_type_ref(&self) -> Option<&Self> {
+                        Some(self)
+                    }
+                }
             };
 
             match gpu_repr {

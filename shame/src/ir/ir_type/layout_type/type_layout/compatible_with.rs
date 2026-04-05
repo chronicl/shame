@@ -589,7 +589,7 @@ mod tests {
     fn wgsl_uniform_array_stride_requirements_not_satisfied() {
         let _guard = enable_color();
 
-        #[derive(sm::GpuLayout)]
+        #[derive(sm::GpuLayout, Clone)]
         struct A {
             a: f32x1,
             // has stride 4, but wgsl's uniform address space requires a stride of 16.
@@ -612,7 +612,7 @@ mod tests {
         // Testing that the error remains the same when nested in another struct
         #[derive(sm::GpuLayout)]
         struct B {
-            a: sm::Struct<A>,
+            a: A,
         }
         assert!(is_struct_mismatch!(
             TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, B::layout_type()),
@@ -625,10 +625,7 @@ mod tests {
 
         // Testing that the error remains the same when nested in an array
         assert!(is_struct_mismatch!(
-            TypeLayoutCompatibleWith::<Uniform>::try_from(
-                Language::Wgsl,
-                <sm::Array<sm::Struct<A>, sm::Size<1>>>::layout_type()
-            ),
+            TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, <sm::Array<A, sm::Size<1>>>::layout_type()),
             RequirementsNotSatisfied,
             StructMismatch::FieldLayout {
                 mismatch: TopLevelMismatch::ArrayStride { .. },
@@ -641,12 +638,12 @@ mod tests {
     fn wgsl_uniform_field_offset_requirements_not_satisfied() {
         let _guard = enable_color();
 
-        #[derive(sm::GpuLayout)]
+        #[derive(sm::GpuLayout, Clone)]
         struct A {
             a: f32x1,
-            b: sm::Struct<B>,
+            b: B,
         }
-        #[derive(sm::GpuLayout)]
+        #[derive(sm::GpuLayout, Clone)]
         struct B {
             a: f32x1,
         }
@@ -662,7 +659,7 @@ mod tests {
         // Testing that the error remains the same when nested in another struct
         #[derive(sm::GpuLayout)]
         struct C {
-            a: sm::Struct<A>,
+            a: A,
         }
         assert!(is_struct_mismatch!(
             TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, C::layout_type()),
@@ -672,10 +669,7 @@ mod tests {
 
         // Testing that the error remains the same when nested in an array
         assert!(is_struct_mismatch!(
-            TypeLayoutCompatibleWith::<Uniform>::try_from(
-                Language::Wgsl,
-                <sm::Array<sm::Struct<A>, sm::Size<1>>>::layout_type()
-            ),
+            TypeLayoutCompatibleWith::<Uniform>::try_from(Language::Wgsl, <sm::Array<A, sm::Size<1>>>::layout_type()),
             RequirementsNotSatisfied,
             StructMismatch::FieldOffset { .. }
         ));

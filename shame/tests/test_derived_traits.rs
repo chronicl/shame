@@ -36,7 +36,6 @@ fn assert_derived_traits() {
             impl (sm::GpuStore    ) for T; // no packed vec, or gpu_repr(packed)
 
             impl (sm::BufferFields) for T; // support buffer bindings
-            impl (sm::SizedFields ) for T; // BufferFields + all fields are sized
 
             impl (sm::GpuSized    ) for T; // GpuAligned + no unsized arrays
 
@@ -125,7 +124,6 @@ fn assert_derived_traits() {
 
             impl !(sm::VertexLayout) for T, R;
             impl  (sm::BufferFields) for T, R;
-            impl !(sm::SizedFields ) for T, R;
 
             impl !(sm::GpuSized    ) for T, R;
 

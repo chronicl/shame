@@ -35,7 +35,7 @@ use super::{
     },
     mem::AddressSpace,
     reference::AccessMode,
-    struct_::{BufferFields, SizedFields, Struct},
+    struct_::{BufferFields},
     type_traits::{GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles, VertexAttribute},
     vec::vec,
 };
@@ -531,124 +531,13 @@ impl NoHandles for GpuT {}
 impl NoAtomics for GpuT {}
 impl NoBools for GpuT {}
 
-impl SizedFields for GpuT
-where
-    vec<f32, x1>: for<'trivial_bound> GpuSized,
-    vec<u32, x1>: for<'trivial_bound> GpuSized,
-    Array<vec<i32, x1>, Size<4>>: for<'trivial_bound> GpuSized,
-{
-    fn get_sizedstruct_type() -> ir::SizedStruct {
-        ir::SizedStruct::new(
-            std::stringify!(GpuType),
-            vec![
-                ir::SizedField::new("a", <vec<f32, x1> as GpuSized>::sized_ty()),
-                ir::SizedField::new("b", <vec<u32, x1> as GpuSized>::sized_ty()),
-                ir::SizedField::new("c", <vec<i32, x1> as GpuSized>::sized_ty()),
-            ],
-            // TODO(chronicl)
-            Repr::Wgsl,
-        )
-    }
-}
-
 impl BufferFields for GpuT {
-    type LastField = Array<vec<i32, x1>, Size<4>>;
-
-    fn as_anys(&self) -> impl Borrow<[Any]> { [self.a.as_any(), self.b.as_any(), self.c.as_any()] }
-
     #[allow(clippy::clone_on_copy)]
     fn clone_fields(&self) -> Self {
         Self {
             a: self.a.clone(),
             b: self.b.clone(),
             c: self.c.clone(),
-        }
-    }
-
-    fn get_struct_kind() -> ir::StructKind {
-        // compiler_error! if the struct has zero fields!
-
-        let a = (
-            std::stringify!(a).into(),
-            <vec<f32, x1> as GpuSized>::sized_ty(),
-            Some(32),
-            Some(32).map(|a| a.try_into().expect("power of two validated during codegen")),
-        );
-        let b = (
-            std::stringify!(b).into(),
-            <vec<u32, x1> as GpuSized>::sized_ty(),
-            None,
-            None,
-        );
-
-        // generate the following line if a custom-size was provided:
-        // this will trigger a compipler error if the type is not `shame::Sized`
-        let c = (
-            std::stringify!(b).into(),
-            <vec<i32, x1> as GpuLayout>::layout_type(),
-            None,
-            None,
-        );
-
-        // otherwise generate this line:
-        // let c = (std::stringify!(b).into(), <vec<i32, x1> as crate::Aligned>::aligned_ty(), None, None,);
-
-        let mut fields = vec![
-            {
-                let (name, ty, custom_min_size, custom_min_align) = a;
-                crate::ir::SizedField {
-                    name,
-                    custom_min_size,
-                    custom_min_align,
-                    ty,
-                }
-            },
-            {
-                let (name, ty, custom_min_size, custom_min_align) = b;
-                crate::ir::SizedField {
-                    name,
-                    custom_min_size,
-                    custom_min_align,
-                    ty,
-                }
-            },
-        ];
-
-        let mut last_unsized = None;
-        #[allow(clippy::no_effect)]
-        {
-            Some(4);
-            <vec<i32, x1> as GpuSized>::sized_ty;
-            let (name, ty, custom_min_size, custom_min_align) = c;
-            match ty {
-                crate::ir::LayoutType::Sized(ty) => fields.push(crate::ir::SizedField {
-                    name,
-                    custom_min_size,
-                    custom_min_align,
-                    ty,
-                }),
-                crate::ir::LayoutType::RuntimeSizedArray(array) => {
-                    last_unsized = Some(crate::ir::RuntimeSizedArrayField {
-                        name,
-                        custom_min_align,
-                        array,
-                    })
-                }
-                crate::ir::LayoutType::UnsizedStruct(s) => panic!("Is not something"),
-            }
-        }
-
-        let name = stringify!(GpuT);
-        match last_unsized {
-            Some(last_unsized) => UnsizedStruct::new(
-                name,
-                fields,
-                last_unsized,
-                // TODO(chronicl)
-                Repr::Wgsl,
-            )
-            .into(),
-            None => SizedStruct::new(name, fields, Repr::Wgsl).into(),
         }
     }
 }
@@ -702,17 +591,6 @@ impl FromAnys for GpuT {
             c: From::from(c),
         }
     }
-}
-
-impl<T: SizedFields + NoAtomics> ToGpuType for T {
-    type Gpu = Struct<T>;
-
-    #[track_caller]
-    fn to_gpu(&self) -> Self::Gpu {
-        Struct::<T>::from(Any::new_struct(T::get_sizedstruct_type(), self.as_anys().borrow()))
-    }
-
-    fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> { None }
 }
 
 impl GpuType for GpuT {
