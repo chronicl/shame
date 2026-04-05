@@ -15,6 +15,7 @@ pub mod atomic;
 pub mod barrier;
 pub mod constructors;
 pub mod error;
+pub mod gpu_type2;
 pub mod index;
 pub mod layout_traits;
 pub mod len;

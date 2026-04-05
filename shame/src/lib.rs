@@ -483,7 +483,6 @@ pub mod any {
     pub use ir::SizedField;
     pub use ir::StructKind;
     pub use ir::StructKindRef;
-    pub use ir::FieldOffsets;
     pub use ir::Repr;
 
     // LayoutType atoms
@@ -506,7 +505,8 @@ pub mod any {
     pub use ir::type_layout::FieldLayout;
 
     // layout calculation utility
-    pub use ir::ir_type::layout_type::StructLayoutCalculator;
+    pub use crate::frontend::rust_types::gpu_type2::align_size::StructLayoutCalculator;
+    pub use crate::frontend::rust_types::gpu_type2::align_size::FieldOffsets;
 
     // address space and language compatibility checks
     pub use ir::type_layout::compatible_with::TypeLayoutCompatibleWith;

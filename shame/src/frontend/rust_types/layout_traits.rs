@@ -16,11 +16,10 @@ use crate::{
         },
         encoding::io_iter::LocationCounter,
         error::InternalError,
-        rust_types::{len::*, reference::Ref},
+        rust_types::{gpu_type2::align_size::array_stride, len::*, reference::Ref},
     },
     ir::{
         self, LayoutType, Repr, SizedStruct, SizedType, UnsizedStruct,
-        ir_type::layout_type::array_stride,
         recording::Context,
         type_layout::{ArrayLayout, VectorLayout, eq::CheckEqLayoutMismatch},
     },

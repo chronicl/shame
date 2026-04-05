@@ -21,7 +21,6 @@ mod tensor;
 pub use tensor::*;
 pub use canon_name::*;
 
-pub use align_size::{FieldOffsets, MatrixMajor, StructLayoutCalculator, array_size, array_stride, array_align};
 pub use builder::{FieldOptions};
 
 /// `TypeLayoutRecipe` describes how a type should be laid out in memory.

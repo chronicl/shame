@@ -24,6 +24,7 @@ glam-cuda = ["glam/cuda"]
 thiserror = "1.0.47"
 shame_derive = { path = "../shame_derive/" }
 glam = { version = "0.30", optional = true }
+bumpalo = { version = "3.20.2", features = ["collections"] }
 
 [dev-dependencies]
 static_assertions = "1.1.0"

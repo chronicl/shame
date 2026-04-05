@@ -131,20 +131,21 @@ impl SizedArray {
 #[allow(missing_docs)]
 impl SizedStruct {
     pub fn layout(&self) -> StructLayout {
-        let mut field_offsets = self.field_offsets();
-        let fields = (&mut field_offsets)
-            .zip(self.fields.iter())
-            .map(|(offset, field)| sized_field_to_field_layout(field, offset, self.repr))
-            .collect::<Vec<_>>();
+        self.field_offsets(|mut field_offsets| {
+            let fields = (&mut field_offsets)
+                .zip(self.fields.iter())
+                .map(|(offset, field)| sized_field_to_field_layout(field, offset, self.repr))
+                .collect::<Vec<_>>();
 
-        let (byte_size, align) = field_offsets.struct_byte_size_and_align();
+            let (byte_size, align) = field_offsets.struct_byte_size_and_align();
 
-        StructLayout {
-            byte_size: Some(byte_size),
-            align: align.into(),
-            name: self.name.clone().into(),
-            fields,
-        }
+            StructLayout {
+                byte_size: Some(byte_size),
+                align: align.into(),
+                name: self.name.clone().into(),
+                fields,
+            }
+        })
     }
 
     pub fn contains(&self, c: RecipeContains) -> bool {
@@ -182,31 +183,32 @@ fn sized_field_to_field_layout(field: &SizedField, offset: u64, repr: Repr) -> F
 #[allow(missing_docs)]
 impl UnsizedStruct {
     pub fn layout(&self) -> StructLayout {
-        let mut field_offsets = self.field_offsets();
-        let mut fields = (&mut field_offsets.sized_field_offsets())
-            .zip(self.sized_fields.iter())
-            .map(|(offset, field)| sized_field_to_field_layout(field, offset, self.repr))
-            .collect::<Vec<_>>();
+        self.field_offsets(|mut field_offsets| {
+            let mut fields = (&mut field_offsets.sized_field_offsets())
+                .zip(self.sized_fields.iter())
+                .map(|(offset, field)| sized_field_to_field_layout(field, offset, self.repr))
+                .collect::<Vec<_>>();
 
-        let (field_offset, align) = field_offsets.last_field_offset_and_struct_align();
+            let (field_offset, align) = field_offsets.last_field_offset_and_struct_align();
 
-        let mut ty = self.last_unsized.array.layout(self.repr);
-        // VERY IMPORTANT: TypeLayout::from_runtime_sized_array does not take into account
-        // custom_min_align, but s.last_unsized.align does.
-        ty.align = self.last_unsized.align(self.repr).into();
+            let mut ty = self.last_unsized.array.layout(self.repr);
+            // VERY IMPORTANT: TypeLayout::from_runtime_sized_array does not take into account
+            // custom_min_align, but s.last_unsized.align does.
+            ty.align = self.last_unsized.align(self.repr).into();
 
-        fields.push(FieldLayout {
-            rel_byte_offset: field_offset,
-            name: self.last_unsized.name.clone(),
-            ty: ty.into(),
-        });
+            fields.push(FieldLayout {
+                rel_byte_offset: field_offset,
+                name: self.last_unsized.name.clone(),
+                ty: ty.into(),
+            });
 
-        StructLayout {
-            byte_size: None,
-            align: align.into(),
-            name: self.name.clone().into(),
-            fields,
-        }
+            StructLayout {
+                byte_size: None,
+                align: align.into(),
+                name: self.name.clone().into(),
+                fields,
+            }
+        })
     }
 
     pub fn contains(&self, c: RecipeContains) -> bool {

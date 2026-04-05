@@ -39,10 +39,6 @@ pub enum U32PowerOf2 {
     _2147483648 = 2147483648,
 }
 
-impl U32PowerOf2 {
-    /// Returns the maximum between `self` and `other`.
-    pub const fn max(self, other: Self) -> Self { if self as u32 > other as u32 { self } else { other } }
-}
 
 #[allow(missing_docs)]
 #[derive(Debug)]
@@ -60,10 +56,23 @@ impl U32PowerOf2 {
     /// Creates a new U32PowerOf2 and panics if the value is not a power of two.
     pub const fn new_unchecked(value: u32) -> Self { Self::try_from_u32(value).unwrap() }
 
-
     /// Gets the exponent of the power of two.
     #[inline]
     pub const fn exponent(self) -> u32 { (self as u32).trailing_zeros() }
+
+    /// Returns the next multiple of `other_power_of_two` that is greater than or equal to `self`.
+    pub const fn next_multiple_of(self, other_power_of_two: U32PowerOf2) -> Self {
+        // n <= multiple_of  ->  next_multiple_of = other_power_of_two
+        // n > multiple_of   ->  next_multiple_of = n, because, since both are powers of 2, n must already
+        //                                          be a multiple of multiple of Other_power_of_two
+        // In both cases next_multiple_of is a power of 2
+        Self::new_unchecked((self as u32).next_multiple_of(other_power_of_two as u32))
+    }
+
+    /// Returns the maximum between `self` and `other`.
+    pub const fn max(self, other: Self) -> Self { if self as u32 > other as u32 { self } else { other } }
+
+
 
     /// Tries to convert a u32 to U32PowerOf2.
     pub const fn try_from_u32(value: u32) -> Option<Self> {

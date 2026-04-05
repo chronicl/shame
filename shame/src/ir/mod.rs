@@ -52,7 +52,6 @@ pub use ir_type::layout_type::RuntimeSizedArrayField;
 pub use ir_type::layout_type::SizedField;
 pub use ir_type::layout_type::StructKind;
 pub use ir_type::layout_type::StructKindRef;
-pub use ir_type::layout_type::FieldOffsets;
 pub use ir_type::layout_type::Repr;
 
 pub use ir_type::layout_type::Len;
