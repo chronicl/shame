@@ -287,3 +287,99 @@ impl ir::UnsizedStruct {
         }
     }
 }
+
+// No bools and no atomics checks
+
+impl LayoutType<'_> {
+    pub const fn contains_bools(&self) -> bool {
+        match self {
+            LayoutType::Sized(s) => s.contains_bools(),
+            LayoutType::UnsizedStruct(s) => s.contains_bools(),
+            LayoutType::RuntimeSizedArray(a) => a.contains_bools(),
+        }
+    }
+
+    pub const fn contains_atomics(&self) -> bool {
+        match self {
+            LayoutType::Sized(s) => s.contains_atomics(),
+            LayoutType::UnsizedStruct(s) => s.contains_atomics(),
+            LayoutType::RuntimeSizedArray(a) => a.contains_atomics(),
+        }
+    }
+}
+
+impl SizedType<'_> {
+    pub const fn contains_bools(&self) -> bool {
+        match self {
+            SizedType::Vector(v) => matches!(v.scalar, ir::ScalarType::Bool),
+            SizedType::Matrix(_) => false,
+            SizedType::Atomic(_) => false,
+            SizedType::Array(a) => a.element.contains_bools(),
+            SizedType::Struct(s) => s.contains_bools(),
+        }
+    }
+
+    pub const fn contains_atomics(&self) -> bool {
+        match self {
+            SizedType::Vector(_) => false,
+            SizedType::Matrix(_) => false,
+            SizedType::Atomic(_) => true,
+            SizedType::Array(a) => a.element.contains_atomics(),
+            SizedType::Struct(s) => s.contains_atomics(),
+        }
+    }
+}
+
+impl SizedStruct<'_> {
+    pub const fn contains_bools(&self) -> bool {
+        let mut i = 0;
+        while i < self.fields.len() {
+            if self.fields[i].ty.contains_bools() {
+                return true;
+            }
+            i += 1;
+        }
+        false
+    }
+
+    pub const fn contains_atomics(&self) -> bool {
+        let mut i = 0;
+        while i < self.fields.len() {
+            if self.fields[i].ty.contains_atomics() {
+                return true;
+            }
+            i += 1;
+        }
+        false
+    }
+}
+
+impl UnsizedStruct<'_> {
+    pub const fn contains_bools(&self) -> bool {
+        let mut i = 0;
+        while i < self.sized_fields.len() {
+            if self.sized_fields[i].ty.contains_bools() {
+                return true;
+            }
+            i += 1;
+        }
+        self.last_unsized.array.contains_bools()
+    }
+
+    pub const fn contains_atomics(&self) -> bool {
+        let mut i = 0;
+        while i < self.sized_fields.len() {
+            if self.sized_fields[i].ty.contains_atomics() {
+                return true;
+            }
+            i += 1;
+        }
+        self.last_unsized.array.contains_atomics()
+    }
+}
+
+impl RuntimeSizedArray<'_> {
+    pub const fn contains_bools(&self) -> bool { self.element.contains_bools() }
+
+    pub const fn contains_atomics(&self) -> bool { self.element.contains_atomics() }
+}
