@@ -406,20 +406,6 @@ pub fn impl_for_struct(
                     }
                 }
 
-                impl<#generics_decl> #re::BufferFields for #derive_struct_ident<#(#idents_of_generics),*>
-                where
-                    #(#triv #field_type: #re::GpuStore + #re::GpuType,)*
-                    #(#triv #first_fields_type: #re::GpuSized,)*
-                    #triv #last_field_type:     #re::GpuLayout,
-                    #where_clause_predicates
-                {
-                    fn clone_fields(&self) -> Self {
-                        Self {
-                            #(#field_ident: std::clone::Clone::clone(&self.#field_ident)),*
-                        }
-                    }
-                }
-
                 impl<#generics_decl> #re::GpuStore for #derive_struct_ident<#(#idents_of_generics),*>
                 where
                     #(#triv #field_type: #re::GpuLayout + #re::GpuType,)*
@@ -495,7 +481,7 @@ pub fn impl_for_struct(
                     type Gpu = Self;
 
                     fn to_gpu(&self) -> Self {
-                        <Self as #re::BufferFields>::clone_fields(self)
+                        ::std::convert::Into::into(<Self as #re::AsAny>::as_any(self))
                     }
 
                     fn as_gpu_type_ref(&self) -> Option<&Self> {

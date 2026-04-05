@@ -20,7 +20,6 @@ use crate::{
             packed_vec::PackedScalarType,
             reference::{AccessModeReadable, Read, ReadWrite, Ref},
             scalar_type::{ScalarType, ScalarTypeFp, ScalarTypeInteger},
-            struct_::{BufferFields},
             type_traits::{BindingArgs, GpuSized, GpuStore, NoAtomics, NoBools, NoHandles},
             vec::vec,
         },

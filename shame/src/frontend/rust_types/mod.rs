@@ -25,7 +25,6 @@ pub mod mem;
 pub mod packed_vec;
 pub mod reference;
 pub mod scalar_type;
-pub mod struct_;
 pub mod type_traits;
 pub mod vec;
 pub mod vec_functions;

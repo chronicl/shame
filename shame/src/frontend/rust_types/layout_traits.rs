@@ -35,7 +35,6 @@ use super::{
     },
     mem::AddressSpace,
     reference::AccessMode,
-    struct_::{BufferFields},
     type_traits::{GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles, VertexAttribute},
     vec::vec,
 };
@@ -530,17 +529,6 @@ impl<AS: AddressSpace, AM: AccessMode> FromAnys for GpuTypeRef<AS, AM> {
 impl NoHandles for GpuT {}
 impl NoAtomics for GpuT {}
 impl NoBools for GpuT {}
-
-impl BufferFields for GpuT {
-    #[allow(clippy::clone_on_copy)]
-    fn clone_fields(&self) -> Self {
-        Self {
-            a: self.a.clone(),
-            b: self.b.clone(),
-            c: self.c.clone(),
-        }
-    }
-}
 
 impl GetAllFields for GpuT
 where

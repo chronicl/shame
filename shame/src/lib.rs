@@ -335,8 +335,6 @@ pub use common::po2::NotAU32PowerOf2;
 pub use frontend::rust_types::type_traits::GpuStore;
 pub use frontend::rust_types::type_traits::GpuSized;
 
-pub use frontend::rust_types::struct_::BufferFields;
-
 pub use frontend::rust_types::type_traits::NoBools;
 pub use frontend::rust_types::type_traits::NoAtomics;
 pub use frontend::rust_types::type_traits::NoHandles;
