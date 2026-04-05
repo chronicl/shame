@@ -13,7 +13,7 @@ use std::{
 };
 
 use super::layout_traits::{GetAllFields, GpuLayout};
-use super::type_traits::{GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoBools};
+use super::type_traits::{GpuSized, GpuStore, GpuStoreImplCategory, NoBools};
 use super::{
     layout_traits::{ArrayElementsUnsizedError, FromAnys},
     mem::AddressSpace,
@@ -39,7 +39,7 @@ pub trait SizedFields: BufferFields + GpuSized /*not `NoAtomics`, since it can b
 // May contain atomics, packed vectors, or a runtime-sized `Array<T>` at the last field
 // TODO(release) consider renaming to StoreFields
 /// (no documentation yet)
-pub trait BufferFields: GpuStore + GpuAligned + GpuLayout + NoHandles + FromAnys + GetAllFields {
+pub trait BufferFields: GpuStore + GpuLayout + NoHandles + FromAnys + GetAllFields {
     /// (no documentation yet)
     fn as_anys(&self) -> impl Borrow<[Any]>;
 
@@ -87,10 +87,6 @@ impl<T: SizedFields + GpuStore> GpuStore for Struct<T> {
     fn store_ty() -> ir::StoreType { <Self as GpuSized>::sized_ty().into() }
 
     fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
-}
-
-impl<T: SizedFields + GpuStore> GpuAligned for Struct<T> {
-    fn aligned_ty() -> ir::AlignedType { ir::AlignedType::Sized(<Self as GpuSized>::sized_ty()) }
 }
 
 impl<T: SizedFields + GpuStore> GpuSized for Struct<T> {

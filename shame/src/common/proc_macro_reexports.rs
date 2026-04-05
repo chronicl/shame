@@ -23,7 +23,6 @@ pub use crate::frontend::rust_types::reference::Ref;
 pub use crate::frontend::rust_types::struct_::BufferFields;
 pub use crate::frontend::rust_types::struct_::SizedFields;
 pub use crate::frontend::rust_types::type_traits::BindingArgs;
-pub use crate::frontend::rust_types::type_traits::GpuAligned;
 pub use crate::frontend::rust_types::type_traits::GpuSized;
 pub use crate::frontend::rust_types::type_traits::GpuStore;
 pub use crate::frontend::rust_types::type_traits::GpuStoreImplCategory;

@@ -338,7 +338,6 @@ pub use common::po2::NotAU32PowerOf2;
 // derived traits
 pub use frontend::rust_types::type_traits::GpuStore;
 pub use frontend::rust_types::type_traits::GpuSized;
-pub use frontend::rust_types::type_traits::GpuAligned;
 
 pub use frontend::rust_types::struct_::BufferFields;
 pub use frontend::rust_types::struct_::SizedFields;

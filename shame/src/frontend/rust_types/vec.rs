@@ -6,7 +6,7 @@ use super::{
     mem::AddressSpace,
     reference::AccessMode,
     scalar_type::{dtype_as_scalar_from_f64, ScalarType, ScalarTypeNumber},
-    type_traits::{GpuAligned, GpuStoreImplCategory, NoAtomics, NoHandles, VertexAttribute},
+    type_traits::{GpuStoreImplCategory, NoAtomics, NoHandles, VertexAttribute},
     AsAny, GpuType, To, ToGpuType,
 };
 use crate::{
@@ -532,10 +532,6 @@ impl<T: ScalarType, L: Len> Deref for vec<T, L> {
 
 impl<T: ScalarType, L: Len> GpuSized for vec<T, L> {
     fn sized_ty() -> ir::SizedType { Vector::new(T::SCALAR_TYPE, L::LEN).into() }
-}
-
-impl<T: ScalarType, L: Len> GpuAligned for vec<T, L> {
-    fn aligned_ty() -> ir::AlignedType { ir::AlignedType::Sized(<Self as GpuSized>::sized_ty()) }
 }
 
 impl<T: ScalarType, L: Len> GpuStore for vec<T, L> {

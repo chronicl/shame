@@ -39,7 +39,6 @@ fn assert_derived_traits() {
             impl (sm::SizedFields ) for T; // BufferFields + all fields are sized
 
             impl (sm::GpuSized    ) for T; // GpuAligned + no unsized arrays
-            impl (sm::GpuAligned  ) for T; // no handles/ptrs/refs
 
             impl (sm::NoBools     ) for T;
             impl (sm::NoAtomics   ) for T;
@@ -65,7 +64,6 @@ fn assert_derived_traits() {
             impl !(sm::SizedFields ) for T;
 
             impl  (sm::GpuSized    ) for T;
-            impl  (sm::GpuAligned  ) for T;
 
             impl  (sm::NoBools     ) for T;
             impl  (sm::NoAtomics   ) for T;
@@ -130,7 +128,6 @@ fn assert_derived_traits() {
             impl !(sm::SizedFields ) for T, R;
 
             impl !(sm::GpuSized    ) for T, R;
-            impl  (sm::GpuAligned  ) for T, R;
 
             impl  (sm::NoBools     ) for T, R;
             impl  (sm::NoAtomics   ) for T, R;

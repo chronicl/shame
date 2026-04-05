@@ -57,7 +57,7 @@ pub struct BindingArgs {
 //[old-doc]
 //[old-doc] corresponds to WGSL "Storable type" https://www.w3.org/TR/WGSL/#storable-types
 /// (no documentation yet)
-pub trait GpuStore: GpuAligned + GetAllFields + FromAnys {
+pub trait GpuStore: GetAllFields + FromAnys {
     /// the type whose public immutable interface is exposed by [`shame::Ref<Self>`]:
     ///
     /// `<shame::Ref<Self, _, _> as std::ops::Deref>::Target`
@@ -138,24 +138,12 @@ impl GpuStoreImplCategory {
 /// note: [`GpuSized`] does not imply [`GpuStore`], because [`Atomic<T>`] is [`GpuSized`] but `!GpuStore`
 ///
 /// [`Atomic<T>`]: crate::Atomic
-pub trait GpuSized: GpuAligned {
+pub trait GpuSized {
     // `GpuSized` does not imply `GpuStore`, because `Atomic<T>` is `GpuSized` but `!GpuStore`
 
     /// returns the `ir::SizedType` that `Self` corresponds to inside the shader type system.
     #[doc(hidden)] // runtime api
     fn sized_ty() -> ir::SizedType
-    where
-        Self: GpuType;
-}
-
-#[diagnostic::on_unimplemented(
-    message = "the memory alignment of `{Self}` on the gpu is not known at rust compile-time"
-)]
-/// ## known byte-alignment on the gpu
-/// types that have a byte-alignment on the graphics device that is known at rust compile-time
-pub trait GpuAligned {
-    #[doc(hidden)] // runtime api
-    fn aligned_ty() -> AlignedType
     where
         Self: GpuType;
 }

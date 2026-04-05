@@ -17,9 +17,7 @@ use super::{
     len::x1,
     mem::AddressSpace,
     reference::{AccessMode, AccessModeReadable},
-    type_traits::{
-        EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles,
-    },
+    type_traits::{EmptyRefFields, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles},
     vec::ToInteger,
 };
 
@@ -109,15 +107,6 @@ impl<T: GpuType + GpuSized + GpuStore, N: ArrayLen> GpuStore for Array<T, N> {
     fn store_ty() -> ir::StoreType { Self::array_store_ty() }
 
     fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
-}
-
-impl<T: GpuType + GpuSized, N: ArrayLen> GpuAligned for Array<T, N> {
-    fn aligned_ty() -> ir::AlignedType {
-        match N::LEN {
-            Some(len) => ir::AlignedType::Sized(ir::SizedArray::new(Rc::new(T::sized_ty()), len).into()),
-            None => ir::AlignedType::RuntimeSizedArray(T::sized_ty()),
-        }
-    }
 }
 
 impl<T: GpuType + GpuSized, const N: usize> GpuSized for Array<T, Size<N>> {

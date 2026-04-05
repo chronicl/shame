@@ -8,9 +8,7 @@ use super::{
     reference::AccessMode,
     scalar_type::{ScalarTypeFp},
     ir::type_layout::TypeLayout,
-    type_traits::{
-        EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles,
-    },
+    type_traits::{EmptyRefFields, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles},
     vec::{scalar, vec, ToInteger},
     AsAny, GpuType, To, ToGpuType,
 };
@@ -101,10 +99,6 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuStore for mat<T, C, R> {
     fn store_ty() -> ir::StoreType { <Self as GpuSized>::sized_ty().into() }
 
     fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::GpuType(Self::store_ty()) }
-}
-
-impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuAligned for mat<T, C, R> {
-    fn aligned_ty() -> ir::AlignedType { ir::AlignedType::Sized(<Self as GpuSized>::sized_ty()) }
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> ToGpuType for mat<T, C, R> {

@@ -13,7 +13,7 @@ use super::{
     reference::{AccessMode, ReadWrite},
     scalar_type::ScalarTypeInteger,
     ir::type_layout::TypeLayout,
-    type_traits::{EmptyRefFields, GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoBools, NoHandles},
+    type_traits::{EmptyRefFields, GpuSized, GpuStore, GpuStoreImplCategory, NoBools, NoHandles},
     vec::vec,
     AsAny, GpuType, To, ToGpuType,
 };
@@ -62,10 +62,6 @@ impl<T: ScalarTypeInteger> ToGpuType for Atomic<T> {
 
 impl<T: ScalarTypeInteger> GpuSized for Atomic<T> {
     fn sized_ty() -> ir::SizedType { ir::Atomic::new(T::SCALAR_TYPE_INTEGER).into() }
-}
-
-impl<T: ScalarTypeInteger> GpuAligned for Atomic<T> {
-    fn aligned_ty() -> ir::AlignedType { ir::AlignedType::Sized(<Self as GpuSized>::sized_ty()) }
 }
 
 impl<T: ScalarTypeInteger> GpuStore for Atomic<T> {

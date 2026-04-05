@@ -322,17 +322,6 @@ pub fn impl_for_struct(
                         unreachable!("Self: !GpuType")
                     }
                 }
-
-                impl<#generics_decl> #re::GpuAligned for #derive_struct_ident<#(#idents_of_generics),*>
-                where
-                    #(#triv #field_type: #re::GpuAligned,)*
-                    #where_clause_predicates
-                {
-                    fn aligned_ty() -> #re::ir::AlignedType where
-                    #triv Self: #re::GpuType {
-                        unreachable!("Self: !GpuType")
-                    }
-                }
             };
 
             match gpu_repr {
@@ -376,7 +365,7 @@ pub fn impl_for_struct(
                         where
                             #(#triv #field_type: #re::GpuStore + #re::GpuType,)*
                             #(#triv #first_fields_type: #re::GpuSized,)*
-                            #triv #last_field_type:     #re::GpuAligned,
+                            #triv #last_field_type:     #re::GpuLayout,
                             #where_clause_predicates
                         {
                             type LastField = #last_field_type;
@@ -416,20 +405,22 @@ pub fn impl_for_struct(
                                         fn __() where #last_field_type: #re::GpuSized {}
                                     )*
 
-                                    match <#last_field_type as #re::GpuAligned>::aligned_ty() {
-                                        #re::ir::AlignedType::Sized(ty) =>
+                                    match <#last_field_type as #re::GpuLayout>::layout_type() {
+                                        #re::ir::LayoutType::Sized(ty) =>
                                             fields.push(#re::ir::SizedField {
                                                 name: std::stringify!(#last_field_ident).into(),
                                                 custom_min_size: #last_field_size,
                                                 custom_min_align: #last_field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")),
                                                 ty
                                             }),
-                                        #re::ir::AlignedType::RuntimeSizedArray(element_ty) =>
+                                        #re::ir::LayoutType::RuntimeSizedArray(array) =>
                                             last_unsized = Some(#re::ir::RuntimeSizedArrayField {
                                                 name: std::stringify!(#last_field_ident).into(),
                                                 custom_min_align: #last_field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")),
-                                                array: #re::RuntimeSizedArray::new(element_ty)
+                                                array
                                             }),
+                                        // TODO(chronicl)
+                                        #re::ir::LayoutType::UnsizedStruct(_) => panic!("This will be const checked")
                                     }
                                 }
 
@@ -485,7 +476,7 @@ pub fn impl_for_struct(
                         impl<#generics_decl> #re::GetAllFields for #derive_struct_ident<#(#idents_of_generics),*>
                         where
                             #(#triv #first_fields_type: #re::GpuSized,)*
-                            #triv #last_field_type: #re::GpuAligned,
+                            #triv #last_field_type: #re::GpuLayout,
                             #where_clause_predicates
                         {
                             fn fields_as_anys_unchecked(self_: #re::Any) -> impl std::borrow::Borrow<[#re::Any]> {

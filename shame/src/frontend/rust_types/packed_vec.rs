@@ -20,7 +20,7 @@ use super::{
     layout_traits::{from_single_any, FromAnys},
     len::LenEven,
     scalar_type::ScalarType,
-    type_traits::{GpuAligned, GpuSized, NoAtomics, NoBools, NoHandles, VertexAttribute},
+    type_traits::{GpuSized, NoAtomics, NoBools, NoHandles, VertexAttribute},
     vec::IsVec,
     GpuType,
 };
@@ -116,12 +116,6 @@ impl<T: PackedScalarType, L: LenEven> GpuSized for PackedVec<T, L> {
     {
         unreachable!("Self: !GpuType")
     }
-}
-
-impl<T: PackedScalarType, L: LenEven> GpuAligned for PackedVec<T, L> {
-    // TODO(release) shouldn't this add a Self: GpuType bound as well, like GpuSized does?
-    //     that way we can maybe get rid of the sized_ty_equivalent workaround
-    fn aligned_ty() -> ir::AlignedType { ir::AlignedType::Sized(Self::sized_ty_equivalent()) }
 }
 
 impl<T: PackedScalarType, L: LenEven> NoBools for PackedVec<T, L> {}

@@ -36,9 +36,7 @@ use super::{
     mem::AddressSpace,
     reference::AccessMode,
     struct_::{BufferFields, SizedFields, Struct},
-    type_traits::{
-        GpuAligned, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles, VertexAttribute,
-    },
+    type_traits::{GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles, VertexAttribute},
     vec::vec,
 };
 
@@ -587,7 +585,7 @@ impl BufferFields for GpuT {
         // this will trigger a compipler error if the type is not `shame::Sized`
         let c = (
             std::stringify!(b).into(),
-            <vec<i32, x1> as GpuAligned>::aligned_ty(),
+            <vec<i32, x1> as GpuLayout>::layout_type(),
             None,
             None,
         );
@@ -623,19 +621,20 @@ impl BufferFields for GpuT {
             <vec<i32, x1> as GpuSized>::sized_ty;
             let (name, ty, custom_min_size, custom_min_align) = c;
             match ty {
-                crate::ir::AlignedType::Sized(ty) => fields.push(crate::ir::SizedField {
+                crate::ir::LayoutType::Sized(ty) => fields.push(crate::ir::SizedField {
                     name,
                     custom_min_size,
                     custom_min_align,
                     ty,
                 }),
-                crate::ir::AlignedType::RuntimeSizedArray(element_ty) => {
+                crate::ir::LayoutType::RuntimeSizedArray(array) => {
                     last_unsized = Some(crate::ir::RuntimeSizedArrayField {
                         name,
                         custom_min_align,
-                        array: ir::RuntimeSizedArray::new(element_ty),
+                        array,
                     })
                 }
+                crate::ir::LayoutType::UnsizedStruct(s) => panic!("Is not something"),
             }
         }
 
@@ -727,15 +726,6 @@ impl GpuStore for GpuT {
     }
 
     fn impl_category() -> GpuStoreImplCategory { GpuStoreImplCategory::Fields(Self::get_struct_kind()) }
-}
-
-impl GpuAligned for GpuT {
-    fn aligned_ty() -> ir::AlignedType
-    where
-        Self: for<'trivial_bound> GpuType,
-    {
-        unreachable!("Self: !GpuType")
-    }
 }
 
 impl GpuSized for GpuT {
