@@ -6,7 +6,7 @@ use super::{
     type_traits::{GpuSized, NoAtomics},
     typecheck_downcast,
     vec::ToInteger,
-    AsAny, GpuType, To,
+    AsAny, To,
 };
 use crate::{
     GpuLayout, Len, ScalarTypeNumber, ToGpuType, call_info,
@@ -144,7 +144,7 @@ where
 
 impl<T, AS, AM> Ref<T, AS, AM>
 where
-    T: GpuType + GpuLayout + NoAtomics,
+    T: GpuLayout + NoAtomics,
     AS: AddressSpace,
     AM: AccessModeWritable,
 {
