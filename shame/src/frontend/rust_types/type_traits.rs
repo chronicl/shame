@@ -4,7 +4,7 @@ use super::{
     reference::AccessMode,
     AsAny, GpuType,
 };
-use crate::frontend::any::shared_io::BindPath;
+use crate::{GpuLayout, frontend::any::shared_io::BindPath};
 use crate::{
     call_info,
     frontend::{
@@ -130,7 +130,7 @@ impl GpuStoreImplCategory {
 /// note: [`GpuSized`] does not imply [`GpuStore`], because [`Atomic<T>`] is [`GpuSized`] but `!GpuStore`
 ///
 /// [`Atomic<T>`]: crate::Atomic
-pub trait GpuSized {
+pub trait GpuSized: GpuLayout {
     /// The sized layout of `Self` on the gpu.
     const LAYOUT_SIZED: crate::layout::SizedType<'static>;
 }

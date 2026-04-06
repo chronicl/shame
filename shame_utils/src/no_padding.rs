@@ -98,7 +98,7 @@ impl<T: ScalarTypeInteger> NoPadding for shame::Atomic<T> {
 
 impl<T: GpuType + GpuSized + NoPadding, N: ArrayLen> NoPadding for shame::Array<T, N> {
     const LAYOUT: Layout = {
-        let stride = match T::LAYOUT.size_rounded_to_align() {
+        let stride = match <T as NoPadding>::LAYOUT.size_rounded_to_align() {
             Some(size) => size,
             None => panic!("Array element type must not be unsized"),
         };
@@ -106,7 +106,7 @@ impl<T: GpuType + GpuSized + NoPadding, N: ArrayLen> NoPadding for shame::Array<
             Some(n) => Some(n.get() as usize * stride),
             None => None,
         };
-        Layout::from_align_size(T::LAYOUT.align, size)
+        Layout::from_align_size(<T as NoPadding>::LAYOUT.align, size)
     };
 }
 

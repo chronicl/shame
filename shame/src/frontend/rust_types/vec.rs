@@ -539,10 +539,7 @@ impl<T: ScalarType, L: Len> GpuStore for vec<T, L> {
     fn store_ty() -> ir::StoreType { Self::LAYOUT_SIZED.into() }
 }
 
-impl<T: ScalarType, L: Len> GpuLayout for vec<T, L>
-where
-    vec<T, L>: NoBools,
-{
+impl<T: ScalarType, L: Len> GpuLayout for vec<T, L> {
     const LAYOUT: crate::layout::LayoutType<'static> = Self::LAYOUT_SIZED.to_layout_type();
 
     fn layout_type() -> LayoutType { ir::Vector::new(T::SCALAR_TYPE, L::LEN).into() }
