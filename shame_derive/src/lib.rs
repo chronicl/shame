@@ -98,7 +98,7 @@ use crate::derive_layout::impl_vertex_layout;
 /// [`NoBools`]: shame::NoBools
 /// [`NoHandles`]: shame::NoHandles
 /// [`NoAtomics`]: shame::NoAtomics
-#[proc_macro_derive(GpuLayout, attributes(size, align, cpu, gpu_repr))]
+#[proc_macro_derive(GpuLayout, attributes(size, align, cpu, gpu_repr, phantom))]
 pub fn derive_gpu_layout(input: TokenStream) -> TokenStream { derive_impl(WhichDerive::GpuLayout, input) }
 
 #[proc_macro_derive(CpuLayout, attributes())]

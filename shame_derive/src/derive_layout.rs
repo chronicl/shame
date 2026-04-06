@@ -45,35 +45,126 @@ pub fn impl_for_struct(
     }
     let num_fields = fields.named.len();
 
-    // TODO(release) test all the different cases of generics and bounds
+    // Detect #[phantom] fields (only valid for GpuLayout)
+    let is_phantom_field: Vec<bool> = fields
+        .named
+        .iter()
+        .map(|f| f.attrs.iter().any(|a| a.path().is_ident("phantom")))
+        .collect();
+    let phantom_count = is_phantom_field.iter().filter(|&&b| b).count();
+
+    if let (true, WhichDerive::CpuLayout) = (phantom_count > 0, &which_derive) {
+        bail!(*span, "`#[phantom]` fields are only supported by `derive(GpuLayout)`")
+    }
+    if phantom_count > 1 {
+        bail!(*span, "`#[phantom]` can only be applied to at most one field")
+    }
+
+    let num_gpu_fields = num_fields - phantom_count;
+    if num_gpu_fields == 0 {
+        return Err(syn::Error::new_spanned(
+            fields,
+            format!("`derive({which_derive:?})` requires at least one non-phantom field"),
+        ));
+    }
+
+    // Validate that phantom fields don't carry #[align] or #[size]
+    for (field, &is_p) in fields.named.iter().zip(&is_phantom_field) {
+        if is_p {
+            if let Some((attr_span, _)) = util::find_literal_list_attr::<LitInt>("size", &field.attrs)? {
+                bail!(attr_span, "`#[size]` cannot be used on a `#[phantom]` field")
+            }
+            if let Some((attr_span, _)) = util::find_literal_list_attr::<LitInt>("align", &field.attrs)? {
+                bail!(attr_span, "`#[align]` cannot be used on a `#[phantom]` field")
+            }
+        }
+    }
+
+    // Generics support
     let util::Generics {
         decl: generics_decl,
         where_clause_predicates,
         idents: idents_of_generics,
     } = util::Generics::from_input(input);
 
-    if let Some(first) = idents_of_generics.first() {
-        bail!(
-            first.span(),
-            format!("`derive({which_derive:?})` currently does not support generics")
-        )
-    }
+    // Collect gpu fields (non-phantom) and phantom fields
+    let gpu_fields: Vec<&Field> = fields
+        .named
+        .iter()
+        .zip(is_phantom_field.iter())
+        .filter(|(_, p)| !*p)
+        .map(|(f, _)| f)
+        .collect();
+    let phantom_fields: Vec<&Field> = fields
+        .named
+        .iter()
+        .zip(is_phantom_field.iter())
+        .filter(|(_, p)| **p)
+        .map(|(f, _)| f)
+        .collect();
 
-    if let Some(where_) = where_clause_predicates {
-        bail!(
-            where_.span(),
-            format!("`derive({which_derive:?})` currently does not support where clauses")
-        )
-    }
-
-    // we do lots of `Vec<_>` collection here, because `&Vec<_>` is copy and supports `quote` repetition,
-    // if we find another way of getting this without requiring `collect` replace all the vecs in here.
+    // vecs for all fields (used by CpuLayout which has no phantom fields)
     let field_vec = |f: fn(&Field) -> _| fields.named.iter().map(f).collect::<Vec<_>>();
-
-    // &vecs for repetitions
-    let field_vis = &field_vec(|f @ Field { vis, .. }| quote_spanned!(f.span() => #vis));
     let field_ident = &field_vec(|f @ Field { ident, .. }| quote_spanned!(f.span() => #ident));
     let field_type = &field_vec(|f @ Field { ty, .. }| quote_spanned!(f.span() => #ty   ));
+
+    // vecs for gpu-only fields (used by GpuLayout)
+    let gpu_field_vis: Vec<TokenStream2> = gpu_fields
+        .iter()
+        .map(|f| {
+            let v = &f.vis;
+            quote_spanned!(f.span() => #v)
+        })
+        .collect();
+    let gpu_field_ident: Vec<TokenStream2> = gpu_fields
+        .iter()
+        .map(|f| {
+            let id = &f.ident;
+            quote_spanned!(f.span() => #id)
+        })
+        .collect();
+    let gpu_field_type: Vec<TokenStream2> = gpu_fields
+        .iter()
+        .map(|f| {
+            let ty = &f.ty;
+            quote_spanned!(f.span() => #ty)
+        })
+        .collect();
+
+    // phantom field vecs (for struct construction)
+    let phantom_field_ident: Vec<TokenStream2> = phantom_fields
+        .iter()
+        .map(|f| {
+            let id = &f.ident;
+            quote_spanned!(f.span() => #id)
+        })
+        .collect();
+    let phantom_field_type: Vec<TokenStream2> = phantom_fields
+        .iter()
+        .map(|f| {
+            let ty = &f.ty;
+            quote_spanned!(f.span() => #ty)
+        })
+        .collect();
+
+    // For the _ref struct: combine struct generics with _AS and _AM
+    let generics_decl_with_as_am: TokenStream2 = if generics_decl.is_empty() {
+        quote!(_AS: #re::AddressSpace, _AM: #re::AccessMode)
+    } else {
+        quote!(#generics_decl, _AS: #re::AddressSpace, _AM: #re::AccessMode)
+    };
+    // Args for `type RefFields<AS, AM> = Foo_ref<T, AS, AM>` — uses RefFields' own AS/AM names
+    let ref_struct_args_ref_fields: TokenStream2 = if idents_of_generics.is_empty() {
+        quote!(AS, AM)
+    } else {
+        quote!(#(#idents_of_generics,)* AS, AM)
+    };
+    // Args for impl blocks / struct defs that declare _AS/_AM via generics_decl_with_as_am
+    let ref_struct_args_impl: TokenStream2 = if idents_of_generics.is_empty() {
+        quote!(_AS, _AM)
+    } else {
+        quote!(#(#idents_of_generics,)* _AS, _AM)
+    };
 
     // parse/validate attributes
     // #[cpu(T)]
@@ -151,8 +242,9 @@ pub fn impl_for_struct(
         align: Option<(Span, LitInt)>,
     }
 
-    let mut fields_with_attrs = Vec::with_capacity(num_fields);
-    for field in fields.named.iter() {
+    // fields_with_attrs only covers gpu (non-phantom) fields
+    let mut gpu_fields_with_attrs = Vec::with_capacity(num_gpu_fields);
+    for field in gpu_fields.iter() {
         let fwa = FieldAttrs {
             size: util::find_literal_list_attr::<syn::LitInt>("size", &field.attrs)?,
             align: util::find_literal_list_attr::<syn::LitInt>("align", &field.attrs)?,
@@ -180,7 +272,7 @@ pub fn impl_for_struct(
                 ),
             }
         }
-        fields_with_attrs.push(fwa);
+        gpu_fields_with_attrs.push(fwa);
     }
 
     // turns None/Some((span, x)) into quote_spanned!(span => None/Some(x))
@@ -189,11 +281,12 @@ pub fn impl_for_struct(
         Some((span, x)) => quote_spanned!(span => Some(#x)),
     };
 
-    let field_size = &fields_with_attrs
+    // size/align arrays for gpu fields only
+    let gpu_field_size = &gpu_fields_with_attrs
         .iter()
         .map(|f| quote_option(f.size.clone()))
         .collect::<Vec<_>>();
-    let field_align = &fields_with_attrs
+    let gpu_field_align = &gpu_fields_with_attrs
         .iter()
         .map(|f| quote_option(f.align.clone()))
         .map(|align| {
@@ -208,14 +301,20 @@ pub fn impl_for_struct(
         })
         .collect::<Vec<_>>();
 
+    // splits on gpu fields (for GpuLayout)
+    let (last_gpu_field_ident, first_gpu_fields_ident) = gpu_field_ident.split_last().expect("checked above");
+    let (last_gpu_field_type, first_gpu_fields_type) = gpu_field_type.split_last().expect("checked above");
+    let (last_gpu_field_size, first_gpu_fields_size) = gpu_field_size.split_last().expect("checked above");
+    let (last_gpu_field_align, first_gpu_fields_align) = gpu_field_align.split_last().expect("checked above");
+
+    // splits on all fields (for CpuLayout which has no phantom fields)
     let (last_field_ident, first_fields_ident) = field_ident.split_last().expect("checked above");
     let (last_field_type, first_fields_type) = field_type.split_last().expect("checked above");
-    let (last_field_size, first_fields_size) = field_size.split_last().expect("checked above");
-    let (last_field_align, first_fields_align) = field_align.split_last().expect("checked above");
 
     let (first_field_ident, _) = field_ident.split_first().expect("checked above");
+    let _ = first_field_ident; // silence unused warning when only used conditionally
 
-    let enable_if_last_field_has_size_attribute = fields_with_attrs
+    let enable_if_last_field_has_size_attribute = gpu_fields_with_attrs
         .last()
         .and_then(|l| l.size.clone())
         .map(|_| quote!(()))
@@ -229,47 +328,47 @@ pub fn impl_for_struct(
             let impl_gpu_layout = quote! {
                 impl<#generics_decl> #re::GpuLayout for #derive_struct_ident<#(#idents_of_generics),*>
                 where
-                    #(#first_fields_type: #re::GpuSized,)*
-                    #last_field_type: #re::GpuLayout,
+                    #(#first_gpu_fields_type: #re::GpuSized,)*
+                    #last_gpu_field_type: #re::GpuLayout,
                     #where_clause_predicates
                 {
                     const LAYOUT: #re::layout::LayoutType<'static> = {
                         const FIELDS_WHEN_SIZED: &[#re::layout::SizedField<'static>] = &[
                             #(
                                 #re::layout::SizedField {
-                                    name: std::stringify!(#first_fields_ident),
-                                    ty: <#first_fields_type as #re::GpuSized>::LAYOUT_SIZED,
-                                    custom_min_align: #first_fields_align,
-                                    custom_min_size: #first_fields_size,
+                                    name: std::stringify!(#first_gpu_fields_ident),
+                                    ty: <#first_gpu_fields_type as #re::GpuSized>::LAYOUT_SIZED,
+                                    custom_min_align: #first_gpu_fields_align,
+                                    custom_min_size: #first_gpu_fields_size,
                                 },
                             )*
                             #re::layout::SizedField {
-                                name: std::stringify!(#last_field_ident),
-                                ty: match <#last_field_type as #re::GpuLayout>::LAYOUT {
+                                name: std::stringify!(#last_gpu_field_ident),
+                                ty: match <#last_gpu_field_type as #re::GpuLayout>::LAYOUT {
                                     #re::layout::LayoutType::Sized(s) => s,
                                     _ => #re::layout::SizedType::DUMMY
                                 },
-                                custom_min_align: #last_field_align,
-                                custom_min_size: #last_field_size,
+                                custom_min_align: #last_gpu_field_align,
+                                custom_min_size: #last_gpu_field_size,
                             },
                         ];
 
                         const SIZED_FIELDS_WHEN_UNSIZED: &[#re::layout::SizedField<'static>] = &[
                             #(
                                 #re::layout::SizedField {
-                                    name: std::stringify!(#first_fields_ident),
-                                    ty: <#first_fields_type as #re::GpuSized>::LAYOUT_SIZED,
-                                    custom_min_align: #first_fields_align,
-                                    custom_min_size: #first_fields_size,
+                                    name: std::stringify!(#first_gpu_fields_ident),
+                                    ty: <#first_gpu_fields_type as #re::GpuSized>::LAYOUT_SIZED,
+                                    custom_min_align: #first_gpu_fields_align,
+                                    custom_min_size: #first_gpu_fields_size,
                                 },
                             )*
                         ];
-                        const RUNTIME_SIZED_ARRAY: #re::layout::RuntimeSizedArray<'static> = match <#last_field_type as #re::GpuLayout>::LAYOUT {
+                        const RUNTIME_SIZED_ARRAY: #re::layout::RuntimeSizedArray<'static> = match <#last_gpu_field_type as #re::GpuLayout>::LAYOUT {
                             #re::layout::LayoutType::RuntimeSizedArray(a) => a,
                             _ => #re::layout::RuntimeSizedArray::DUMMY,
                         };
 
-                        match <#last_field_type as #re::GpuLayout>::LAYOUT {
+                        match <#last_gpu_field_type as #re::GpuLayout>::LAYOUT {
                             #re::layout::LayoutType::Sized(_) => {
                                 #re::layout::SizedStruct {
                                     name: std::stringify!(#derive_struct_ident),
@@ -282,9 +381,9 @@ pub fn impl_for_struct(
                                     name: std::stringify!(#derive_struct_ident),
                                     sized_fields: SIZED_FIELDS_WHEN_UNSIZED,
                                     last_unsized: #re::layout::RuntimeSizedArrayField {
-                                        name: std::stringify!(#last_field_ident),
+                                        name: std::stringify!(#last_gpu_field_ident),
                                         array: RUNTIME_SIZED_ARRAY,
-                                        custom_min_align: #last_field_align,
+                                        custom_min_align: #last_gpu_field_align,
                                     },
                                     repr: #gpu_repr_shame,
                                 }.to_layout_type()
@@ -293,10 +392,10 @@ pub fn impl_for_struct(
                         }
                     };
 
-                    type RefFields<AS: #re::AddressSpace, AM: #re::AccessMode> = #derive_struct_ref_ident<AS, AM>;
+                    type RefFields<AS: #re::AddressSpace, AM: #re::AccessMode> = #derive_struct_ref_ident<#ref_struct_args_ref_fields>;
                     fn fields_as_anys_unchecked(self_: #re::Any) -> impl std::borrow::Borrow<[#re::Any]> {
                         [
-                            #(self_.get_field(std::stringify!(#field_ident).into())),*
+                            #(self_.get_field(std::stringify!(#gpu_field_ident).into())),*
                         ]
                     }
 
@@ -317,7 +416,7 @@ pub fn impl_for_struct(
             let impl_from_anys = quote! {
                 impl<#generics_decl> #re::FromAnys for #derive_struct_ident<#(#idents_of_generics),*>
                 where #where_clause_predicates {
-                    fn expected_num_anys() -> usize {#num_fields}
+                    fn expected_num_anys() -> usize {#num_gpu_fields}
 
                     #[track_caller]
                     fn from_anys(mut anys: impl Iterator<Item = #re::Any>) -> Self {
@@ -326,8 +425,8 @@ pub fn impl_for_struct(
                             push_wrong_amount_of_args_error
                         };
 
-                        const EXPECTED_LEN: usize = #num_fields;
-                        let [#(#field_ident),*] = match collect_into_array_exact::<#re::Any, EXPECTED_LEN>(anys) {
+                        const EXPECTED_LEN: usize = #num_gpu_fields;
+                        let [#(#gpu_field_ident),*] = match collect_into_array_exact::<#re::Any, EXPECTED_LEN>(anys) {
                             Ok(t) => t,
                             Err(actual_len) => {
                                 let any = push_wrong_amount_of_args_error(actual_len, EXPECTED_LEN, #re::call_info!());
@@ -336,7 +435,8 @@ pub fn impl_for_struct(
                         };
 
                         Self {
-                            #(#field_ident: <#field_type as #re::GpuLayoutField>::from_any(#field_ident)),*
+                            #(#gpu_field_ident: <#gpu_field_type as #re::GpuLayoutField>::from_any(#gpu_field_ident),)*
+                            #(#phantom_field_ident: ::std::marker::PhantomData,)*
                         }
                     }
                 }
@@ -344,7 +444,7 @@ pub fn impl_for_struct(
                  // impl fake auto traits via `for<'trivial_bound>` trick:
                 impl<#generics_decl> #re::GpuSized for #derive_struct_ident<#(#idents_of_generics),*>
                 where
-                    #(#triv #field_type: #re::GpuSized,)*
+                    #(#triv #gpu_field_type: #re::GpuSized,)*
                     #where_clause_predicates
                 {
                     const LAYOUT_SIZED: #re::layout::SizedType<'static> = {
@@ -352,20 +452,20 @@ pub fn impl_for_struct(
                         const FIELDS_SIZED: &[#re::layout::SizedField<'static>] = &[
                             #(
                                 #re::layout::SizedField {
-                                    name: std::stringify!(#first_fields_ident),
-                                    ty: <#first_fields_type as #re::GpuSized>::LAYOUT_SIZED,
-                                    custom_min_align: #first_fields_align,
-                                    custom_min_size: #first_fields_size,
+                                    name: std::stringify!(#first_gpu_fields_ident),
+                                    ty: <#first_gpu_fields_type as #re::GpuSized>::LAYOUT_SIZED,
+                                    custom_min_align: #first_gpu_fields_align,
+                                    custom_min_size: #first_gpu_fields_size,
                                 },
                             )*
                             #re::layout::SizedField {
-                                name: std::stringify!(#last_field_ident),
-                                ty: match <#last_field_type as #re::GpuLayout>::LAYOUT {
+                                name: std::stringify!(#last_gpu_field_ident),
+                                ty: match <#last_gpu_field_type as #re::GpuLayout>::LAYOUT {
                                     #re::layout::LayoutType::Sized(s) => s,
                                     _ => #re::layout::SizedType::DUMMY
                                 },
-                                custom_min_align: #last_field_align,
-                                custom_min_size: #last_field_size,
+                                custom_min_align: #last_gpu_field_align,
+                                custom_min_size: #last_gpu_field_size,
                             },
                         ];
 
@@ -389,7 +489,7 @@ pub fn impl_for_struct(
             let impl_gpu_type = quote! {
                 impl<#generics_decl> #re::GpuType for #derive_struct_ident<#(#idents_of_generics),*>
                 where
-                    #(#triv #field_type: #re::GpuLayout + #re::GpuType,)*
+                    #(#triv #gpu_field_type: #re::GpuLayout + #re::GpuType,)*
                     #where_clause_predicates
                 {
                     fn ty() -> #re::ir::Type {
@@ -399,16 +499,17 @@ pub fn impl_for_struct(
                     #[track_caller]
                     fn from_any_unchecked(any: #re::Any) -> Self {
                         Self {
-                            #(#field_ident: <#field_type as #re::GpuLayoutField>::from_any(
-                                any.get_field(std::stringify!(#field_ident).into())
+                            #(#gpu_field_ident: <#gpu_field_type as #re::GpuLayoutField>::from_any(
+                                any.get_field(std::stringify!(#gpu_field_ident).into())
                             ),)*
+                            #(#phantom_field_ident: ::std::marker::PhantomData,)*
                         }
                     }
                 }
 
                 impl<#generics_decl> #re::AsAny for #derive_struct_ident<#(#idents_of_generics),*>
                 where
-                    #(#triv #field_type: #re::GpuLayout + #re::GpuType,)*
+                    #(#triv #gpu_field_type: #re::GpuLayout + #re::GpuType,)*
                     #where_clause_predicates
                 {
                     fn as_any(&self) -> #re::Any {
@@ -418,7 +519,7 @@ pub fn impl_for_struct(
                         match ty {
                             #re::LayoutType::Sized(#re::SizedType::Struct(s)) => {
                                 #re::Any::new_struct(s,
-                                    &[#(self.#field_ident.as_any()),*],
+                                    &[#(self.#gpu_field_ident.as_any()),*],
                                 )
                             },
                             _ => match #re::Context::try_with_or_invalid_any(#re::call_info!(), |ctx| {
@@ -434,7 +535,7 @@ pub fn impl_for_struct(
 
                 impl<#generics_decl> From<#re::Any> for #derive_struct_ident<#(#idents_of_generics),*>
                 where
-                    #(#triv #field_type: #re::GpuLayout,)*
+                    #(#triv #gpu_field_type: #re::GpuLayout,)*
                     #where_clause_predicates
                 {
                     #[track_caller]
@@ -443,11 +544,11 @@ pub fn impl_for_struct(
                     }
                 }
 
-                impl<AS: #re::AddressSpace, AM: #re::AccessMode> #re::FromAnys for #derive_struct_ref_ident<AS, AM>
+                impl<#generics_decl_with_as_am> #re::FromAnys for #derive_struct_ref_ident<#ref_struct_args_impl>
                 where #(
-                    #triv #field_type: #re::GpuStore,
+                    #triv #gpu_field_type: #re::GpuStore,
                 )* {
-                    fn expected_num_anys() -> usize {#num_fields}
+                    fn expected_num_anys() -> usize {#num_gpu_fields}
 
                     #[track_caller]
                     fn from_anys(mut anys: impl Iterator<Item = #re::Any>) -> Self {
@@ -455,8 +556,8 @@ pub fn impl_for_struct(
                             collect_into_array_exact,
                             push_wrong_amount_of_args_error
                         };
-                        const EXPECTED_LEN: usize = #num_fields;
-                        let [#(#field_ident),*] = match collect_into_array_exact::<#re::Any, EXPECTED_LEN>(anys) {
+                        const EXPECTED_LEN: usize = #num_gpu_fields;
+                        let [#(#gpu_field_ident),*] = match collect_into_array_exact::<#re::Any, EXPECTED_LEN>(anys) {
                             Ok(t) => t,
                             Err(actual_len) => {
                                 let any = push_wrong_amount_of_args_error(actual_len, EXPECTED_LEN, #re::call_info!());
@@ -464,27 +565,44 @@ pub fn impl_for_struct(
                             }
                         };
                         Self {
-                            #(#field_ident: From::from(#field_ident)),*
+                            #(#gpu_field_ident: From::from(#gpu_field_ident),)*
+                            #(#phantom_field_ident: ::std::marker::PhantomData,)*
                         }
                     }
                 }
 
                 #[doc = #struct_ref_doc]
                 #[allow(non_camel_case_types)]
-                #[derive(Clone, Copy)]
-                #vis struct #derive_struct_ref_ident<_AS: #re::AddressSpace, _AM: #re::AccessMode>
+                #vis struct #derive_struct_ref_ident<#generics_decl_with_as_am>
                 where #(
-                    #triv #field_type: #re::GpuStore + #re::GpuType,
+                    #triv #gpu_field_type: #re::GpuStore + #re::GpuType,
                 )*
                 {
                     #(
-                        #field_vis #field_ident: #re::Ref<#field_type, _AS, _AM>,
+                        #gpu_field_vis #gpu_field_ident: #re::Ref<#gpu_field_type, _AS, _AM>,
+                    )*
+                    #(
+                        #phantom_field_ident: #phantom_field_type,
                     )*
                 }
 
+                // Manual Clone/Copy impls so we don't add T: Clone/Copy bounds —
+                // PhantomData<T> is always Copy regardless of T.
+                impl<#generics_decl_with_as_am> Clone for #derive_struct_ref_ident<#ref_struct_args_impl>
+                where #(
+                    #triv #gpu_field_type: #re::GpuStore,
+                )* {
+                    fn clone(&self) -> Self { *self }
+                }
+
+                impl<#generics_decl_with_as_am> Copy for #derive_struct_ref_ident<#ref_struct_args_impl>
+                where #(
+                    #triv #gpu_field_type: #re::GpuStore,
+                )* {}
+
                 impl<#generics_decl> #re::ToGpuType for #derive_struct_ident<#(#idents_of_generics),*>
                 where
-                    #(#triv #field_type: #re::GpuStore + #re::GpuType,)*
+                    #(#triv #gpu_field_type: #re::GpuStore,)*
                     #where_clause_predicates
                 {
                     type Gpu = Self;
