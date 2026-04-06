@@ -293,6 +293,13 @@ pub fn impl_for_struct(
                         }
                     };
 
+                    type RefFields<AS: #re::AddressSpace, AM: #re::AccessMode> = #derive_struct_ref_ident<AS, AM>;
+                    fn fields_as_anys_unchecked(self_: #re::Any) -> impl std::borrow::Borrow<[#re::Any]> {
+                        [
+                            #(self_.get_field(std::stringify!(#field_ident).into())),*
+                        ]
+                    }
+
                     fn cpu_type_name_and_layout() -> Option<Result<(std::borrow::Cow<'static, str>, #re::TypeLayout), #re::ArrayElementsUnsizedError>> {
                         use #re::CpuLayout as _;
                         #(
@@ -473,22 +480,14 @@ pub fn impl_for_struct(
 
                 impl<#generics_decl> #re::GpuStore for #derive_struct_ident<#(#idents_of_generics),*>
                 where
-                    #(#triv #field_type: #re::GpuLayout + #re::GpuType,)*
+                    #(#triv #field_type: #re::GpuLayout,)*
                     #where_clause_predicates
                 {
-                    type RefFields<AS: #re::AddressSpace, AM: #re::AccessMode> = #derive_struct_ref_ident<AS, AM>;
-
                     fn store_ty() -> #re::ir::StoreType {
                         match <Self as #re::GpuType>::ty() {
                             #re::ir::Type::Store(t) => t,
                             _ => unreachable!(),
                         }
-                    }
-
-                    fn fields_as_anys_unchecked(self_: #re::Any) -> impl std::borrow::Borrow<[#re::Any]> {
-                        [
-                            #(self_.get_field(std::stringify!(#field_ident).into())),*
-                        ]
                     }
                 }
 

@@ -135,7 +135,7 @@ use super::{
 /// [`Texture`]: crate::Texture
 /// [`StorageTexture`]: crate::StorageTexture
 ///
-pub trait GpuLayout: GpuStore {
+pub trait GpuLayout: GpuStore + FromAnys {
     /// The layout of the type.
     const LAYOUT: crate::layout::LayoutType<'static>;
     /// Compile time asserts that the type does not contain bools.
@@ -155,6 +155,51 @@ pub trait GpuLayout: GpuStore {
 
     /// `Self::LAYOUT`, but in it's owned / ir form.
     fn layout_type_owned() -> LayoutType { Self::LAYOUT.into() }
+
+    /// the type whose public immutable interface is exposed by [`shame::Ref<Self>`]:
+    ///
+    /// `<shame::Ref<Self, _, _> as std::ops::Deref>::Target`
+    ///
+    /// Since `shame` cannot make use of rusts builtin `&`/`&mut` propagation mechanism,
+    /// it needs to be imitated by generating reference versions of [`GpuLayout`]
+    /// structs.
+    ///
+    /// for example, for a type
+    /// ```
+    /// #[derive(shame::GpuLayout)]
+    /// struct Foo {
+    ///     a: float,
+    ///     b: float,
+    /// }
+    /// ```
+    /// the `shame::GpuLayout` derive macro generates a type
+    /// ```
+    /// struct Foo_ref<AM, AS> where ... {
+    ///     a: Ref<float, AM, AS>,
+    ///     b: Ref<float, AM, AS>,
+    /// }
+    /// ```
+    /// which is the [`std::ops::Deref`] target of
+    /// `Ref<Foo, _, _>` such that
+    /// `foo.a` and `foo.b` resolve to the appropriate `Ref<float, _, _>`.
+    ///
+    /// if a type `Self` does not represent a composite type (like `vec<_, x1>`), it may set
+    /// `RefFields` = [`EmptyRefFields`]
+    ///
+    /// [`Ref<Foo, _, _>`]: crate::Ref
+    /// [`shame::Ref<Self>`]: crate::Ref
+    type RefFields<AS: AddressSpace, AM: AccessMode>: FromAnys + Copy;
+
+    // get the individual fields of `Self` or `Ref<Self>` in its `Any` form,
+    //
+    // i.e. the fields of a `Struct<T>`, the xyzw components of a `vec` etc.
+    //
+    // returns an empty array if `Self` has no fields.
+    //
+    // The implementation of this function is not required to do type checking
+    // on the incoming or outgoing `Any`s. That part is up to the caller.
+    /// (no documentation yet)
+    fn fields_as_anys_unchecked(self_as_any: Any) -> impl Borrow<[Any]>;
 
     /// the `#[cpu(...)]` in `#[derive(GpuLayout)]` allows the definition of a
     /// corresponding Cpu type to the Gpu type that the derive macro is used on.
@@ -536,6 +581,16 @@ impl GpuLayout for GpuT {
     }
     .to_layout_type();
 
+    type RefFields<AS: AddressSpace, AM: AccessMode> = GpuTypeRef<AS, AM>;
+
+    fn fields_as_anys_unchecked(self_: Any) -> impl Borrow<[Any]> {
+        [
+            self_.get_field("a".into()),
+            self_.get_field("b".into()),
+            self_.get_field("c".into()),
+        ]
+    }
+
     fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
         Some(Ok((
             std::stringify!(RustType).into(),
@@ -584,17 +639,7 @@ impl From<Any> for GpuT {
 }
 
 impl GpuStore for GpuT {
-    type RefFields<AS: AddressSpace, AM: AccessMode> = GpuTypeRef<AS, AM>;
-
     fn store_ty() -> ir::StoreType { unreachable!() }
-
-    fn fields_as_anys_unchecked(self_: Any) -> impl Borrow<[Any]> {
-        [
-            self_.get_field("a".into()),
-            self_.get_field("b".into()),
-            self_.get_field("c".into()),
-        ]
-    }
 }
 
 impl GpuSized for GpuT {

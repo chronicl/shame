@@ -170,7 +170,7 @@ impl std::fmt::Display for BufferAddressSpaceEnum {
 /// > the precise trait bounds of buffer bindings are found in the `Binding` impl blocks.
 pub struct Buffer<T, AS = mem::Storage, AM = Read, const DYNAMIC_OFFSET: bool = false>
 where
-    T: GpuStore + NoBools + NoHandles,
+    T: GpuLayout + NoBools + NoHandles,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
 {
@@ -180,7 +180,7 @@ where
 
 impl<T, AS, AM, const DYNAMIC_OFFSET: bool> Deref for Buffer<T, AS, AM, DYNAMIC_OFFSET>
 where
-    T: GpuStore + NoBools + NoHandles,
+    T: GpuLayout + NoBools + NoHandles,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
 {
@@ -190,16 +190,11 @@ where
 
 impl<T, AS, AM, const DYNAMIC_OFFSET: bool> Buffer<T, AS, AM, DYNAMIC_OFFSET>
 where
-    T: GpuStore + NoBools + NoHandles,
+    T: GpuLayout + NoBools + NoHandles,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
 {
-    fn new(args: BindingArgs) -> Self
-    where
-        T: GpuLayout,
-    {
-        Self::from_ref(create_ref_for_buffer_binding(args, DYNAMIC_OFFSET))
-    }
+    fn new(args: BindingArgs) -> Self { Self::from_ref(create_ref_for_buffer_binding(args, DYNAMIC_OFFSET)) }
 
     fn new_invalid(reason: InvalidReason) -> Self { Self::from_ref(Ref::from(Any::new_invalid(reason))) }
 

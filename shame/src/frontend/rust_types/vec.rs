@@ -534,9 +534,10 @@ impl<T: ScalarType, L: Len> GpuSized for vec<T, L> {
     const LAYOUT_SIZED: crate::layout::SizedType<'static> = Vector::new(T::SCALAR_TYPE, L::LEN).to_sized_type();
 }
 
-impl<T: ScalarType, L: Len> GpuStore for vec<T, L> {
+impl<T: ScalarType, L: Len> GpuLayout for vec<T, L> {
+    const LAYOUT: crate::layout::LayoutType<'static> = Self::LAYOUT_SIZED.to_layout_type();
+
     type RefFields<AS: AddressSpace, AM: AccessMode> = L::VecComponentsRef<T, AS, AM>;
-    fn store_ty() -> ir::StoreType { Self::LAYOUT_SIZED.into() }
     #[rustfmt::skip]
     fn fields_as_anys_unchecked(any: Any) -> impl std::borrow::Borrow<[Any]> {
         use crate::common::small_vec::SmallVec;
@@ -552,16 +553,16 @@ impl<T: ScalarType, L: Len> GpuStore for vec<T, L> {
 
         smallvec
     }
-}
-
-impl<T: ScalarType, L: Len> GpuLayout for vec<T, L> {
-    const LAYOUT: crate::layout::LayoutType<'static> = Self::LAYOUT_SIZED.to_layout_type();
 
     fn cpu_type_name_and_layout()
     -> Option<Result<(std::borrow::Cow<'static, str>, TypeLayout), super::layout_traits::ArrayElementsUnsizedError>>
     {
         None
     }
+}
+
+impl<T: ScalarType, L: Len> GpuStore for vec<T, L> {
+    fn store_ty() -> ir::StoreType { Self::LAYOUT_SIZED.into() }
 }
 
 impl<T: ScalarType, L: Len> GpuType for vec<T, L> {

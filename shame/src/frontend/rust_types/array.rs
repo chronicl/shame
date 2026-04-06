@@ -103,9 +103,7 @@ impl<const N: usize> Size<N> {
 }
 
 impl<T: GpuType + GpuSized + GpuStore, N: ArrayLen> GpuStore for Array<T, N> {
-    type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
     fn store_ty() -> ir::StoreType { Self::array_store_ty() }
-    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
 }
 
 impl<T: GpuSized, const N: usize> GpuSized for Array<T, Size<N>> {
@@ -131,6 +129,9 @@ impl<T: GpuSized, N: ArrayLen> GpuLayout for Array<T, N> {
         Some(n) => crate::layout::SizedArray::new(&T::LAYOUT_SIZED, n).to_layout_type(),
         None => crate::layout::RuntimeSizedArray::new(T::LAYOUT_SIZED).to_layout_type(),
     };
+
+    type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
+    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
 
     fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
         let (t_cpu_name, t_cpu_layout) = match T::cpu_type_name_and_layout()? {

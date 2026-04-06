@@ -47,6 +47,9 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> Default for mat<T, C, R> {
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuLayout for mat<T, C, R> {
     const LAYOUT: crate::layout::LayoutType<'static> = Self::LAYOUT_SIZED.to_layout_type();
 
+    type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
+    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
+
     fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> { None }
 }
 
@@ -88,9 +91,7 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> AsAny for mat<T, C, R> {
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuStore for mat<T, C, R> {
-    type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
     fn store_ty() -> ir::StoreType { <Self as GpuSized>::LAYOUT_SIZED.into() }
-    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> ToGpuType for mat<T, C, R> {

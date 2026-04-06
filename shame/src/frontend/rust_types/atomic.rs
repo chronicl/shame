@@ -65,9 +65,7 @@ impl<T: ScalarTypeInteger> GpuSized for Atomic<T> {
 }
 
 impl<T: ScalarTypeInteger> GpuStore for Atomic<T> {
-    type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
     fn store_ty() -> ir::StoreType { <Self as GpuSized>::LAYOUT_SIZED.into() }
-    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
 }
 
 impl<T: ScalarTypeInteger> NoBools for Atomic<T> {}
@@ -95,6 +93,9 @@ impl<T: ScalarTypeInteger> FromAnys for Atomic<T> {
 
 impl<T: ScalarTypeInteger> GpuLayout for Atomic<T> {
     const LAYOUT: crate::layout::LayoutType<'static> = Self::LAYOUT_SIZED.to_layout_type();
+
+    type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
+    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
 
     fn cpu_type_name_and_layout()
     -> Option<Result<(std::borrow::Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {

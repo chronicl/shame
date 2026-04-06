@@ -3,15 +3,15 @@ use super::{
     error::FrontendError,
     layout_traits::{FromAnys},
     mem::{self, AddressSpace},
-    type_traits::{GpuSized, GpuStore, NoAtomics},
+    type_traits::{GpuSized, NoAtomics},
     typecheck_downcast,
     vec::ToInteger,
     AsAny, GpuType, To,
 };
 use crate::{
-    Len, ScalarTypeNumber, ToGpuType, call_info,
+    GpuLayout, Len, ScalarTypeNumber, ToGpuType, call_info,
     frontend::{any::Any, rust_types::vec::vec},
-    ir::{self, StoreType, Type, recording::Context},
+    ir::{self, LayoutType, StoreType, Type, recording::Context},
     x1,
 };
 use std::borrow::Borrow;
@@ -72,7 +72,7 @@ impl AccessModeWritable for Write {}
 /// (no documentation yet)
 pub struct Ref<T, AS = mem::Fn, AM = ReadWrite>
 where
-    T: GpuStore,
+    T: GpuLayout,
     AS: AddressSpace,
     AM: AccessMode,
 {
@@ -80,15 +80,15 @@ where
     fields_as_refs: T::RefFields<AS, AM>,
 }
 
-impl<T: GpuStore, AS: AddressSpace, AM: AccessMode> Copy for Ref<T, AS, AM> {}
+impl<T: GpuLayout, AS: AddressSpace, AM: AccessMode> Copy for Ref<T, AS, AM> {}
 
-impl<T: GpuStore, AS: AddressSpace, AM: AccessMode> Clone for Ref<T, AS, AM> {
+impl<T: GpuLayout, AS: AddressSpace, AM: AccessMode> Clone for Ref<T, AS, AM> {
     fn clone(&self) -> Self { *self }
 }
 
 impl<T, AS, AM> AsAny for Ref<T, AS, AM>
 where
-    T: GpuStore,
+    T: GpuLayout,
     AS: AddressSpace,
     AM: AccessMode,
 {
@@ -98,7 +98,7 @@ where
 // TODO: this is a misuse of ToGpuType
 impl<T, AS, AM> ToGpuType for Ref<T, AS, AM>
 where
-    T: GpuType + GpuStore + GpuSized + NoAtomics,
+    T: GpuSized + NoAtomics,
     AS: AddressSpace,
     AM: AccessModeReadable,
 {
@@ -108,7 +108,7 @@ where
 
 impl<T, AS, AM> Ref<T, AS, AM>
 where
-    T: GpuType + GpuStore + NoAtomics,
+    T: GpuLayout + NoAtomics,
     AS: AddressSpace,
     AM: AccessModeReadable,
 {
@@ -133,7 +133,7 @@ where
 
 impl<T, AS, AM> std::ops::Deref for Ref<T, AS, AM>
 where
-    T: GpuStore,
+    T: GpuLayout,
     AS: AddressSpace,
     AM: AccessMode,
 {
@@ -144,7 +144,7 @@ where
 
 impl<T, AS, AM> Ref<T, AS, AM>
 where
-    T: GpuType + GpuStore + NoAtomics,
+    T: GpuType + GpuLayout + NoAtomics,
     AS: AddressSpace,
     AM: AccessModeWritable,
 {
@@ -160,24 +160,24 @@ where
 
 impl<T, AS, AM> From<Any> for Ref<T, AS, AM>
 where
-    T: GpuStore,
+    T: GpuLayout,
     AS: AddressSpace,
     AM: AccessMode,
 {
     #[track_caller]
-    fn from(any: Any) -> Self { ref_from_any_and_store_type(any, <T as GpuStore>::store_ty()) }
+    fn from(any: Any) -> Self { ref_from_any_and_layout_type(any, <T as GpuLayout>::layout_type_owned()) }
 }
 
-fn ref_from_any_and_store_type<T, AS, AM>(any: Any, expected_store_ty: StoreType) -> Ref<T, AS, AM>
+fn ref_from_any_and_layout_type<T, AS, AM>(any: Any, expected_store_ty: LayoutType) -> Ref<T, AS, AM>
 where
-    T: GpuStore,
+    T: GpuLayout,
     AS: AddressSpace,
     AM: AccessMode,
 {
     let from_any_unchecked = |any| Ref::<T, AS, AM> {
         any,
         fields_as_refs: {
-            let field_anys = <T as GpuStore>::fields_as_anys_unchecked(any);
+            let field_anys = <T as GpuLayout>::fields_as_anys_unchecked(any);
             FromAnys::from_anys((field_anys.borrow() as &[Any]).iter().copied())
         },
     };
@@ -186,7 +186,11 @@ where
 
         match any.ty() {
             Some(Type::Ref(alloc, store_ty, access)) => match alloc.address_space == AS::ADDRESS_SPACE {
-                true => typecheck_downcast(any, Type::Ref(alloc, expected_store_ty, AM::ACCESS), from_any_unchecked),
+                true => typecheck_downcast(
+                    any,
+                    Type::Ref(alloc, expected_store_ty.into(), AM::ACCESS),
+                    from_any_unchecked,
+                ),
                 false => invalid(
                     FrontendError::DowncastWithInvalidAddressSpace {
                         dynamic_as: alloc.address_space,
@@ -198,7 +202,7 @@ where
             Some(ty) => invalid(
                 FrontendError::DowncastNonRefToRef {
                     dynamic_type: ty,
-                    rust_type: expected_store_ty,
+                    rust_type: expected_store_ty.into(),
                 }
                 .into(),
             ),
@@ -209,7 +213,7 @@ where
 
 impl<T, AS, AM, N> Ref<Array<T, N>, AS, AM>
 where
-    T: GpuType + GpuSized + GpuStore + 'static,
+    T: GpuSized + 'static,
     AS: AddressSpace + 'static,
     AM: AccessMode + 'static,
     N: ArrayLen,
@@ -219,14 +223,14 @@ where
     pub fn at(&self, index: impl ToInteger) -> Ref<T, AS, AM> { self.as_any().array_index(index.to_any()).into() }
 }
 
-impl<T: GpuStore + GpuSized + GpuType + 'static, AS: AddressSpace, AM: AccessMode> Ref<Array<T>, AS, AM> {
+impl<T: GpuSized + 'static, AS: AddressSpace, AM: AccessMode> Ref<Array<T>, AS, AM> {
     /// (no documentation yet)
     pub fn len(&self) -> vec<u32, x1> { self.any.address().array_length().into() }
 }
 
 impl<T, AM> Ref<T, mem::WorkGroup, AM>
 where
-    T: GpuType + GpuStore + NoAtomics,
+    T: GpuLayout + NoAtomics,
     AM: AccessModeReadable,
 {
     // see WGSL https://www.w3.org/TR/WGSL/#workgroupUniformLoad-builtin
@@ -237,7 +241,7 @@ where
 // Unary ops
 impl<T, AS, AM> std::ops::Neg for Ref<T, AS, AM>
 where
-    T: GpuType + GpuStore + GpuSized + NoAtomics,
+    T: GpuSized + NoAtomics,
     AS: AddressSpace,
     AM: AccessModeReadable,
     T: std::ops::Neg,
@@ -248,7 +252,7 @@ where
 
 impl<T, AS, AM> std::ops::Not for Ref<T, AS, AM>
 where
-    T: GpuType + GpuStore + GpuSized + NoAtomics,
+    T: GpuSized + NoAtomics,
     AS: AddressSpace,
     AM: AccessModeReadable,
     T: std::ops::Not,
@@ -262,7 +266,7 @@ macro_rules! impl_ref_binop {
     ($trait:ident, $method:ident) => {
         impl<T1, T2, AS, AM> std::ops::$trait<T1> for Ref<T2, AS, AM>
         where
-            T2: GpuType + GpuStore + GpuSized + NoAtomics,
+            T2: GpuSized + NoAtomics,
             AS: AddressSpace,
             AM: AccessModeReadable,
             T2: std::ops::$trait<T1>,
@@ -275,7 +279,7 @@ macro_rules! impl_ref_binop {
         where
             N: ScalarTypeNumber,
             L: Len,
-            T: GpuType + GpuStore + GpuSized + NoAtomics,
+            T: GpuSized + NoAtomics,
             AS: AddressSpace,
             AM: AccessModeReadable,
             vec<N, L>: std::ops::$trait<T>,
@@ -286,7 +290,7 @@ macro_rules! impl_ref_binop {
 
         impl<T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for u32
         where
-            T: GpuType + GpuStore + GpuSized + NoAtomics,
+            T: GpuSized + NoAtomics,
             AS: AddressSpace,
             AM: AccessModeReadable,
             u32: std::ops::$trait<T>,
@@ -297,7 +301,7 @@ macro_rules! impl_ref_binop {
 
         impl<T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for i32
         where
-            T: GpuType + GpuStore + GpuSized + NoAtomics,
+            T: GpuSized + NoAtomics,
             AS: AddressSpace,
             AM: AccessModeReadable,
             i32: std::ops::$trait<T>,
@@ -308,7 +312,7 @@ macro_rules! impl_ref_binop {
 
         impl<T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for f32
         where
-            T: GpuType + GpuStore + GpuSized + NoAtomics,
+            T: GpuSized + NoAtomics,
             AS: AddressSpace,
             AM: AccessModeReadable,
             f32: std::ops::$trait<T>,
@@ -320,7 +324,7 @@ macro_rules! impl_ref_binop {
         // impl<S, T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for crate::Struct<S>
         // where
         //     S: SizedFields,
-        //     T: GpuType + GpuStore + GpuSized + NoAtomics,
+        //     T: GpuSized + NoAtomics,
         //     AS: AddressSpace,
         //     AM: AccessModeReadable,
         //     crate::Struct<S>: std::ops::$trait<T>,
@@ -332,7 +336,7 @@ macro_rules! impl_ref_binop {
         // This probably doesn't really implement much
         impl<A, T, AS, AM, const N: usize> std::ops::$trait<Ref<T, AS, AM>> for crate::Array<A, crate::Size<N>>
         where
-            T: GpuType + GpuStore + GpuSized + NoAtomics,
+            T: GpuSized + NoAtomics,
             AS: AddressSpace,
             AM: AccessModeReadable,
             crate::Array<A, crate::Size<N>>: std::ops::$trait<T>,
