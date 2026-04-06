@@ -145,7 +145,7 @@ impl AddressSpaceAtomic for WorkGroup {}
 // #[track_caller]
 // fn alloc_impl<T: ToGpuType, AS: AddressSpace + Allocable>(init: T) -> Ref<T::Gpu, AS, AS::DefaultAccess>
 // where
-//     T::Gpu: GpuStore + GpuSized, //TODO(release) it appears WGSL accepts unsized array vars in function address space, investigate if this bound can be removed
+//     T::Gpu: GpuSized, //TODO(release) it appears WGSL accepts unsized array vars in function address space, investigate if this bound can be removed
 // {
 //     Any::alloc_in(AS::ADDRESS_SPACE, init.to_any()).into()
 // }
@@ -169,7 +169,7 @@ impl AddressSpaceAtomic for WorkGroup {}
 #[track_caller]
 pub(crate) fn alloc<T: ToGpuType>(init: T) -> Ref<T::Gpu, Fn>
 where
-    T::Gpu: GpuStore + GpuSized,
+    T::Gpu: GpuSized,
 {
     Any::alloc(T::Gpu::LAYOUT_SIZED.into(), init.to_any()).into()
 }
@@ -179,7 +179,7 @@ where
 // #[track_caller]
 // pub fn workgroup_local<T: ToGpuType>(init: T) -> Ref<T::Gpu, mem::WorkGroup>
 // where
-//     T::Gpu: GpuStore + GpuSized,
+//     T::Gpu: GpuSized,
 // {
 //     alloc_impl::<_, WorkGroup>(init)
 // }
@@ -191,7 +191,7 @@ where
 ///
 /// [`Settings`]: crate::Settings
 #[track_caller]
-pub fn workgroup_local<T: GpuType + GpuStore + GpuSized>() -> Ref<T, mem::WorkGroup> {
+pub fn workgroup_local<T: GpuSized>() -> Ref<T, mem::WorkGroup> {
     // workgroup allocations are default initialized (or uninitialized), since they cannot take
     // an inintializer value if `T` contains atomics. Atomics are not values but
     // memory cells, so we would require some sort of mapping from composit types
@@ -204,7 +204,7 @@ pub fn workgroup_local<T: GpuType + GpuStore + GpuSized>() -> Ref<T, mem::WorkGr
 #[track_caller]
 pub fn thread_local<T: ToGpuType>(init: T) -> Ref<T::Gpu, mem::Thread>
 where
-    T::Gpu: GpuStore + GpuSized,
+    T::Gpu: GpuSized,
 {
     Any::alloc_explicit(
         ir::AddressSpace::Thread,
@@ -227,7 +227,7 @@ impl Cell {
     #[track_caller]
     pub fn new<T: ToGpuType>(init: T) -> Ref<T::Gpu, Fn>
     where
-        T::Gpu: GpuStore + GpuSized,
+        T::Gpu: GpuSized,
     {
         alloc(init)
     }

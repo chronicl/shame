@@ -800,16 +800,22 @@ impl<T: ScalarType, AS: AddressSpace, AM: AccessMode> FromAnys for RefXyzw<T, AS
 
 impl<T: ScalarType, L: Len> vec<T, L> {
     /// (no documentation yet)
+    #[track_caller]
     pub fn to_f16(self) -> vec<f16, L> { self.into_generic() }
     /// (no documentation yet)
+    #[track_caller]
     pub fn to_f32(self) -> vec<f32, L> { self.into_generic() }
     /// (no documentation yet)
+    #[track_caller]
     pub fn to_f64(self) -> vec<f64, L> { self.into_generic() }
     /// (no documentation yet)
+    #[track_caller]
     pub fn to_u32(self) -> vec<u32, L> { self.into_generic() }
     /// (no documentation yet)
+    #[track_caller]
     pub fn to_i32(self) -> vec<i32, L> { self.into_generic() }
     /// (no documentation yet)
+    #[track_caller]
     pub fn to_bool(self) -> vec<bool, L> { self.into_generic() }
 
     /// identical to `Into::into(_)` except that it is also usable in generic

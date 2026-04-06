@@ -36,10 +36,10 @@ impl_to_glam!(
     shame::Atomic<u32> => u32
 );
 
-impl<T: GpuType + GpuSized + NoPadding + ToGlam, const N: usize> ToGlam for Array<T, shame::Size<N>> {
+impl<T: GpuSized + NoPadding + ToGlam, const N: usize> ToGlam for Array<T, shame::Size<N>> {
     type GlamType = [T::GlamType; N];
 }
 
-impl<T: GpuType + GpuSized + NoPadding + ToGlam> ToGlam for Array<T> {
+impl<T: GpuSized + NoPadding + ToGlam> ToGlam for Array<T> {
     type GlamType = Vec<T::GlamType>;
 }

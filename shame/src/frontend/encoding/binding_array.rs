@@ -44,7 +44,7 @@ impl<T, L> BindingArray<T, L> {
 
 impl<T, L, AS, AM, const DO: bool> Binding for BindingArray<Buffer<T, AS, AM, DO>, L>
 where
-    T: GpuStore + GpuLayout,
+    T: GpuLayout,
     Buffer<T, AS, AM, DO>: Binding,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
@@ -131,7 +131,7 @@ where
 
 impl<T, AS, AM, L, const DO: bool> BindingArray<Buffer<T, AS, AM, DO>, L>
 where
-    T: GpuStore + GpuLayout,
+    T: GpuLayout,
     Buffer<T, AS, AM, DO>: Binding,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
@@ -149,7 +149,7 @@ where
 
 impl<Idx: ToInteger, T, AS, AM, L, const DO: bool> GpuIndex<Idx> for BindingArray<Buffer<T, AS, AM, DO>, L>
 where
-    T: GpuStore + GpuLayout,
+    T: GpuLayout,
     Buffer<T, AS, AM, DO>: Binding,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,

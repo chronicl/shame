@@ -94,7 +94,7 @@ impl<T: ScalarTypeInteger> NoPadding for shame::Atomic<T> {
     };
 }
 
-impl<T: GpuType + GpuSized + NoPadding, N: ArrayLen> NoPadding for shame::Array<T, N> {
+impl<T: GpuSized + NoPadding, N: ArrayLen> NoPadding for shame::Array<T, N> {
     const LAYOUT: Layout = {
         let stride = match <T as NoPadding>::LAYOUT.size_rounded_to_align() {
             Some(size) => size,

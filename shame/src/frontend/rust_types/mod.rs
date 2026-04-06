@@ -137,7 +137,7 @@ pub trait ToGpuType {
     #[track_caller]
     fn cell(self) -> Ref<Self::Gpu, mem::Fn>
     where
-        Self::Gpu: GpuStore + GpuSized,
+        Self::Gpu: GpuSized,
         Self: std::marker::Sized,
     {
         Cell::new(self)
