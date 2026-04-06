@@ -376,6 +376,11 @@ pub mod packed {
     };
 }
 
+/// types related to gpu type layouts
+pub mod layout {
+    pub use crate::frontend::rust_types::gpu_type2::{*};
+}
+
 /// results of pipeline encoding
 pub mod results {
     use crate::any::ColorTarget;

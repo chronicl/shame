@@ -4,7 +4,7 @@ use std::{cell::RefCell, num::NonZeroU32, sync::Arc};
 
 use crate::{
     U32PowerOf2,
-    ir::{self, Atomic, Matrix, Repr, Vector},
+    ir::{self, Atomic, Len, Matrix, Repr, Vector},
 };
 
 pub mod align_size;
@@ -31,6 +31,8 @@ pub enum SizedType<'a> {
     Array(SizedArray<'a>),
     Struct(SizedStruct<'a>),
 }
+
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SizedArray<'a> {
@@ -71,6 +73,20 @@ pub struct RuntimeSizedArrayField<'a> {
     pub name: &'a str,
     pub array: RuntimeSizedArray<'a>,
     pub custom_min_align: Option<U32PowerOf2>,
+}
+
+// Some dummys required by the GpuLayout derive
+
+impl SizedType<'static> {
+    /// Used by the GpuLayout derive.
+    pub const DUMMY: Self = SizedType::Vector(Vector {
+        scalar: ir::ScalarType::U32,
+        len: Len::X1,
+    });
+}
+impl RuntimeSizedArray<'static> {
+    /// Used by the GpuLayout derive.
+    pub const DUMMY: Self = Self::new(SizedType::DUMMY);
 }
 
 // some conversions
@@ -150,6 +166,10 @@ impl<'a> RuntimeSizedArrayField<'a> {
             custom_min_align,
         }
     }
+}
+
+impl<'a> SizedArray<'a> {
+    pub const fn new(element: &'a SizedType<'a>, len: NonZeroU32) -> Self { Self { element, len } }
 }
 
 impl<'a> RuntimeSizedArray<'a> {
@@ -291,6 +311,13 @@ impl ir::UnsizedStruct {
 // No bools and no atomics checks
 
 impl LayoutType<'_> {
+    pub const fn is_sized(&self) -> bool {
+        match self {
+            LayoutType::Sized(s) => true,
+            LayoutType::UnsizedStruct(_) | LayoutType::RuntimeSizedArray(_) => false,
+        }
+    }
+
     pub const fn contains_bools(&self) -> bool {
         match self {
             LayoutType::Sized(s) => s.contains_bools(),

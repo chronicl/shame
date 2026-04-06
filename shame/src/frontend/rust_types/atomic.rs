@@ -97,6 +97,11 @@ impl<T: ScalarTypeInteger> GetAllFields for Atomic<T> {
 }
 
 impl<T: ScalarTypeInteger> GpuLayout for Atomic<T> {
+    const LAYOUT: crate::layout::LayoutType<'static> = ir::Atomic {
+        scalar: T::SCALAR_TYPE_INTEGER,
+    }
+    .to_layout_type();
+
     fn layout_type() -> ir::LayoutType {
         ir::Atomic {
             scalar: T::SCALAR_TYPE_INTEGER,

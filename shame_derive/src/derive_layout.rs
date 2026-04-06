@@ -223,6 +223,64 @@ pub fn impl_for_struct(
                     #last_field_type: #re::NoBools + #re::NoHandles + #re::GpuLayout,
                     #where_clause_predicates
                 {
+                    const LAYOUT: #re::layout::LayoutType<'static> = {
+                        const LAST_FIELD_SIZED_LAYOUT: #re::layout::SizedType<'static> = match <#last_field_type as #re::GpuLayout>::LAYOUT {
+                            #re::layout::LayoutType::Sized(s) => s,
+                            _ => #re::layout::SizedType::DUMMY
+                        };
+                        const LAST_FIELD_UNSIZED_LAYOUT: #re::layout::RuntimeSizedArray<'static> = match <#last_field_type as #re::GpuLayout>::LAYOUT {
+                            #re::layout::LayoutType::RuntimeSizedArray(a) => a,
+                            _ => #re::layout::RuntimeSizedArray::DUMMY,
+                        };
+
+                        match <#last_field_type as #re::GpuLayout>::LAYOUT {
+                            #re::layout::LayoutType::Sized(_) => {
+                                #re::layout::SizedStruct {
+                                    name: std::stringify!(#derive_struct_ident),
+                                    fields: &[
+                                        #(
+                                            #re::layout::SizedField {
+                                                name: std::stringify!(#first_fields_ident),
+                                                ty: <#first_fields_type as #re::GpuLayout>::LAYOUT_SIZED,
+                                                custom_min_align: None,
+                                                custom_min_size: None
+                                            },
+                                        )*
+                                        #re::layout::SizedField {
+                                            name: std::stringify!(#last_field_ident),
+                                            ty: LAST_FIELD_SIZED_LAYOUT,
+                                            custom_min_align: None,
+                                            custom_min_size: None,
+                                        },
+                                    ],
+                                    repr: #gpu_repr_shame,
+                                }.to_layout_type()
+                            },
+                            #re::layout::LayoutType::RuntimeSizedArray(_) => {
+                                #re::layout::UnsizedStruct {
+                                    name: std::stringify!(#derive_struct_ident),
+                                    sized_fields: &[
+                                        #(
+                                            #re::layout::SizedField {
+                                                name: std::stringify!(#first_fields_ident),
+                                                ty: <#first_fields_type as #re::GpuLayout>::LAYOUT_SIZED,
+                                                custom_min_align: None,
+                                                custom_min_size: None
+                                            },
+                                        )*
+                                    ],
+                                    last_unsized: #re::layout::RuntimeSizedArrayField {
+                                        name: std::stringify!(#last_field_ident),
+                                        array: LAST_FIELD_UNSIZED_LAYOUT,
+                                        custom_min_align: None,
+                                    },
+                                    repr: #gpu_repr_shame,
+                                }.to_layout_type()
+                            },
+                            #re::layout::LayoutType::UnsizedStruct(_) => panic!("structs may not contain unsized structs"),
+                        }
+                    };
+
                     fn layout_type() -> #re::LayoutType {
                         let result = #re::LayoutType::struct_from_parts(
                             std::stringify!(#derive_struct_ident),

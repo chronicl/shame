@@ -130,6 +130,11 @@ impl<T: GpuType + GpuStore + GpuSized, N: ArrayLen> ToGpuType for Array<T, N> {
 }
 
 impl<T: GpuType + GpuSized + GpuLayout, N: ArrayLen> GpuLayout for Array<T, N> {
+    const LAYOUT: crate::layout::LayoutType<'static> = match N::LEN {
+        Some(n) => crate::layout::SizedArray::new(&T::LAYOUT_SIZED, n).to_layout_type(),
+        None => crate::layout::RuntimeSizedArray::new(T::LAYOUT_SIZED).to_layout_type(),
+    };
+
     fn layout_type() -> ir::LayoutType {
         match N::LEN {
             Some(n) => ir::SizedArray::new(Rc::new(T::layout_sized()), n).into(),

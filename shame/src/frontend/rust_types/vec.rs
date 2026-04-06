@@ -543,15 +543,9 @@ impl<T: ScalarType, L: Len> GpuLayout for vec<T, L>
 where
     vec<T, L>: NoBools,
 {
-    fn layout_type() -> LayoutType {
-        ir::Vector::new(
-            T::SCALAR_TYPE
-                .try_into()
-                .expect("guaranteed via `NoBools` trait bound above"),
-            L::LEN,
-        )
-        .into()
-    }
+    const LAYOUT: crate::layout::LayoutType<'static> = ir::Vector::new(T::SCALAR_TYPE, L::LEN).to_layout_type();
+
+    fn layout_type() -> LayoutType { ir::Vector::new(T::SCALAR_TYPE, L::LEN).into() }
 
     fn cpu_type_name_and_layout()
     -> Option<Result<(std::borrow::Cow<'static, str>, TypeLayout), super::layout_traits::ArrayElementsUnsizedError>>

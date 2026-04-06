@@ -136,6 +136,29 @@ use super::{
 /// [`StorageTexture`]: crate::StorageTexture
 ///
 pub trait GpuLayout {
+    /// The layout of the type.
+    const LAYOUT: crate::layout::LayoutType<'static>;
+
+    /// The sized layout of the type, if it is sized. Compile time panics if it is not sized.
+    const LAYOUT_SIZED: crate::layout::SizedType<'static> = match Self::LAYOUT {
+        crate::layout::LayoutType::Sized(s) => s,
+        _ => panic!("Is not sized. This type needs to be sized for your intended usage."),
+    };
+    /// Compile time asserts that the type does not contain bools.
+    const ASSERT_NO_BOOLS: () = {
+        assert!(
+            !Self::LAYOUT.contains_bools(),
+            "Contains bools. This type needs to not contain bools for your intended usage."
+        );
+    };
+    /// Compile time asserts that the type does not contain atomics.
+    const ASSERT_NO_ATOMICS: () = {
+        assert!(
+            !Self::LAYOUT.contains_atomics(),
+            "Contains atomics. This type needs to not contain atomics for your intended usage."
+        );
+    };
+
     /// Returns a [`TypeLayoutRecipe`] that describes how a layout algorithm (repr) should layout this type in memory.
     fn layout_type() -> LayoutType;
 
@@ -546,6 +569,18 @@ where
 }
 
 impl GpuLayout for GpuT {
+    const LAYOUT: crate::layout::LayoutType<'static> = crate::layout::SizedStruct {
+        name: "GpuT",
+        fields: &[crate::layout::SizedField {
+            name: "a",
+            ty: <vec<f32, x1> as GpuLayout>::LAYOUT_SIZED,
+            custom_min_align: None,
+            custom_min_size: None,
+        }],
+        repr: Repr::Wgsl,
+    }
+    .to_layout_type();
+
     fn layout_type() -> LayoutType { todo!() }
 
     fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
