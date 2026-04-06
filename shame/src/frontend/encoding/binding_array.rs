@@ -68,7 +68,7 @@ where
 
             // If our type is not a struct we wrap it in a struct, because wgsl requires
             // all buffer bindings to be structs.
-            let recipe = T::layout_type();
+            let recipe = T::layout_type_owned();
             let (recipe, is_generated_struct) = match recipe {
                 // already structs
                 LayoutType::Sized(SizedType::Struct(_)) | LayoutType::UnsizedStruct(_) => (recipe, false),

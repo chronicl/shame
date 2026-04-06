@@ -131,13 +131,6 @@ impl<T: GpuSized, N: ArrayLen> GpuLayout for Array<T, N> {
         None => crate::layout::RuntimeSizedArray::new(T::LAYOUT_SIZED).to_layout_type(),
     };
 
-    fn layout_type() -> ir::LayoutType {
-        match N::LEN {
-            Some(n) => ir::SizedArray::new(Rc::new(T::layout_sized()), n).into(),
-            None => ir::RuntimeSizedArray::new(T::layout_sized()).into(),
-        }
-    }
-
     fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
         let (t_cpu_name, t_cpu_layout) = match T::cpu_type_name_and_layout()? {
             Ok(t) => t,

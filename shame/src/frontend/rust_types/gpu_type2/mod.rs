@@ -116,6 +116,8 @@ impl<'a, T: Into<SizedType<'a>>> From<T> for LayoutType<'a> {
     fn from(value: T) -> Self { LayoutType::Sized(value.into()) }
 }
 
+
+
 // const conversions
 
 impl Matrix {

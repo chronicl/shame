@@ -224,7 +224,7 @@ where
         get_layout_compare_with_cpu_push_error::<T>(ctx, None);
     });
 
-    let ty = T::layout_type();
+    let ty = T::layout_type_owned();
     Ref::from(create_ref_any_for_buffer_binding(
         args,
         has_dynamic_offset,

@@ -542,8 +542,6 @@ impl<T: ScalarType, L: Len> GpuStore for vec<T, L> {
 impl<T: ScalarType, L: Len> GpuLayout for vec<T, L> {
     const LAYOUT: crate::layout::LayoutType<'static> = Self::LAYOUT_SIZED.to_layout_type();
 
-    fn layout_type() -> LayoutType { ir::Vector::new(T::SCALAR_TYPE, L::LEN).into() }
-
     fn cpu_type_name_and_layout()
     -> Option<Result<(std::borrow::Cow<'static, str>, TypeLayout), super::layout_traits::ArrayElementsUnsizedError>>
     {

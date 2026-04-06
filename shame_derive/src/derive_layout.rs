@@ -293,33 +293,6 @@ pub fn impl_for_struct(
                         }
                     };
 
-                    fn layout_type() -> #re::LayoutType {
-                        let result = #re::LayoutType::struct_from_parts(
-                            std::stringify!(#derive_struct_ident),
-                            [
-                                #((
-                                    #re::FieldOptions::new(
-                                        std::stringify!(#field_ident),
-                                        #field_align.into(),
-                                        #field_size.into(),
-                                    ),
-                                    <#field_type as #re::GpuLayout>::layout_type()
-                                ),)*
-                            ],
-                            #gpu_repr_shame,
-                        );
-
-                        match result {
-                            Ok(recipe_type) => recipe_type,
-                            Err(#re::StructFromPartsError::MustHaveAtLeastOneField) => unreachable!("checked above"),
-                            Err(#re::StructFromPartsError::OnlyLastFieldMayBeUnsized) => unreachable!("ensured by field trait bounds"),
-                            // GpuType is not implemented for derived structs directly, so they can't be used
-                            // as the field of another struct, instead shame::Struct<T> has to be used, which
-                            // only accepts sized structs.
-                            Err(#re::StructFromPartsError::MustNotHaveUnsizedStructField) => unreachable!("GpuType bound for fields makes this impossible"),
-                        }
-                    }
-
                     fn cpu_type_name_and_layout() -> Option<Result<(std::borrow::Cow<'static, str>, #re::TypeLayout), #re::ArrayElementsUnsizedError>> {
                         use #re::CpuLayout as _;
                         #(
@@ -435,7 +408,7 @@ pub fn impl_for_struct(
                     #where_clause_predicates
                 {
                     fn ty() -> #re::ir::Type {
-                        <Self as #re::GpuLayout>::layout_type().into()
+                        <Self as #re::GpuLayout>::layout_type_owned().into()
                     }
 
                     #[track_caller]
@@ -459,7 +432,7 @@ pub fn impl_for_struct(
                         match first_any.get_struct_parent() {
                             Some(parent) => parent,
                             None => {
-                                let ty = <Self as #re::GpuLayout>::layout_type();
+                                let ty = <Self as #re::GpuLayout>::layout_type_owned();
                                 match ty {
                                     #re::LayoutType::Sized(#re::SizedType::Struct(s)) => {
                                         #re::Any::new_struct(s,
@@ -488,7 +461,7 @@ pub fn impl_for_struct(
                     fn from(any: #re::Any) -> Self {
                         #re::typecheck_downcast(
                             any,
-                            <Self as #re::GpuLayout>::layout_type().into(),
+                            <Self as #re::GpuLayout>::layout_type_owned().into(),
                             |any| Self {
                                 #(#field_ident: <#field_type as #re::GpuLayoutField>::from_any(
                                     any.get_field(std::stringify!(#field_ident).into())

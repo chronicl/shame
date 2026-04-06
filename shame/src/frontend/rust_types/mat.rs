@@ -47,15 +47,6 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> Default for mat<T, C, R> {
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuLayout for mat<T, C, R> {
     const LAYOUT: crate::layout::LayoutType<'static> = Self::LAYOUT_SIZED.to_layout_type();
 
-    fn layout_type() -> ir::LayoutType {
-        ir::Matrix {
-            columns: C::LEN2,
-            rows: R::LEN2,
-            scalar: T::SCALAR_TYPE_FP,
-        }
-        .into()
-    }
-
     fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> { None }
 }
 

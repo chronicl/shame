@@ -153,21 +153,8 @@ pub trait GpuLayout {
         );
     };
 
-    /// Returns a [`TypeLayoutRecipe`] that describes how a layout algorithm (repr) should layout this type in memory.
-    fn layout_type() -> LayoutType;
-
-    /// For `GpuSized` types, this returns the [`SizedType`] that describes the type's layout.
-    fn layout_sized() -> SizedType
-    where
-        Self: GpuSized,
-    {
-        match Self::layout_type() {
-            LayoutType::Sized(s) => s,
-            LayoutType::RuntimeSizedArray(_) | LayoutType::UnsizedStruct(_) => {
-                unreachable!("Self is GpuSized, which these TypeLayoutRecipe variants aren't.")
-            }
-        }
-    }
+    /// `Self::LAYOUT`, but in it's owned / ir form.
+    fn layout_type_owned() -> LayoutType { Self::LAYOUT.into() }
 
     /// the `#[cpu(...)]` in `#[derive(GpuLayout)]` allows the definition of a
     /// corresponding Cpu type to the Gpu type that the derive macro is used on.
@@ -209,7 +196,7 @@ pub trait GpuLayout {
 /// println!("OnCpu:\n{}\n", OnCpu::cpu_layout());
 /// ```
 #[track_caller]
-pub fn gpu_layout<T: GpuLayout + ?Sized>() -> TypeLayout { T::layout_type().layout() }
+pub fn gpu_layout<T: GpuLayout + ?Sized>() -> TypeLayout { T::layout_type_owned().layout() }
 
 /// (no documentation yet)
 // `CpuLayout::cpu_layout` exists, but this function exists for consistency with
@@ -575,8 +562,6 @@ impl GpuLayout for GpuT {
         repr: Repr::Wgsl,
     }
     .to_layout_type();
-
-    fn layout_type() -> LayoutType { todo!() }
 
     fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> {
         Some(Ok((
