@@ -191,7 +191,7 @@ fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: Transform
 
             let base = &*idx.expr;
             let index = &*idx.index;
-            let ts = quote_spanned! { span => (#base).at((#index)) };
+            let ts = quote_spanned! { span => (#base).at(#index) };
             *expr = syn::parse2(ts).expect("failed to parse .at() call");
         }
         syn::Expr::Assign(assign) if should_transform(&assign.attrs, mode) => {
@@ -202,7 +202,7 @@ fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: Transform
 
             let left = &*assign.left;
             let right = &*assign.right;
-            let ts = quote_spanned! { span => (#left).set((#right)) };
+            let ts = quote_spanned! { span => (#left).set(#right) };
             *expr = syn::parse2(ts).expect("failed to parse .set() call");
         }
         syn::Expr::Binary(bin) if should_transform(&bin.attrs, mode) => {
@@ -236,7 +236,7 @@ fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: Transform
                 let right = &*bin.right;
                 let method_ident = syn::Ident::new(method_name, span);
 
-                let ts = quote_spanned! { span => (#left).#method_ident((#right)) };
+                let ts = quote_spanned! { span => (#left).#method_ident(#right) };
                 *expr = syn::parse2(ts).expect("failed to parse binary method call");
             }
         }

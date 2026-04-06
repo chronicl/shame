@@ -212,8 +212,6 @@ impl<T: ScalarType, L: Len, AS: AddressSpace, AM: AccessModeReadable> Ref<vec<T,
     #[track_caller] pub fn not_equal   (&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.get().not_equal(rhs)}
 }
 
-
-
 // Bit::BitwiseComplement       =>  [Vec(n, t)]              if t.is_integer() => Vec(n, t)
 // Bit::Or | Bit::And | Bit::XOr  =>  [Vec(n, t), Vec(n, t)  ] if t.is_integer() => Vec(n, t)
 // Bit::Shl | Bit::Shr           =>  [Vec(n, t), Vec(n, U32)] if t.is_integer() => Vec(n, t)
