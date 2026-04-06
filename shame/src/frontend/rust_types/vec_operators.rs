@@ -6,7 +6,7 @@ use super::{
     vec::ToVec,
     AsAny, To, ToGpuType,
 };
-use crate::common::floating_point::f16;
+use crate::{AccessMode, AccessModeReadable, common::floating_point::f16};
 use crate::frontend::rust_types::reference::Ref;
 use crate::frontend::rust_types::vec::vec;
 use crate::{
@@ -182,6 +182,36 @@ impl<T: ScalarType, L: Len> vec<T, L> {
     /// component wise "not equal" comparison operation (`!=`)
     #[track_caller] pub fn not_equal   (&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.as_any().ne(rhs.to_any()).into()}
 }
+
+#[rustfmt::skip]
+impl<T: ScalarType, L: Len, AS: AddressSpace, AM: AccessModeReadable> Ref<vec<T, L>, AS, AM> {
+    /// component wise "less than" operation (`<`)
+    #[track_caller] pub fn lt(&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.get().lt(rhs)}
+    /// component wise "less than or equal" operation (`<=`)
+    #[track_caller] pub fn le(&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.get().le(rhs)}
+    /// component wise "greater than" operation (`>`)
+    #[track_caller] pub fn gt(&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.get().gt(rhs)}
+    /// component wise "greater than or equal" operation (`>=`)
+    #[track_caller] pub fn ge(&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.get().ge(rhs)}
+    /// component wise equality comparison operation (`==`)
+    #[track_caller] pub fn eq(&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.get().eq(rhs)}
+    /// component wise "not equal" comparison operation (`!=`)
+    #[track_caller] pub fn ne(&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.get().ne(rhs)}
+
+    /// component wise "less than" operation (`<`)
+    #[track_caller] pub fn less_than   (&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.get().less_than(rhs)}
+    /// component wise "less than or equal" operation (`<=`)
+    #[track_caller] pub fn less_eq     (&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.get().less_eq(rhs)}
+    /// component wise "greater than" operation (`>`)
+    #[track_caller] pub fn greater_than(&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.get().greater_than(rhs)}
+    /// component wise "greater than or equal" operation (`>=`)
+    #[track_caller] pub fn greater_eq  (&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.get().greater_eq(rhs)}
+    /// component wise equality comparison operation (`==`)
+    #[track_caller] pub fn equals       (&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.get().equals(rhs)}
+    /// component wise "not equal" comparison operation (`!=`)
+    #[track_caller] pub fn not_equal   (&self, rhs: impl To<vec<T, L>>) -> vec<bool, L> {self.get().not_equal(rhs)}
+}
+
 
 
 // Bit::BitwiseComplement       =>  [Vec(n, t)]              if t.is_integer() => Vec(n, t)

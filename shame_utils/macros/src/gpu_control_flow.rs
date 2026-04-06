@@ -105,21 +105,19 @@ fn transform_stmt(stmt: &mut syn::Stmt, mode: TransformMode) {
         syn::Stmt::Local(local) => {
             if mode.should_transform_let_mut() && should_transform(&local.attrs, mode) {
                 // transform_let_mut `let mut pat = expr` -> `let pat = ::shame::Cell::new(expr)`
-                if let syn::Pat::Ident(ref mut pat_ident) = local.pat {
-                    if let Some(mut_token) = pat_ident.mutability.take() {
-                        let span = mut_token.span;
-                        if let Some(ref mut init) = local.init {
-                            transform_expr(&mut init.expr, &mut None, mode);
-                            if let Some((_, ref mut diverge)) = init.diverge {
-                                transform_expr(diverge, &mut None, mode);
-                            }
-                            let inner = init.expr.clone();
-                            init.expr = Box::new(
-                                syn::parse2(quote_spanned! { span => ::shame::Cell::new(#inner) })
-                                    .expect("failed to parse Cell::new wrapping"),
-                            );
-                            return;
+                if let syn::Pat::Ident(ref mut pat_ident) = local.pat &&
+                    let Some(mut_token) = pat_ident.mutability.take()
+                {
+                    let span = mut_token.span;
+                    if let Some(ref mut init) = local.init {
+                        transform_expr(&mut init.expr, &mut None, mode);
+                        if let Some((_, ref mut diverge)) = init.diverge {
+                            transform_expr(diverge, &mut None, mode);
                         }
+                        let inner = init.expr.clone();
+                        init.expr = syn::parse2(quote_spanned! { span => ::shame::Cell::new(#inner) })
+                            .expect("failed to parse Cell::new wrapping");
+                        return;
                     }
                 }
             }
