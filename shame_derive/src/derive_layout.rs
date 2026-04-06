@@ -497,6 +497,11 @@ pub fn impl_for_struct(
                         Some(self)
                     }
                 }
+
+                impl<#generics_decl> #re::NotRef for #derive_struct_ident<#(#idents_of_generics),*>
+                where
+                    #where_clause_predicates
+                {}
             };
 
             match gpu_repr {

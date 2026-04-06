@@ -235,6 +235,7 @@ pub use frontend::rust_types::atomic::AtomicI32;
 
 // `Ref` / `Cell`
 pub use frontend::rust_types::reference::Ref;
+pub use frontend::rust_types::reference::NotRef;
 pub use frontend::rust_types::mem::Cell;
 pub use frontend::rust_types::reference::Read;
 pub use frontend::rust_types::reference::Write;

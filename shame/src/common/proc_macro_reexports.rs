@@ -20,6 +20,7 @@ pub use crate::frontend::rust_types::layout_traits::VertexAttributeRecipe;
 pub use crate::frontend::rust_types::reference::AccessMode;
 pub use crate::frontend::rust_types::reference::AccessModeReadable;
 pub use crate::frontend::rust_types::reference::Ref;
+pub use crate::frontend::rust_types::reference::NotRef;
 pub use crate::frontend::rust_types::type_traits::BindingArgs;
 pub use crate::frontend::rust_types::type_traits::GpuSized;
 pub use crate::frontend::rust_types::type_traits::GpuStore;

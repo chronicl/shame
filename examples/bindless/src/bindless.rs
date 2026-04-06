@@ -68,7 +68,7 @@ impl BindlessExample {
 
         if is_tex {
             let tex_index = *bindings.tex_indices.at(tex_index);
-            let texture = bindings.textures.at(tex_index.get());
+            let texture = bindings.textures.at(tex_index);
             let sample = bindings.sampler.sample(texture, MipFn::zero(), tex_uv);
             color.set(sample);
         }
@@ -78,7 +78,7 @@ impl BindlessExample {
             .attachments
             .color_iter()
             .next::<sm::SurfaceFormat>()
-            .blend(sm::Blend::add(), color.get());
+            .blend(sm::Blend::add(), color);
 
         Ok(enc.finish()?)
     }

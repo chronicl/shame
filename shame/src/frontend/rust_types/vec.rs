@@ -10,7 +10,7 @@ use super::{
     AsAny, GpuType, To, ToGpuType,
 };
 use crate::{
-    call_info,
+    AccessModeReadable, call_info,
     common::{
         proc_macro_utils::{collect_into_array_exact, push_wrong_amount_of_args_error},
         small_vec::SmallVec,
@@ -521,6 +521,12 @@ impl ToInteger for i32 {
 }
 impl ToInteger for crate::VertexIndex {
     const SCALAR_TYPE_INTEGER: ir::ScalarTypeInteger = ir::ScalarTypeInteger::U32;
+}
+impl<T: GpuSized + ToInteger, AS: AddressSpace, AM: AccessModeReadable> ToInteger for Ref<T, AS, AM>
+where
+    Ref<T, AS, AM>: ToVec<L = x1>,
+{
+    const SCALAR_TYPE_INTEGER: ir::ScalarTypeInteger = T::SCALAR_TYPE_INTEGER;
 }
 //impl<V: ToVec<L = x1>> ToInteger for V where V::T: ScalarTypeInteger {}
 

@@ -9,7 +9,7 @@ use super::{
     AsAny, To,
 };
 use crate::{
-    GpuLayout, Len, ScalarTypeNumber, ToGpuType, call_info,
+    GpuLayout, Len, ScalarType, ScalarTypeFp, ScalarTypeInteger, ScalarTypeNumber, ToGpuType, call_info,
     frontend::{any::Any, rust_types::vec::vec},
     ir::{self, LayoutType, StoreType, Type, recording::Context},
     x1,
@@ -267,11 +267,29 @@ where
     fn not(self) -> Self::Output { self.get().not() }
 }
 
+/// This trait is implemented by all types that are not a `shame::Ref`, but want
+/// to auto implement binary ops with `shame::Ref`. The auto impl is
+/// ```
+/// impl<T1, T2, AS, AM> std::ops::BinOp<T1> for Ref<T2, AS, AM> { ... }
+/// ```
+pub trait NotRef {}
+
+impl NotRef for u32 {}
+impl NotRef for i32 {}
+impl NotRef for f32 {}
+impl NotRef for u64 {}
+impl NotRef for bool {}
+impl<T: ScalarType, L: Len> NotRef for vec<T, L> {}
+impl<T: ScalarTypeFp, C: crate::Len2, R: crate::Len2> NotRef for crate::mat<T, C, R> {}
+impl<T: GpuSized, N: ArrayLen> NotRef for Array<T, N> {}
+impl<T: ScalarTypeInteger> NotRef for crate::Atomic<T> {}
+
 // Binary ops
 macro_rules! impl_ref_binop {
     ($trait:ident, $method:ident) => {
         impl<T1, T2, AS, AM> std::ops::$trait<T1> for Ref<T2, AS, AM>
         where
+            T1: NotRef,
             T2: GpuSized,
             AS: AddressSpace,
             AM: AccessModeReadable,
@@ -279,6 +297,19 @@ macro_rules! impl_ref_binop {
         {
             type Output = <T2 as std::ops::$trait<T1>>::Output;
             fn $method(self, rhs: T1) -> Self::Output { self.get().$method(rhs) }
+        }
+
+        impl<T1, AS1, AM1, T2, AS2, AM2> std::ops::$trait<Ref<T1, AS1, AM1>> for Ref<T2, AS2, AM2>
+        where
+            T1: GpuSized,
+            AS1: AddressSpace,
+            AM1: AccessModeReadable,
+            T2: std::ops::$trait<T1> + GpuSized,
+            AS2: AddressSpace,
+            AM2: AccessModeReadable,
+        {
+            type Output = <T2 as std::ops::$trait<T1>>::Output;
+            fn $method(self, rhs: Ref<T1, AS1, AM1>) -> Self::Output { self.get().$method(rhs.get()) }
         }
 
         impl<N, L, T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for vec<N, L>
@@ -291,6 +322,20 @@ macro_rules! impl_ref_binop {
             vec<N, L>: std::ops::$trait<T>,
         {
             type Output = <vec<N, L> as std::ops::$trait<T>>::Output;
+            fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
+        }
+
+        impl<C, R, S, T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for crate::mat<S, C, R>
+        where
+            S: ScalarTypeFp,
+            C: crate::Len2,
+            R: crate::Len2,
+            T: GpuSized,
+            AS: AddressSpace,
+            AM: AccessModeReadable,
+            crate::mat<S, C, R>: std::ops::$trait<T>,
+        {
+            type Output = <crate::mat<S, C, R> as std::ops::$trait<T>>::Output;
             fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
         }
 
@@ -326,18 +371,6 @@ macro_rules! impl_ref_binop {
             type Output = <f32 as std::ops::$trait<T>>::Output;
             fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
         }
-
-        // impl<S, T, AS, AM> std::ops::$trait<Ref<T, AS, AM>> for crate::Struct<S>
-        // where
-        //     S: SizedFields,
-        //     T: GpuSized + NoAtomics,
-        //     AS: AddressSpace,
-        //     AM: AccessModeReadable,
-        //     crate::Struct<S>: std::ops::$trait<T>,
-        // {
-        //     type Output = <crate::Struct<S> as std::ops::$trait<T>>::Output;
-        //     fn $method(self, rhs: Ref<T, AS, AM>) -> Self::Output { self.$method(rhs.get()) }
-        // }
 
         // This probably doesn't really implement much
         impl<A, T, AS, AM, const N: usize> std::ops::$trait<Ref<T, AS, AM>> for crate::Array<A, crate::Size<N>>
