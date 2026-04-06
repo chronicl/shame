@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use std::{cell::RefCell, num::NonZeroU32, sync::Arc};
+use std::{cell::RefCell, num::NonZeroU32, rc::Rc, sync::Arc};
 
 use crate::{
     U32PowerOf2,
@@ -143,6 +143,9 @@ impl<'a> RuntimeSizedArray<'a> {
 }
 impl<'a> UnsizedStruct<'a> {
     pub const fn to_layout_type(self) -> LayoutType<'a> { LayoutType::UnsizedStruct(self) }
+}
+impl<'a> SizedType<'a> {
+    pub const fn to_layout_type(self) -> LayoutType<'a> { LayoutType::Sized(self) }
 }
 
 // some helper constructors
@@ -304,6 +307,89 @@ impl ir::UnsizedStruct {
             sized_fields,
             last_unsized: self.last_unsized.borrow(bump),
             repr: self.repr,
+        }
+    }
+}
+
+// to ir conversions
+
+impl From<LayoutType<'_>> for ir::LayoutType {
+    fn from(value: LayoutType<'_>) -> Self {
+        match value {
+            LayoutType::Sized(s) => ir::LayoutType::Sized(s.into()),
+            LayoutType::UnsizedStruct(s) => ir::LayoutType::UnsizedStruct(s.into()),
+            LayoutType::RuntimeSizedArray(a) => ir::LayoutType::RuntimeSizedArray(a.into()),
+        }
+    }
+}
+
+impl From<SizedType<'_>> for ir::SizedType {
+    fn from(value: SizedType<'_>) -> Self {
+        match value {
+            SizedType::Vector(v) => ir::SizedType::Vector(v),
+            SizedType::Matrix(m) => ir::SizedType::Matrix(m),
+            SizedType::Atomic(a) => ir::SizedType::Atomic(a),
+            SizedType::Array(a) => ir::SizedType::Array(a.into()),
+            SizedType::Struct(s) => ir::SizedType::Struct(s.into()),
+        }
+    }
+}
+
+impl From<SizedArray<'_>> for ir::SizedArray {
+    fn from(value: SizedArray<'_>) -> Self {
+        ir::SizedArray {
+            element: Rc::new((*value.element).into()),
+            len: value.len,
+        }
+    }
+}
+
+impl From<RuntimeSizedArray<'_>> for ir::RuntimeSizedArray {
+    fn from(value: RuntimeSizedArray<'_>) -> Self {
+        ir::RuntimeSizedArray {
+            element: value.element.into(),
+        }
+    }
+}
+
+impl From<SizedField<'_>> for ir::SizedField {
+    fn from(value: SizedField<'_>) -> Self {
+        ir::SizedField {
+            name: value.name.to_owned().into(),
+            ty: value.ty.into(),
+            custom_min_size: value.custom_min_size,
+            custom_min_align: value.custom_min_align,
+        }
+    }
+}
+
+impl From<RuntimeSizedArrayField<'_>> for ir::RuntimeSizedArrayField {
+    fn from(value: RuntimeSizedArrayField<'_>) -> Self {
+        ir::RuntimeSizedArrayField {
+            name: value.name.to_owned().into(),
+            array: value.array.into(),
+            custom_min_align: value.custom_min_align,
+        }
+    }
+}
+
+impl From<SizedStruct<'_>> for ir::SizedStruct {
+    fn from(value: SizedStruct<'_>) -> Self {
+        ir::SizedStruct {
+            name: value.name.to_owned().into(),
+            fields: value.fields.iter().map(|f| (*f).into()).collect(),
+            repr: value.repr,
+        }
+    }
+}
+
+impl From<UnsizedStruct<'_>> for ir::UnsizedStruct {
+    fn from(value: UnsizedStruct<'_>) -> Self {
+        ir::UnsizedStruct {
+            name: value.name.to_owned().into(),
+            sized_fields: value.sized_fields.iter().map(|f| (*f).into()).collect(),
+            last_unsized: value.last_unsized.into(),
+            repr: value.repr,
         }
     }
 }

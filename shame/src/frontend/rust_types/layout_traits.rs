@@ -138,12 +138,6 @@ use super::{
 pub trait GpuLayout {
     /// The layout of the type.
     const LAYOUT: crate::layout::LayoutType<'static>;
-
-    /// The sized layout of the type, if it is sized. Compile time panics if it is not sized.
-    const LAYOUT_SIZED: crate::layout::SizedType<'static> = match Self::LAYOUT {
-        crate::layout::LayoutType::Sized(s) => s,
-        _ => panic!("Is not sized. This type needs to be sized for your intended usage."),
-    };
     /// Compile time asserts that the type does not contain bools.
     const ASSERT_NO_BOOLS: () = {
         assert!(
@@ -573,7 +567,8 @@ impl GpuLayout for GpuT {
         name: "GpuT",
         fields: &[crate::layout::SizedField {
             name: "a",
-            ty: <vec<f32, x1> as GpuLayout>::LAYOUT_SIZED,
+            // ty: <vec<f32, x1> as GpuSized>::sized_ty(),
+            ty: todo!(),
             custom_min_align: None,
             custom_min_size: None,
         }],
@@ -637,12 +632,7 @@ impl GpuStore for GpuT {
 }
 
 impl GpuSized for GpuT {
-    fn sized_ty() -> ir::SizedType
-    where
-        Self: for<'trivial_bound> GpuType,
-    {
-        unreachable!("Self: !GpuType")
-    }
+    const LAYOUT_SIZED: crate::layout::SizedType<'static> = todo!();
 }
 
 // #[derive(HostLayout)]

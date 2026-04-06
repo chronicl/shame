@@ -171,7 +171,7 @@ pub(crate) fn alloc<T: ToGpuType>(init: T) -> Ref<T::Gpu, Fn>
 where
     T::Gpu: GpuStore + GpuSized,
 {
-    Any::alloc(T::Gpu::sized_ty(), init.to_any()).into()
+    Any::alloc(T::Gpu::LAYOUT_SIZED.into(), init.to_any()).into()
 }
 
 // TODO(release) clean this up (delete it or keep it)
@@ -197,7 +197,7 @@ pub fn workgroup_local<T: GpuType + GpuStore + GpuSized>() -> Ref<T, mem::WorkGr
     // memory cells, so we would require some sort of mapping from composit types
     // that contain atomics to composit types that have a regular u32 or i32 in that
     // place. At the time of writing it appears that WGSL does not support this either.
-    Any::alloc_default_in(ir::AddressSpace::WorkGroup, T::sized_ty()).into()
+    Any::alloc_default_in(ir::AddressSpace::WorkGroup, T::LAYOUT_SIZED.into()).into()
 }
 
 #[doc(hidden)] // TODO(release) not necessary when function recording doesn't exist yet, so we keep it private api until then
@@ -206,7 +206,12 @@ pub fn thread_local<T: ToGpuType>(init: T) -> Ref<T::Gpu, mem::Thread>
 where
     T::Gpu: GpuStore + GpuSized,
 {
-    Any::alloc_explicit(ir::AddressSpace::Thread, T::Gpu::sized_ty(), Some(init.to_any())).into()
+    Any::alloc_explicit(
+        ir::AddressSpace::Thread,
+        T::Gpu::LAYOUT_SIZED.into(),
+        Some(init.to_any()),
+    )
+    .into()
 }
 
 /// (no documentation yet)

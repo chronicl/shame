@@ -531,19 +531,19 @@ impl<T: ScalarType, L: Len> Deref for vec<T, L> {
 }
 
 impl<T: ScalarType, L: Len> GpuSized for vec<T, L> {
-    fn sized_ty() -> ir::SizedType { Vector::new(T::SCALAR_TYPE, L::LEN).into() }
+    const LAYOUT_SIZED: crate::layout::SizedType<'static> = Vector::new(T::SCALAR_TYPE, L::LEN).to_sized_type();
 }
 
 impl<T: ScalarType, L: Len> GpuStore for vec<T, L> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = L::VecComponentsRef<T, AS, AM>;
-    fn store_ty() -> ir::StoreType { <Self as GpuSized>::sized_ty().into() }
+    fn store_ty() -> ir::StoreType { Self::LAYOUT_SIZED.into() }
 }
 
 impl<T: ScalarType, L: Len> GpuLayout for vec<T, L>
 where
     vec<T, L>: NoBools,
 {
-    const LAYOUT: crate::layout::LayoutType<'static> = ir::Vector::new(T::SCALAR_TYPE, L::LEN).to_layout_type();
+    const LAYOUT: crate::layout::LayoutType<'static> = Self::LAYOUT_SIZED.to_layout_type();
 
     fn layout_type() -> LayoutType { ir::Vector::new(T::SCALAR_TYPE, L::LEN).into() }
 

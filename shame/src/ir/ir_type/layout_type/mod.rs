@@ -88,7 +88,7 @@ pub struct Atomic {
 
 impl Atomic {
     /// Creates a new atomic with the provided scalar type.
-    pub fn new(scalar: ScalarTypeInteger) -> Self { Self { scalar } }
+    pub const fn new(scalar: ScalarTypeInteger) -> Self { Self { scalar } }
 }
 
 #[allow(missing_docs)]

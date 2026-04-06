@@ -94,27 +94,18 @@ impl<T: PackedScalarType, L: LenEven> PackedVec<T, L> {
     fn sized_ty_equivalent() -> SizedType {
         use ir::ir_type::PackedVectorByteSize as Size;
         match get_type_description::<L, T>().byte_size() {
-            Size::_2 => <vec<f16, x1> as GpuSized>::sized_ty(),
-            Size::_4 => <vec<u32, x1> as GpuSized>::sized_ty(),
-            Size::_8 => <vec<u32, x2> as GpuSized>::sized_ty(),
+            Size::_2 => <vec<f16, x1> as GpuSized>::LAYOUT_SIZED.into(),
+            Size::_4 => <vec<u32, x1> as GpuSized>::LAYOUT_SIZED.into(),
+            Size::_8 => <vec<u32, x2> as GpuSized>::LAYOUT_SIZED.into(),
         }
     }
 }
 
-pub(crate) fn get_type_description<L: LenEven, T: PackedScalarType>() -> PackedVector {
+pub(crate) const fn get_type_description<L: LenEven, T: PackedScalarType>() -> PackedVector {
     PackedVector {
         len: L::LEN_EVEN,
         bits_per_component: T::BITS_PER_COMPONENT,
         scalar_type: T::SCALAR_TYPE,
-    }
-}
-
-impl<T: PackedScalarType, L: LenEven> GpuSized for PackedVec<T, L> {
-    fn sized_ty() -> ir::SizedType
-    where
-        Self: GpuType,
-    {
-        unreachable!("Self: !GpuType")
     }
 }
 

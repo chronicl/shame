@@ -131,13 +131,8 @@ impl GpuStoreImplCategory {
 ///
 /// [`Atomic<T>`]: crate::Atomic
 pub trait GpuSized {
-    // `GpuSized` does not imply `GpuStore`, because `Atomic<T>` is `GpuSized` but `!GpuStore`
-
-    /// returns the `ir::SizedType` that `Self` corresponds to inside the shader type system.
-    #[doc(hidden)] // runtime api
-    fn sized_ty() -> ir::SizedType
-    where
-        Self: GpuType;
+    /// The sized layout of `Self` on the gpu.
+    const LAYOUT_SIZED: crate::layout::SizedType<'static>;
 }
 
 #[diagnostic::on_unimplemented(

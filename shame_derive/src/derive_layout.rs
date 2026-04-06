@@ -196,6 +196,16 @@ pub fn impl_for_struct(
     let field_align = &fields_with_attrs
         .iter()
         .map(|f| quote_option(f.align.clone()))
+        .map(|align| {
+            quote!(
+                match #align {
+                    Some(align) => Some(
+                        #re::U32PowerOf2::new_unchecked(align)
+                    ),
+                    None => None,
+                }
+            )
+        })
         .collect::<Vec<_>>();
 
     let (last_field_ident, first_fields_ident) = field_ident.split_last().expect("checked above");
@@ -224,11 +234,37 @@ pub fn impl_for_struct(
                     #where_clause_predicates
                 {
                     const LAYOUT: #re::layout::LayoutType<'static> = {
-                        const LAST_FIELD_SIZED_LAYOUT: #re::layout::SizedType<'static> = match <#last_field_type as #re::GpuLayout>::LAYOUT {
-                            #re::layout::LayoutType::Sized(s) => s,
-                            _ => #re::layout::SizedType::DUMMY
-                        };
-                        const LAST_FIELD_UNSIZED_LAYOUT: #re::layout::RuntimeSizedArray<'static> = match <#last_field_type as #re::GpuLayout>::LAYOUT {
+                        const FIELDS_WHEN_SIZED: &[#re::layout::SizedField<'static>] = &[
+                            #(
+                                #re::layout::SizedField {
+                                    name: std::stringify!(#first_fields_ident),
+                                    ty: <#first_fields_type as #re::GpuSized>::LAYOUT_SIZED,
+                                    custom_min_align: #first_fields_align,
+                                    custom_min_size: #first_fields_size,
+                                },
+                            )*
+                            #re::layout::SizedField {
+                                name: std::stringify!(#last_field_ident),
+                                ty: match <#last_field_type as #re::GpuLayout>::LAYOUT {
+                                    #re::layout::LayoutType::Sized(s) => s,
+                                    _ => #re::layout::SizedType::DUMMY
+                                },
+                                custom_min_align: #last_field_align,
+                                custom_min_size: #last_field_size,
+                            },
+                        ];
+
+                        const SIZED_FIELDS_WHEN_UNSIZED: &[#re::layout::SizedField<'static>] = &[
+                            #(
+                                #re::layout::SizedField {
+                                    name: std::stringify!(#first_fields_ident),
+                                    ty: <#first_fields_type as #re::GpuSized>::LAYOUT_SIZED,
+                                    custom_min_align: #first_fields_align,
+                                    custom_min_size: #first_fields_size,
+                                },
+                            )*
+                        ];
+                        const RUNTIME_SIZED_ARRAY: #re::layout::RuntimeSizedArray<'static> = match <#last_field_type as #re::GpuLayout>::LAYOUT {
                             #re::layout::LayoutType::RuntimeSizedArray(a) => a,
                             _ => #re::layout::RuntimeSizedArray::DUMMY,
                         };
@@ -237,42 +273,18 @@ pub fn impl_for_struct(
                             #re::layout::LayoutType::Sized(_) => {
                                 #re::layout::SizedStruct {
                                     name: std::stringify!(#derive_struct_ident),
-                                    fields: &[
-                                        #(
-                                            #re::layout::SizedField {
-                                                name: std::stringify!(#first_fields_ident),
-                                                ty: <#first_fields_type as #re::GpuLayout>::LAYOUT_SIZED,
-                                                custom_min_align: None,
-                                                custom_min_size: None
-                                            },
-                                        )*
-                                        #re::layout::SizedField {
-                                            name: std::stringify!(#last_field_ident),
-                                            ty: LAST_FIELD_SIZED_LAYOUT,
-                                            custom_min_align: None,
-                                            custom_min_size: None,
-                                        },
-                                    ],
+                                    fields: FIELDS_WHEN_SIZED,
                                     repr: #gpu_repr_shame,
                                 }.to_layout_type()
                             },
                             #re::layout::LayoutType::RuntimeSizedArray(_) => {
                                 #re::layout::UnsizedStruct {
                                     name: std::stringify!(#derive_struct_ident),
-                                    sized_fields: &[
-                                        #(
-                                            #re::layout::SizedField {
-                                                name: std::stringify!(#first_fields_ident),
-                                                ty: <#first_fields_type as #re::GpuLayout>::LAYOUT_SIZED,
-                                                custom_min_align: None,
-                                                custom_min_size: None
-                                            },
-                                        )*
-                                    ],
+                                    sized_fields: SIZED_FIELDS_WHEN_UNSIZED,
                                     last_unsized: #re::layout::RuntimeSizedArrayField {
                                         name: std::stringify!(#last_field_ident),
-                                        array: LAST_FIELD_UNSIZED_LAYOUT,
-                                        custom_min_align: None,
+                                        array: RUNTIME_SIZED_ARRAY,
+                                        custom_min_align: #last_field_align,
                                     },
                                     repr: #gpu_repr_shame,
                                 }.to_layout_type()
@@ -288,7 +300,7 @@ pub fn impl_for_struct(
                                 #((
                                     #re::FieldOptions::new(
                                         std::stringify!(#field_ident),
-                                        #field_align.map(|align: u32| TryFrom::try_from(align).expect("power of two validated during codegen")).into(),
+                                        #field_align.into(),
                                         #field_size.into(),
                                     ),
                                     <#field_type as #re::GpuLayout>::layout_type()
@@ -374,15 +386,37 @@ pub fn impl_for_struct(
 
                 impl<#generics_decl> #re::GpuSized for #derive_struct_ident<#(#idents_of_generics),*>
                 where
-                    #(#triv #field_type: #re::GpuSized + #re::GpuStore + #re::GpuType,)*
+                    #(#triv #field_type: #re::GpuSized,)*
                     #where_clause_predicates
                 {
-                    fn sized_ty() -> #re::ir::SizedType where #triv Self: #re::GpuType {
-                        match <Self as #re::GpuLayout>::layout_type() {
-                            #re::LayoutType::Sized(s) => s,
-                            _ => unreachable!("All fields are sized."),
-                        }
-                    }
+                    const LAYOUT_SIZED: #re::layout::SizedType<'static> = {
+                        // TODO(chronicl) replace with GpuLayout match
+                        const FIELDS_SIZED: &[#re::layout::SizedField<'static>] = &[
+                            #(
+                                #re::layout::SizedField {
+                                    name: std::stringify!(#first_fields_ident),
+                                    ty: <#first_fields_type as #re::GpuSized>::LAYOUT_SIZED,
+                                    custom_min_align: #first_fields_align,
+                                    custom_min_size: #first_fields_size,
+                                },
+                            )*
+                            #re::layout::SizedField {
+                                name: std::stringify!(#last_field_ident),
+                                ty: match <#last_field_type as #re::GpuLayout>::LAYOUT {
+                                    #re::layout::LayoutType::Sized(s) => s,
+                                    _ => #re::layout::SizedType::DUMMY
+                                },
+                                custom_min_align: #last_field_align,
+                                custom_min_size: #last_field_size,
+                            },
+                        ];
+
+                        #re::layout::SizedStruct {
+                            name: std::stringify!(#derive_struct_ident),
+                            fields: FIELDS_SIZED,
+                            repr: #gpu_repr_shame,
+                        }.to_sized_type()
+                    };
                 }
             };
 

@@ -45,12 +45,7 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> Default for mat<T, C, R> {
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuLayout for mat<T, C, R> {
-    const LAYOUT: crate::layout::LayoutType<'static> = ir::Matrix {
-        columns: C::LEN2,
-        rows: R::LEN2,
-        scalar: T::SCALAR_TYPE_FP,
-    }
-    .to_layout_type();
+    const LAYOUT: crate::layout::LayoutType<'static> = Self::LAYOUT_SIZED.to_layout_type();
 
     fn layout_type() -> ir::LayoutType {
         ir::Matrix {
@@ -64,6 +59,15 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuLayout for mat<T, C, R> {
     fn cpu_type_name_and_layout() -> Option<Result<(Cow<'static, str>, TypeLayout), ArrayElementsUnsizedError>> { None }
 }
 
+impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuSized for mat<T, C, R> {
+    const LAYOUT_SIZED: crate::layout::SizedType<'static> = ir::Matrix {
+        columns: C::LEN2,
+        rows: R::LEN2,
+        scalar: T::SCALAR_TYPE_FP,
+    }
+    .to_sized_type();
+}
+
 impl<T: ScalarTypeFp, C: Len2, R: Len2> FromAnys for mat<T, C, R> {
     fn expected_num_anys() -> usize { 1 }
 
@@ -71,16 +75,7 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> FromAnys for mat<T, C, R> {
     fn from_anys(mut anys: impl Iterator<Item = Any>) -> Self { super::layout_traits::from_single_any(anys).into() }
 }
 
-impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuSized for mat<T, C, R> {
-    fn sized_ty() -> ir::SizedType {
-        ir::Matrix {
-            columns: C::LEN2,
-            rows: R::LEN2,
-            scalar: T::SCALAR_TYPE_FP,
-        }
-        .into()
-    }
-}
+
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuType for mat<T, C, R> {
     fn ty() -> ir::Type { ir::Type::Store(Self::store_ty()) }
@@ -103,7 +98,7 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> AsAny for mat<T, C, R> {
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuStore for mat<T, C, R> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
-    fn store_ty() -> ir::StoreType { <Self as GpuSized>::sized_ty().into() }
+    fn store_ty() -> ir::StoreType { <Self as GpuSized>::LAYOUT_SIZED.into() }
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> ToGpuType for mat<T, C, R> {

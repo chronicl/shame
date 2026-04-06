@@ -61,12 +61,12 @@ impl<T: ScalarTypeInteger> ToGpuType for Atomic<T> {
 }
 
 impl<T: ScalarTypeInteger> GpuSized for Atomic<T> {
-    fn sized_ty() -> ir::SizedType { ir::Atomic::new(T::SCALAR_TYPE_INTEGER).into() }
+    const LAYOUT_SIZED: crate::layout::SizedType<'static> = ir::Atomic::new(T::SCALAR_TYPE_INTEGER).to_sized_type();
 }
 
 impl<T: ScalarTypeInteger> GpuStore for Atomic<T> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
-    fn store_ty() -> ir::StoreType { <Self as GpuSized>::sized_ty().into() }
+    fn store_ty() -> ir::StoreType { <Self as GpuSized>::LAYOUT_SIZED.into() }
 }
 
 impl<T: ScalarTypeInteger> NoBools for Atomic<T> {}
@@ -78,7 +78,7 @@ impl<T: ScalarTypeInteger> AsAny for Atomic<T> {
 
 impl<T: ScalarTypeInteger> From<Any> for Atomic<T> {
     fn from(any: Any) -> Self {
-        super::typecheck_downcast(any, <Self as GpuSized>::sized_ty().into(), |any| Self {
+        super::typecheck_downcast(any, <Self as GpuSized>::LAYOUT_SIZED.into(), |any| Self {
             any,
             phantom: PhantomData,
         })
@@ -97,10 +97,7 @@ impl<T: ScalarTypeInteger> GetAllFields for Atomic<T> {
 }
 
 impl<T: ScalarTypeInteger> GpuLayout for Atomic<T> {
-    const LAYOUT: crate::layout::LayoutType<'static> = ir::Atomic {
-        scalar: T::SCALAR_TYPE_INTEGER,
-    }
-    .to_layout_type();
+    const LAYOUT: crate::layout::LayoutType<'static> = Self::LAYOUT_SIZED.to_layout_type();
 
     fn layout_type() -> ir::LayoutType {
         ir::Atomic {

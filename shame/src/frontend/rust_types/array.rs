@@ -107,14 +107,10 @@ impl<T: GpuType + GpuSized + GpuStore, N: ArrayLen> GpuStore for Array<T, N> {
     fn store_ty() -> ir::StoreType { Self::array_store_ty() }
 }
 
-impl<T: GpuType + GpuSized, const N: usize> GpuSized for Array<T, Size<N>> {
-    fn sized_ty() -> ir::SizedType {
-        ir::SizedArray::new(
-            Rc::new(T::sized_ty()),
-            Size::<N>::LEN.expect("known length at compile time"),
-        )
-        .into()
-    }
+impl<T: GpuSized, const N: usize> GpuSized for Array<T, Size<N>> {
+    const LAYOUT_SIZED: crate::layout::SizedType<'static> =
+        crate::layout::SizedArray::new(&T::LAYOUT_SIZED, Size::<N>::LEN.expect("known length at compile time"))
+            .to_sized_type();
 }
 
 #[rustfmt::skip] impl<T: GpuType + GpuSized + NoHandles, N: ArrayLen> NoHandles for Array<T, N> {}
@@ -195,7 +191,7 @@ impl<T: GpuType + GpuSized, N: ArrayLen> FromAnys for Array<T, N> {
 
 impl<T: GpuType + GpuSized, N: ArrayLen> Array<T, N> {
     fn array_store_ty() -> ir::StoreType {
-        let element_ty = <T as GpuSized>::sized_ty();
+        let element_ty = <T as GpuSized>::LAYOUT_SIZED.into();
         match N::LEN {
             Some(n) => ir::SizedArray::new(Rc::new(element_ty), n).into(),
             None => ir::RuntimeSizedArray::new(element_ty).into(),
@@ -255,7 +251,7 @@ where
 
     fn to_gpu(&self) -> Self::Gpu {
         let anys: [Any; N] = std::array::from_fn(|i| self[i].to_any());
-        Any::new_array(Rc::new(T::Gpu::sized_ty()), &anys).into()
+        Any::new_array(Rc::new(T::Gpu::LAYOUT_SIZED.into()), &anys).into()
     }
 
     fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> { None }
@@ -268,7 +264,7 @@ impl<T: GpuType + GpuStore + GpuSized + NoAtomics, const N: usize> Array<T, Size
 
     /// zero initialize, see https://www.w3.org/TR/WGSL/#zero-value-builtin-function
     #[track_caller]
-    pub fn zero() -> Self { Any::new_default(Self::sized_ty()).into() }
+    pub fn zero() -> Self { Any::new_default(Self::LAYOUT_SIZED.into()).into() }
 
     /// create a new array by transforming the elements of `self`
     ///
