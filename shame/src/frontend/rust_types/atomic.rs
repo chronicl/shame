@@ -7,7 +7,7 @@ use crate::{
 };
 
 use super::{
-    layout_traits::{ArrayElementsUnsizedError, FromAnys, GetAllFields, GpuLayout},
+    layout_traits::{ArrayElementsUnsizedError, FromAnys, GpuLayout},
     len::x1,
     mem::{AddressSpace, AddressSpaceAtomic},
     reference::{AccessMode, ReadWrite},
@@ -67,6 +67,7 @@ impl<T: ScalarTypeInteger> GpuSized for Atomic<T> {
 impl<T: ScalarTypeInteger> GpuStore for Atomic<T> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
     fn store_ty() -> ir::StoreType { <Self as GpuSized>::LAYOUT_SIZED.into() }
+    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
 }
 
 impl<T: ScalarTypeInteger> NoBools for Atomic<T> {}
@@ -90,10 +91,6 @@ impl<T: ScalarTypeInteger> FromAnys for Atomic<T> {
 
     #[track_caller]
     fn from_anys(mut anys: impl Iterator<Item = Any>) -> Self { super::layout_traits::from_single_any(anys).into() }
-}
-
-impl<T: ScalarTypeInteger> GetAllFields for Atomic<T> {
-    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
 }
 
 impl<T: ScalarTypeInteger> GpuLayout for Atomic<T> {

@@ -13,7 +13,7 @@ use super::{
     AsAny, GpuType, To, ToGpuType,
     index::GpuIndex,
     ir::type_layout::{ArrayLayout, TypeLayout},
-    layout_traits::{ArrayElementsUnsizedError, FromAnys, GetAllFields, GpuLayout},
+    layout_traits::{ArrayElementsUnsizedError, FromAnys, GpuLayout},
     len::x1,
     mem::AddressSpace,
     reference::{AccessMode, AccessModeReadable},
@@ -105,6 +105,7 @@ impl<const N: usize> Size<N> {
 impl<T: GpuType + GpuSized + GpuStore, N: ArrayLen> GpuStore for Array<T, N> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
     fn store_ty() -> ir::StoreType { Self::array_store_ty() }
+    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
 }
 
 impl<T: GpuSized, const N: usize> GpuSized for Array<T, Size<N>> {
@@ -274,10 +275,6 @@ impl<T: GpuType + GpuStore + GpuSized + NoAtomics, const N: usize> Array<T, Size
         });
         result.get()
     }
-}
-
-impl<T: GpuType + GpuSized, N: ArrayLen> GetAllFields for Array<T, N> {
-    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
 }
 
 /// Wraps Ref<Array<T>, AS, AM> to provide a more convenient indexing API:

@@ -326,7 +326,6 @@ pub use frontend::rust_types::layout_traits::gpu_layout;
 pub use frontend::rust_types::layout_traits::CpuLayout;
 pub use frontend::rust_types::layout_traits::cpu_layout;
 pub use frontend::rust_types::layout_traits::VertexLayout;
-pub use frontend::rust_types::layout_traits::GetAllFields;
 pub use ir::type_layout::TypeLayout;
 pub use common::po2::U32PowerOf2;
 pub use common::po2::NotAU32PowerOf2;

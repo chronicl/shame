@@ -6,7 +6,6 @@ use crate::{
     frontend::{
         encoding::rasterizer::FragmentStage,
         rust_types::{
-            layout_traits::GetAllFields,
             len::*,
             reference::AccessMode,
             scalar_type::{ScalarType, ScalarTypeInteger},

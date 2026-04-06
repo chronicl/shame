@@ -13,7 +13,6 @@ pub use crate::frontend::rust_types::layout_traits::ArrayElementsUnsizedError;
 pub use crate::frontend::rust_types::layout_traits::CpuAligned;
 pub use crate::frontend::rust_types::layout_traits::CpuLayout;
 pub use crate::frontend::rust_types::layout_traits::FromAnys;
-pub use crate::frontend::rust_types::layout_traits::GetAllFields;
 pub use crate::frontend::rust_types::layout_traits::GpuLayout;
 pub use crate::frontend::rust_types::gpu_type2 as layout;
 pub use crate::frontend::rust_types::layout_traits::VertexLayout;

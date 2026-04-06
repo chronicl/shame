@@ -1,7 +1,7 @@
 use super::{
     array::{Array, ArrayLen},
     error::FrontendError,
-    layout_traits::{FromAnys, GetAllFields},
+    layout_traits::{FromAnys},
     mem::{self, AddressSpace},
     type_traits::{GpuSized, GpuStore, NoAtomics},
     typecheck_downcast,
@@ -177,7 +177,7 @@ where
     let from_any_unchecked = |any| Ref::<T, AS, AM> {
         any,
         fields_as_refs: {
-            let field_anys = <T as GetAllFields>::fields_as_anys_unchecked(any);
+            let field_anys = <T as GpuStore>::fields_as_anys_unchecked(any);
             FromAnys::from_anys((field_anys.borrow() as &[Any]).iter().copied())
         },
     };

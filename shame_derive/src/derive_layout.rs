@@ -484,14 +484,7 @@ pub fn impl_for_struct(
                             _ => unreachable!(),
                         }
                     }
-                }
 
-                impl<#generics_decl> #re::GetAllFields for #derive_struct_ident<#(#idents_of_generics),*>
-                where
-                    #(#triv #first_fields_type: #re::GpuSized,)*
-                    #triv #last_field_type: #re::GpuLayout,
-                    #where_clause_predicates
-                {
                     fn fields_as_anys_unchecked(self_: #re::Any) -> impl std::borrow::Borrow<[#re::Any]> {
                         [
                             #(self_.get_field(std::stringify!(#field_ident).into())),*

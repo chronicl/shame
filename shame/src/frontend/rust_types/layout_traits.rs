@@ -135,7 +135,7 @@ use super::{
 /// [`Texture`]: crate::Texture
 /// [`StorageTexture`]: crate::StorageTexture
 ///
-pub trait GpuLayout {
+pub trait GpuLayout: GpuStore {
     /// The layout of the type.
     const LAYOUT: crate::layout::LayoutType<'static>;
     /// Compile time asserts that the type does not contain bools.
@@ -369,19 +369,6 @@ pub trait FromAnys {
     fn from_anys(anys: impl Iterator<Item = Any>) -> Self;
 }
 
-/// (no documentation yet)
-pub trait GetAllFields {
-    // get the individual fields of `Self` or `Ref<Self>` in its `Any` form,
-    // i.e. the fields of a `Struct<T>`, the xyzw components of a `vec` etc.
-    //
-    // returns an empty array if `Self` has no fields.
-    //
-    // The implementation of this function is not required to do type checking
-    // on the incoming or outgoing `Any`s. That part is up to the caller.
-    /// (no documentation yet)
-    fn fields_as_anys_unchecked(self_as_any: Any) -> impl Borrow<[Any]>;
-}
-
 #[track_caller]
 pub(crate) fn from_single_any(mut anys: impl Iterator<Item = Any>) -> Any {
     let call_info = call_info!();
@@ -534,20 +521,6 @@ impl NoHandles for GpuT {}
 impl NoAtomics for GpuT {}
 impl NoBools for GpuT {}
 
-impl GetAllFields for GpuT
-where
-    vec<f32, x1>: for<'trivial_bound> GpuType,
-    vec<u32, x1>: for<'trivial_bound> GpuType,
-    Array<vec<i32, x1>, Size<4>>: for<'trivial_bound> GpuType,
-{
-    fn fields_as_anys_unchecked(self_: Any) -> impl Borrow<[Any]> {
-        [
-            self_.get_field("a".into()),
-            self_.get_field("b".into()),
-            self_.get_field("c".into()),
-        ]
-    }
-}
 
 impl GpuLayout for GpuT {
     const LAYOUT: crate::layout::LayoutType<'static> = crate::layout::SizedStruct {
@@ -614,6 +587,14 @@ impl GpuStore for GpuT {
     type RefFields<AS: AddressSpace, AM: AccessMode> = GpuTypeRef<AS, AM>;
 
     fn store_ty() -> ir::StoreType { unreachable!() }
+
+    fn fields_as_anys_unchecked(self_: Any) -> impl Borrow<[Any]> {
+        [
+            self_.get_field("a".into()),
+            self_.get_field("b".into()),
+            self_.get_field("c".into()),
+        ]
+    }
 }
 
 impl GpuSized for GpuT {

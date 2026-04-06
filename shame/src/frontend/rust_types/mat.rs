@@ -2,7 +2,7 @@ use std::{borrow::Cow, marker::PhantomData};
 
 use super::{
     index::GpuIndex,
-    layout_traits::{ArrayElementsUnsizedError, FromAnys, GetAllFields, GpuLayout},
+    layout_traits::{ArrayElementsUnsizedError, FromAnys, GpuLayout},
     len::{x1, x2, x3, x4, Len2},
     mem::AddressSpace,
     reference::AccessMode,
@@ -90,6 +90,7 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> AsAny for mat<T, C, R> {
 impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuStore for mat<T, C, R> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = EmptyRefFields;
     fn store_ty() -> ir::StoreType { <Self as GpuSized>::LAYOUT_SIZED.into() }
+    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
 }
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> ToGpuType for mat<T, C, R> {
@@ -532,8 +533,4 @@ where
     ///
     /// see https://www.w3.org/TR/WGSL/#indeterminate-values
     pub fn col(&self, i: impl ToInteger) -> Ref<vec<T, Rows>, AS, AM> { self.as_any().matrix_index(i.to_any()).into() }
-}
-
-impl<Cols: Len2, Rows: Len2, T: ScalarTypeFp> GetAllFields for mat<T, Cols, Rows> {
-    fn fields_as_anys_unchecked(self_as_any: Any) -> impl std::borrow::Borrow<[Any]> { [] }
 }

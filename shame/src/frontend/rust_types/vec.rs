@@ -23,7 +23,7 @@ use crate::{
 };
 
 use super::{
-    layout_traits::{FromAnys, GetAllFields, GpuLayout},
+    layout_traits::{FromAnys, GpuLayout},
     type_traits::{GpuSized, GpuStore, NoBools},
 };
 use crate::frontend::rust_types::reference::Ref;
@@ -537,6 +537,21 @@ impl<T: ScalarType, L: Len> GpuSized for vec<T, L> {
 impl<T: ScalarType, L: Len> GpuStore for vec<T, L> {
     type RefFields<AS: AddressSpace, AM: AccessMode> = L::VecComponentsRef<T, AS, AM>;
     fn store_ty() -> ir::StoreType { Self::LAYOUT_SIZED.into() }
+    #[rustfmt::skip]
+    fn fields_as_anys_unchecked(any: Any) -> impl std::borrow::Borrow<[Any]> {
+        use crate::common::small_vec::SmallVec;
+        use Comp4::*;
+        let swizzle = |c: Comp4| any.swizzle(VectorAccess::Swizzle1([c]));
+
+        let smallvec: SmallVec<_, 4> = match L::LEN {
+            ir::Len::X1 => [].as_slice().into(), // empty, instead of [X].map(swizzle), because a scalar has no .x component
+            ir::Len::X2 => [X, Y]      .map(swizzle).as_slice().into(),
+            ir::Len::X3 => [X, Y, Z]   .map(swizzle).as_slice().into(),
+            ir::Len::X4 => [X, Y, Z, W].map(swizzle).as_slice().into(),
+        };
+
+        smallvec
+    }
 }
 
 impl<T: ScalarType, L: Len> GpuLayout for vec<T, L> {
@@ -1035,24 +1050,6 @@ impl Swizzle<3> for () {
 impl Swizzle<4> for () {
     type Len = x4;
     fn to_vector_access(comps: [Comp4; 4]) -> VectorAccess { VectorAccess::Swizzle4(comps) }
-}
-
-impl<T: ScalarType, L: Len> GetAllFields for vec<T, L> {
-    #[rustfmt::skip]
-    fn fields_as_anys_unchecked(any: Any) -> impl std::borrow::Borrow<[Any]> {
-        use crate::common::small_vec::SmallVec;
-        use Comp4::*;
-        let swizzle = |c: Comp4| any.swizzle(VectorAccess::Swizzle1([c]));
-
-        let smallvec: SmallVec<_, 4> = match L::LEN {
-            ir::Len::X1 => [].as_slice().into(), // empty, instead of [X].map(swizzle), because a scalar has no .x component
-            ir::Len::X2 => [X, Y]      .map(swizzle).as_slice().into(),
-            ir::Len::X3 => [X, Y, Z]   .map(swizzle).as_slice().into(),
-            ir::Len::X4 => [X, Y, Z, W].map(swizzle).as_slice().into(),
-        };
-
-        smallvec
-    }
 }
 
 impl<T: ScalarType, L: Len> VertexAttribute for vec<T, L>

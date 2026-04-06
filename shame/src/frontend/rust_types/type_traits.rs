@@ -1,5 +1,7 @@
+use std::borrow::Borrow;
+
 use super::{
-    layout_traits::{FromAnys, GetAllFields},
+    layout_traits::{FromAnys},
     mem::AddressSpace,
     reference::AccessMode,
     AsAny, GpuType,
@@ -57,7 +59,7 @@ pub struct BindingArgs {
 //[old-doc]
 //[old-doc] corresponds to WGSL "Storable type" https://www.w3.org/TR/WGSL/#storable-types
 /// (no documentation yet)
-pub trait GpuStore: GpuType + GetAllFields + FromAnys {
+pub trait GpuStore: GpuType + FromAnys {
     /// the type whose public immutable interface is exposed by [`shame::Ref<Self>`]:
     ///
     /// `<shame::Ref<Self, _, _> as std::ops::Deref>::Target`
@@ -92,8 +94,21 @@ pub trait GpuStore: GpuType + GetAllFields + FromAnys {
     /// [`shame::Ref<Self>`]: crate::Ref
     type RefFields<AS: AddressSpace, AM: AccessMode>: FromAnys + Copy;
 
+
     #[doc(hidden)] // runtime api
     fn store_ty() -> ir::StoreType;
+
+    // get the individual fields of `Self` or `Ref<Self>` in its `Any` form,
+    //
+    // i.e. the fields of a `Struct<T>`, the xyzw components of a `vec` etc.
+    //
+    // returns an empty array if `Self` has no fields.
+    //
+    // The implementation of this function is not required to do type checking
+    // on the incoming or outgoing `Any`s. That part is up to the caller.
+    /// (no documentation yet)
+    fn fields_as_anys_unchecked(self_as_any: Any) -> impl Borrow<[Any]>;
+
 
     #[doc(hidden)] // unstable
     #[track_caller]

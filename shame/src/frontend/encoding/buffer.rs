@@ -13,7 +13,7 @@ use crate::{
             GpuType,
             array::{Array, ArrayRef, RuntimeSize, Size},
             atomic::Atomic,
-            layout_traits::{FromAnys, GetAllFields, get_layout_compare_with_cpu_push_error},
+            layout_traits::{FromAnys, get_layout_compare_with_cpu_push_error},
             len::{Len, Len2, LenEven},
             mat::mat,
             mem::{self, AddressSpace, SupportsAccess},
