@@ -434,20 +434,12 @@ pub fn impl_for_struct(
 
                 impl<#generics_decl> From<#re::Any> for #derive_struct_ident<#(#idents_of_generics),*>
                 where
-                    #(#triv #field_type: #re::GpuLayout + #re::GpuType,)*
+                    #(#triv #field_type: #re::GpuLayout,)*
                     #where_clause_predicates
                 {
                     #[track_caller]
                     fn from(any: #re::Any) -> Self {
-                        #re::typecheck_downcast(
-                            any,
-                            <Self as #re::GpuLayout>::layout_type_owned().into(),
-                            |any| Self {
-                                #(#field_ident: <#field_type as #re::GpuLayoutField>::from_any(
-                                    any.get_field(std::stringify!(#field_ident).into())
-                                ),)*
-                            }
-                        )
+                        <Self as #re::GpuType>::from_any(any)
                     }
                 }
 

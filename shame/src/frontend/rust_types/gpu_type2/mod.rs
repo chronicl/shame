@@ -11,10 +11,6 @@ pub mod align_size;
 
 pub(crate) const PACKED_ALIGN: U32PowerOf2 = U32PowerOf2::_1;
 
-pub trait GpuType2 {
-    const TYPE: LayoutType<'static>;
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LayoutType<'a> {
     Sized(SizedType<'a>),
