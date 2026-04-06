@@ -413,25 +413,20 @@ pub fn impl_for_struct(
                 {
                     fn as_any(&self) -> #re::Any {
                         use #re::AsAny as _;
-                        let first_any = self.#first_field_ident.as_any();
-                        match first_any.get_struct_parent() {
-                            Some(parent) => parent,
-                            None => {
-                                let ty = <Self as #re::GpuLayout>::layout_type_owned();
-                                match ty {
-                                    #re::LayoutType::Sized(#re::SizedType::Struct(s)) => {
-                                        #re::Any::new_struct(s,
-                                            &[#(self.#field_ident.as_any()),*],
-                                        )
-                                    },
-                                    _ => match #re::Context::try_with_or_invalid_any(#re::call_info!(), |ctx| {
-                                        ctx.push_error(#re::EncodingErrorKind::UnexpectedTypeForStructConstruction(ty));
-                                        #re::Any::new_invalid(#re::InvalidReason::ErrorThatWasPushed)
-                                    }) {
-                                        Ok(any) => any,
-                                        Err(any) => any
-                                    },
-                                }
+
+                        let ty = <Self as #re::GpuLayout>::layout_type_owned();
+                        match ty {
+                            #re::LayoutType::Sized(#re::SizedType::Struct(s)) => {
+                                #re::Any::new_struct(s,
+                                    &[#(self.#field_ident.as_any()),*],
+                                )
+                            },
+                            _ => match #re::Context::try_with_or_invalid_any(#re::call_info!(), |ctx| {
+                                ctx.push_error(#re::EncodingErrorKind::UnexpectedTypeForStructConstruction(ty));
+                                #re::Any::new_invalid(#re::InvalidReason::ErrorThatWasPushed)
+                            }) {
+                                Ok(any) => any,
+                                Err(any) => any
                             },
                         }
                     }

@@ -98,6 +98,7 @@ pub trait VertexAttribute: FromAnys {
     fn vertex_attrib_format() -> VertexAttribFormat;
 }
 
+// TODO probably remove
 /// Trait that the fields of a derived `GpuLayout` type must implement.
 /// This is used for showing a more helpful error message when trying to use
 /// #[derive(GpuLayout)]
@@ -110,7 +111,7 @@ pub trait VertexAttribute: FromAnys {
 /// struct B { a: shame::Struct<A> }
 /// which the error message points out.
 #[diagnostic::on_unimplemented(
-    message = "{Self} is not a valid `shame::GpuLayout` field type. These include `shame::GpuType`s and `shame::packed::PackedVec`. If {Self} is a `shame::GpuLayout` struct, it can be used as a field by wrapping it in `shame::Struct<{Self}>`."
+    message = "{Self} is not a valid `shame::GpuLayout` field type. These include `shame::GpuType`s`."
 )]
 pub trait GpuLayoutField {
     /// Constructs Self from Any
