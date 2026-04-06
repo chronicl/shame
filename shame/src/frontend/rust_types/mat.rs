@@ -86,10 +86,6 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> AsAny for mat<T, C, R> {
     fn as_any(&self) -> Any { self.any }
 }
 
-impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuStore for mat<T, C, R> {
-    fn store_ty() -> ir::StoreType { <Self as GpuSized>::LAYOUT_SIZED.into() }
-}
-
 impl<T: ScalarTypeFp, C: Len2, R: Len2> ToGpuType for mat<T, C, R> {
     type Gpu = Self;
 

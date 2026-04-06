@@ -451,19 +451,6 @@ pub fn impl_for_struct(
                     }
                 }
 
-                impl<#generics_decl> #re::GpuStore for #derive_struct_ident<#(#idents_of_generics),*>
-                where
-                    #(#triv #field_type: #re::GpuLayout,)*
-                    #where_clause_predicates
-                {
-                    fn store_ty() -> #re::ir::StoreType {
-                        match <Self as #re::GpuType>::ty() {
-                            #re::ir::Type::Store(t) => t,
-                            _ => unreachable!(),
-                        }
-                    }
-                }
-
                 impl<AS: #re::AddressSpace, AM: #re::AccessMode> #re::FromAnys for #derive_struct_ref_ident<AS, AM>
                 where #(
                     #triv #field_type: #re::GpuStore,

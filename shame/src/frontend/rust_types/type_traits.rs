@@ -72,6 +72,10 @@ pub trait GpuStore: GpuType {
     }
 }
 
+impl<T: GpuLayout> GpuStore for T {
+    fn store_ty() -> ir::StoreType { T::layout_type_owned().into() }
+}
+
 #[diagnostic::on_unimplemented(message = "the size of `{Self}` on the gpu is not known at rust compile-time")]
 /// ## known byte-size on the gpu
 /// types whose byte-size on the graphics device is known at rust compile-time

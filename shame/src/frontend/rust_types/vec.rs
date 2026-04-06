@@ -561,10 +561,6 @@ impl<T: ScalarType, L: Len> GpuLayout for vec<T, L> {
     }
 }
 
-impl<T: ScalarType, L: Len> GpuStore for vec<T, L> {
-    fn store_ty() -> ir::StoreType { Self::LAYOUT_SIZED.into() }
-}
-
 impl<T: ScalarType, L: Len> GpuType for vec<T, L> {
     fn ty() -> ir::Type { ir::Type::Store(Self::store_ty()) }
 

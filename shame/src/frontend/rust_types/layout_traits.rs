@@ -633,10 +633,6 @@ impl From<Any> for GpuT {
     fn from(any: Any) -> Self { todo!() }
 }
 
-impl GpuStore for GpuT {
-    fn store_ty() -> ir::StoreType { unreachable!() }
-}
-
 impl GpuSized for GpuT {
     const LAYOUT_SIZED: crate::layout::SizedType<'static> = todo!();
 }

@@ -64,10 +64,6 @@ impl<T: ScalarTypeInteger> GpuSized for Atomic<T> {
     const LAYOUT_SIZED: crate::layout::SizedType<'static> = ir::Atomic::new(T::SCALAR_TYPE_INTEGER).to_sized_type();
 }
 
-impl<T: ScalarTypeInteger> GpuStore for Atomic<T> {
-    fn store_ty() -> ir::StoreType { <Self as GpuSized>::LAYOUT_SIZED.into() }
-}
-
 impl<T: ScalarTypeInteger> AsAny for Atomic<T> {
     fn as_any(&self) -> Any { self.any }
 }

@@ -102,10 +102,6 @@ impl<const N: usize> Size<N> {
     }
 }
 
-impl<T: GpuType + GpuSized + GpuStore, N: ArrayLen> GpuStore for Array<T, N> {
-    fn store_ty() -> ir::StoreType { Self::array_store_ty() }
-}
-
 impl<T: GpuSized, const N: usize> GpuSized for Array<T, Size<N>> {
     const LAYOUT_SIZED: crate::layout::SizedType<'static> =
         crate::layout::SizedArray::new(&T::LAYOUT_SIZED, Size::<N>::LEN.expect("known length at compile time"))
@@ -180,19 +176,9 @@ impl<T: GpuType + GpuSized, N: ArrayLen> FromAnys for Array<T, N> {
     fn from_anys(mut anys: impl Iterator<Item = Any>) -> Self { super::layout_traits::from_single_any(anys).into() }
 }
 
-impl<T: GpuType + GpuSized, N: ArrayLen> Array<T, N> {
-    fn array_store_ty() -> ir::StoreType {
-        let element_ty = <T as GpuSized>::LAYOUT_SIZED.into();
-        match N::LEN {
-            Some(n) => ir::SizedArray::new(Rc::new(element_ty), n).into(),
-            None => ir::RuntimeSizedArray::new(element_ty).into(),
-        }
-    }
-}
-
-impl<T: GpuType + GpuSized, N: ArrayLen> From<Any> for Array<T, N> {
+impl<T: GpuSized, N: ArrayLen> From<Any> for Array<T, N> {
     fn from(any: Any) -> Self {
-        super::typecheck_downcast(any, ir::Type::Store(Self::array_store_ty()), |any| Self {
+        super::typecheck_downcast(any, ir::Type::Store(Self::store_ty()), |any| Self {
             any,
             phantom: PhantomData,
         })
