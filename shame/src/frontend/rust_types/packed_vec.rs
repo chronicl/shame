@@ -20,7 +20,7 @@ use super::{
     layout_traits::{from_single_any, FromAnys},
     len::LenEven,
     scalar_type::ScalarType,
-    type_traits::{GpuSized, NoAtomics, NoBools, NoHandles, VertexAttribute},
+    type_traits::{GpuSized, VertexAttribute},
     vec::IsVec,
     GpuType,
 };
@@ -108,10 +108,6 @@ pub(crate) const fn get_type_description<L: LenEven, T: PackedScalarType>() -> P
         scalar_type: T::SCALAR_TYPE,
     }
 }
-
-impl<T: PackedScalarType, L: LenEven> NoBools for PackedVec<T, L> {}
-impl<T: PackedScalarType, L: LenEven> NoHandles for PackedVec<T, L> {}
-impl<T: PackedScalarType, L: LenEven> NoAtomics for PackedVec<T, L> {}
 
 impl<T: PackedScalarType, L: LenEven> FromAnys for PackedVec<T, L> {
     fn expected_num_anys() -> usize { 1 }
@@ -241,10 +237,7 @@ impl PackedScalarType for snorm16 {
     const BITS_PER_COMPONENT: ir::PackedBitsPerComponent = ir::PackedBitsPerComponent::_16;
 }
 
-impl<T: PackedScalarType, L: LenEven> VertexAttribute for PackedVec<T, L>
-where
-    Self: NoBools,
-{
+impl<T: PackedScalarType, L: LenEven> VertexAttribute for PackedVec<T, L> {
     fn vertex_attrib_format() -> VertexAttribFormat { VertexAttribFormat::Coarse(get_type_description::<L, T>()) }
 }
 

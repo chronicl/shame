@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types, unused)]
 use pretty_assertions::{assert_eq, assert_ne};
 
-use shame::{self as sm, NoBools};
+use shame::{self as sm};
 use sm::{f32x1, i32x1, u32x1, CpuLayout, GpuLayout};
 use static_assertions::{assert_impl_all, assert_impl_one, assert_not_impl_all, assert_not_impl_any};
 
@@ -36,10 +36,6 @@ fn assert_derived_traits() {
             impl (sm::GpuStore    ) for T; // no packed vec, or gpu_repr(packed)
 
             impl (sm::GpuSized    ) for T; // GpuAligned + no unsized arrays
-
-            impl (sm::NoBools     ) for T;
-            impl (sm::NoAtomics   ) for T;
-            impl (sm::NoHandles   ) for T;
         );
     }
 
@@ -61,10 +57,6 @@ fn assert_derived_traits() {
             // impl !(sm::SizedFields ) for T;
 
             impl  (sm::GpuSized    ) for T;
-
-            impl  (sm::NoBools     ) for T;
-            impl  (sm::NoAtomics   ) for T;
-            impl  (sm::NoHandles   ) for T;
         );
 
         #[derive(sm::VertexLayout)]
@@ -123,10 +115,6 @@ fn assert_derived_traits() {
             impl !(sm::VertexLayout) for T, R;
 
             impl !(sm::GpuSized    ) for T, R;
-
-            impl  (sm::NoBools     ) for T, R;
-            impl  (sm::NoAtomics   ) for T, R;
-            impl  (sm::NoHandles   ) for T, R;
         );
     }
 }

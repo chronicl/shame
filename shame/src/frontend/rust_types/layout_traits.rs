@@ -35,7 +35,7 @@ use super::{
     },
     mem::AddressSpace,
     reference::AccessMode,
-    type_traits::{GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles, VertexAttribute},
+    type_traits::{GpuSized, GpuStore, VertexAttribute},
     vec::vec,
 };
 
@@ -561,11 +561,6 @@ impl<AS: AddressSpace, AM: AccessMode> FromAnys for GpuTypeRef<AS, AM> {
         }
     }
 }
-
-impl NoHandles for GpuT {}
-impl NoAtomics for GpuT {}
-impl NoBools for GpuT {}
-
 
 impl GpuLayout for GpuT {
     const LAYOUT: crate::layout::LayoutType<'static> = crate::layout::SizedStruct {

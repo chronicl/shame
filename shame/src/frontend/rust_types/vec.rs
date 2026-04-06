@@ -6,7 +6,7 @@ use super::{
     mem::AddressSpace,
     reference::AccessMode,
     scalar_type::{dtype_as_scalar_from_f64, ScalarType, ScalarTypeNumber},
-    type_traits::{GpuStoreImplCategory, NoAtomics, NoHandles, VertexAttribute},
+    type_traits::{VertexAttribute},
     AsAny, GpuType, To, ToGpuType,
 };
 use crate::{
@@ -24,7 +24,7 @@ use crate::{
 
 use super::{
     layout_traits::{FromAnys, GpuLayout},
-    type_traits::{GpuSized, GpuStore, NoBools},
+    type_traits::{GpuSized, GpuStore},
 };
 use crate::frontend::rust_types::reference::Ref;
 use crate::{
@@ -928,14 +928,6 @@ impl<T: ScalarType, L: Len> Default for vec<T, L> {
     }
 }
 
-impl<T: ScalarType, L: Len> NoHandles for vec<T, L> {}
-impl<T: ScalarType, L: Len> NoAtomics for vec<T, L> {}
-impl<L: Len> NoBools for vec<f16, L> {}
-impl<L: Len> NoBools for vec<f32, L> {}
-impl<L: Len> NoBools for vec<f64, L> {}
-impl<L: Len> NoBools for vec<u32, L> {}
-impl<L: Len> NoBools for vec<i32, L> {}
-
 impl<T: ScalarType, L: Len, AS: AddressSpace, AM: AccessMode, Idx: ToInteger> GpuIndex<Idx> for Ref<vec<T, L>, AS, AM> {
     type Output = Ref<vec<T, x1>, AS, AM>;
 
@@ -1053,10 +1045,7 @@ impl Swizzle<4> for () {
     fn to_vector_access(comps: [Comp4; 4]) -> VectorAccess { VectorAccess::Swizzle4(comps) }
 }
 
-impl<T: ScalarType, L: Len> VertexAttribute for vec<T, L>
-where
-    Self: NoBools,
-{
+impl<T: ScalarType, L: Len> VertexAttribute for vec<T, L> {
     fn vertex_attrib_format() -> VertexAttribFormat {
         VertexAttribFormat::Fine(
             L::LEN,

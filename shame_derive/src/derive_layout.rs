@@ -229,8 +229,8 @@ pub fn impl_for_struct(
             let impl_gpu_layout = quote! {
                 impl<#generics_decl> #re::GpuLayout for #derive_struct_ident<#(#idents_of_generics),*>
                 where
-                    #(#first_fields_type: #re::NoBools + #re::NoHandles + #re::GpuLayout + #re::GpuSized,)*
-                    #last_field_type: #re::NoBools + #re::NoHandles + #re::GpuLayout,
+                    #(#first_fields_type: #re::GpuSized,)*
+                    #last_field_type: #re::GpuLayout,
                     #where_clause_predicates
                 {
                     const LAYOUT: #re::layout::LayoutType<'static> = {
@@ -340,30 +340,8 @@ pub fn impl_for_struct(
                         }
                     }
                 }
-            };
 
-            let impl_fake_auto_traits = quote! {
-                // impl fake auto traits via `for<'trivial_bound>` trick:
-
-                impl<#generics_decl> #re::NoAtomics for #derive_struct_ident<#(#idents_of_generics),*>
-                where
-                    #(#triv #field_type: #re::NoAtomics,)*
-                    #where_clause_predicates
-                {}
-
-                impl<#generics_decl> #re::NoBools for #derive_struct_ident<#(#idents_of_generics),*>
-                where
-                    #(#triv #field_type: #re::NoBools,)*
-                    #where_clause_predicates
-                {}
-
-                // NoHandles does not use the 'trivial_bound trick, because it is a requirement for #[derive(GpuLayout)] and an implication of `GpuAligned`
-                impl<#generics_decl> #re::NoHandles for #derive_struct_ident<#(#idents_of_generics),*>
-                where
-                    #(#field_type: #re::NoHandles,)*
-                    #where_clause_predicates
-                {}
-
+                 // impl fake auto traits via `for<'trivial_bound>` trick:
                 impl<#generics_decl> #re::GpuSized for #derive_struct_ident<#(#idents_of_generics),*>
                 where
                     #(#triv #field_type: #re::GpuSized,)*
@@ -493,7 +471,7 @@ pub fn impl_for_struct(
 
                 impl<AS: #re::AddressSpace, AM: #re::AccessMode> #re::FromAnys for #derive_struct_ref_ident<AS, AM>
                 where #(
-                    #triv #field_type: #re::GpuStore + #re::GpuType,
+                    #triv #field_type: #re::GpuStore,
                 )* {
                     fn expected_num_anys() -> usize {#num_fields}
 
@@ -554,14 +532,12 @@ pub fn impl_for_struct(
                 {
                     Ok(quote! {
                         #impl_gpu_layout
-                        #impl_fake_auto_traits
                         #impl_from_anys
                         #impl_gpu_type
                     })
                 }
                 Repr::Wgsl => Ok(quote! {
                     #impl_gpu_layout
-                    #impl_fake_auto_traits
                     #impl_from_anys
                     #impl_gpu_type
                 }),

@@ -16,7 +16,7 @@ use crate::{
         rust_types::{
             error::FrontendError,
             layout_traits::{GpuLayout, VertexLayout, get_layout_compare_with_cpu_push_error},
-            type_traits::{BindingArgs, GpuSized, GpuStore, NoAtomics, NoBools},
+            type_traits::{BindingArgs, GpuSized, GpuStore},
         },
     },
     ir::{
@@ -581,8 +581,11 @@ impl PushConstants<'_> {
     #[track_caller]
     pub fn get<T>(self) -> T
     where
-        T: GpuStore + GpuSized + NoAtomics + NoBools + GpuLayout,
+        T: GpuSized,
     {
+        T::ASSERT_NO_ATOMICS;
+        T::ASSERT_NO_BOOLS;
+
         let _caller_scope = Context::call_info_scope();
 
         // the push constants structure as a whole doesn't need to have the same stride

@@ -13,7 +13,7 @@ use super::{
     reference::{AccessMode, ReadWrite},
     scalar_type::ScalarTypeInteger,
     ir::type_layout::TypeLayout,
-    type_traits::{EmptyRefFields, GpuSized, GpuStore, GpuStoreImplCategory, NoBools, NoHandles},
+    type_traits::{EmptyRefFields, GpuSized, GpuStore},
     vec::vec,
     AsAny, GpuType, To, ToGpuType,
 };
@@ -67,9 +67,6 @@ impl<T: ScalarTypeInteger> GpuSized for Atomic<T> {
 impl<T: ScalarTypeInteger> GpuStore for Atomic<T> {
     fn store_ty() -> ir::StoreType { <Self as GpuSized>::LAYOUT_SIZED.into() }
 }
-
-impl<T: ScalarTypeInteger> NoBools for Atomic<T> {}
-impl<T: ScalarTypeInteger> NoHandles for Atomic<T> {}
 
 impl<T: ScalarTypeInteger> AsAny for Atomic<T> {
     fn as_any(&self) -> Any { self.any }

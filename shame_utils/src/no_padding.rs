@@ -1,7 +1,7 @@
 use any::Repr;
 use shame::{
+    ArrayLen, GpuLayout, GpuSized, GpuType, Len, Len2, ScalarType, ScalarTypeFp, ScalarTypeInteger,
     any::{self},
-    ArrayLen, GpuSized, GpuType, Len, Len2, NoBools, ScalarType, ScalarTypeFp, ScalarTypeInteger,
 };
 
 use crate::{const_len, const_write, StrBuf, ToStr};
@@ -56,11 +56,9 @@ impl Layout {
 
 const fn round_up(align: usize, size: usize) -> usize { size.next_multiple_of(align) }
 
-impl<T: ScalarType, L: Len> NoPadding for shame::vec<T, L>
-where
-    shame::vec<T, L>: NoBools,
-{
+impl<T: ScalarType, L: Len> NoPadding for shame::vec<T, L> {
     const LAYOUT: Layout = {
+        const { <shame::vec<T, L> as GpuLayout>::ASSERT_NO_BOOLS };
         let v = any::Vector::new(
             match T::SCALAR_TYPE {
                 any::ScalarType::F16 => any::ScalarType::F16,

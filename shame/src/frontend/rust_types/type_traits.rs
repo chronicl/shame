@@ -72,22 +72,6 @@ pub trait GpuStore: GpuType {
     }
 }
 
-#[doc(hidden)] // proc macro detail
-pub enum GpuStoreImplCategory {
-    GpuType(ir::StoreType),
-    Fields(ir::StructKind),
-}
-
-impl GpuStoreImplCategory {
-    /// returns the [`ir::StoreType`] that this category corresponds to
-    pub fn to_store_ty(self) -> ir::StoreType {
-        match self {
-            GpuStoreImplCategory::GpuType(ty) => ty,
-            GpuStoreImplCategory::Fields(s) => s.into(),
-        }
-    }
-}
-
 #[diagnostic::on_unimplemented(message = "the size of `{Self}` on the gpu is not known at rust compile-time")]
 /// ## known byte-size on the gpu
 /// types whose byte-size on the graphics device is known at rust compile-time
@@ -102,41 +86,6 @@ pub trait GpuSized: GpuLayout {
     /// The sized layout of `Self` on the gpu.
     const LAYOUT_SIZED: crate::layout::SizedType<'static>;
 }
-
-#[diagnostic::on_unimplemented(
-    message = "`{Self}` may contain `bool`s, which have an unspecified memory footprint on the graphics device."
-)]
-// implementor note:
-// NoXYZ traits should require some other base trait, so that the
-// error message isn't misleading for user provided types `T`. Those types will then show
-// the base trait diagnostic, instead of "`T` contains `XYZ`" which it doesn't.
-/// types that don't contain booleans at any nesting level
-///
-/// boolean types do not have a defined size on gpus.
-/// You may want to use unsigned integers for transferring boolean data instead.
-pub trait NoBools {}
-
-/// (no documentation yet)
-#[diagnostic::on_unimplemented(
-    message = "`{Self}` may be or contain a `shame::Atomic` type. Atomics are usable via `shame::Buffer<_, Storage, ReadWrite>` or via allocations in workgroup memory"
-)]
-// implementor note:
-// NoXYZ traits should require some other base trait, so that the
-// error message isn't misleading for user provided types `T`. Those types will then show
-// the base trait diagnostic, instead of "`T` contains `XYZ`" which it doesn't.
-/// types that don't contain atomics at any nesting level
-pub trait NoAtomics {}
-
-#[diagnostic::on_unimplemented(
-    message = "`{Self}` may be or contain a handle type such as `Texture`, `Sampler`, `StorageTexture`."
-)]
-// implementor note:
-// NoXYZ traits should require some other base trait, so that the
-// error message isn't misleading for user provided types `T`. Those types will then show
-// the base trait diagnostic, instead of "`T` contains `XYZ`" which it doesn't.
-
-/// Implemented by types that aren't/contain no textures, storage textures, their array variants or samplers
-pub trait NoHandles {}
 
 /// this trait is only implemented by:
 ///

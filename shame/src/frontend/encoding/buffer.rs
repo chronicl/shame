@@ -20,7 +20,7 @@ use crate::{
             packed_vec::PackedScalarType,
             reference::{AccessModeReadable, Read, ReadWrite, Ref},
             scalar_type::{ScalarType, ScalarTypeFp, ScalarTypeInteger},
-            type_traits::{BindingArgs, GpuSized, GpuStore, NoAtomics, NoBools, NoHandles},
+            type_traits::{BindingArgs, GpuSized, GpuStore},
             vec::vec,
         },
     },
@@ -170,7 +170,7 @@ impl std::fmt::Display for BufferAddressSpaceEnum {
 /// > the precise trait bounds of buffer bindings are found in the `Binding` impl blocks.
 pub struct Buffer<T, AS = mem::Storage, AM = Read, const DYNAMIC_OFFSET: bool = false>
 where
-    T: GpuLayout + NoBools + NoHandles,
+    T: GpuLayout,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
 {
@@ -180,26 +180,36 @@ where
 
 impl<T, AS, AM, const DYNAMIC_OFFSET: bool> Deref for Buffer<T, AS, AM, DYNAMIC_OFFSET>
 where
-    T: GpuLayout + NoBools + NoHandles,
+    T: GpuLayout,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
 {
     type Target = Ref<T, AS, AM>;
-    fn deref(&self) -> &Self::Target { &self.content }
+    fn deref(&self) -> &Self::Target {
+        T::ASSERT_NO_BOOLS;
+        &self.content
+    }
 }
 
 impl<T, AS, AM, const DYNAMIC_OFFSET: bool> Buffer<T, AS, AM, DYNAMIC_OFFSET>
 where
-    T: GpuLayout + NoBools + NoHandles,
+    T: GpuLayout,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
 {
-    fn new(args: BindingArgs) -> Self { Self::from_ref(create_ref_for_buffer_binding(args, DYNAMIC_OFFSET)) }
+    fn new(args: BindingArgs) -> Self {
+        T::ASSERT_NO_BOOLS;
+        Self::from_ref(create_ref_for_buffer_binding(args, DYNAMIC_OFFSET))
+    }
 
-    fn new_invalid(reason: InvalidReason) -> Self { Self::from_ref(Ref::from(Any::new_invalid(reason))) }
+    fn new_invalid(reason: InvalidReason) -> Self {
+        T::ASSERT_NO_BOOLS;
+        Self::from_ref(Ref::from(Any::new_invalid(reason)))
+    }
 
     /// TODO(chronicl)
     pub fn from_ref(r: Ref<T, AS, AM>) -> Self {
+        T::ASSERT_NO_BOOLS;
         Self {
             content: r,
             _phantom: PhantomData,
@@ -211,7 +221,7 @@ where
 /// that [`Buffer`] performs. Those type checks instead are runtime errors.
 pub fn create_ref_for_buffer_binding<T, AS, AM>(args: BindingArgs, has_dynamic_offset: bool) -> Ref<T, AS, AM>
 where
-    T: GpuLayout + GpuStore,
+    T: GpuLayout,
     AS: BufferAddressSpace,
     AM: AccessModeReadable,
 {
@@ -281,13 +291,30 @@ pub fn create_ref_any_for_buffer_binding(
 
 impl<T, AS, AM, const DYNAMIC_OFFSET: bool> Binding for Buffer<T, AS, AM, DYNAMIC_OFFSET>
 where
-    T: GpuLayout + GpuStore + NoBools + NoHandles,
+    T: GpuLayout,
     AS: BufferAddressSpace + SupportsAccess<AM>,
     AM: AccessModeReadable,
-    (AS, T): AtomicsInStorageOnly,
-    (AM, T): AtomicsRequireWriteable,
 {
     fn binding_type() -> BindingType {
+        const {
+            match AS::BUFFER_ADDRESS_SPACE {
+                BufferAddressSpaceEnum::Storage => {}
+                BufferAddressSpaceEnum::Uniform => {
+                    if T::LAYOUT.contains_atomics() {
+                        panic!("Atomics may only be used in ReadWrite Storage buffers.")
+                    }
+                }
+            }
+            match AM::ACCESS_MODE_READABLE {
+                ir::AccessModeReadable::Read => {
+                    if T::LAYOUT.contains_atomics() {
+                        panic!("Atomics may only be used in ReadWrite Storage buffers.")
+                    }
+                }
+                ir::AccessModeReadable::ReadWrite => {}
+            }
+        }
+
         let access = AM::ACCESS_MODE_READABLE;
         BindingType::Buffer {
             ty: match AS::BUFFER_ADDRESS_SPACE {
@@ -302,18 +329,6 @@ where
     fn new_binding(args: BindingArgs) -> Self { Self::new(args) }
     fn store_ty() -> ir::StoreType { <T as GpuStore>::store_ty() }
 }
-
-#[diagnostic::on_unimplemented(message = "atomics can only be used in read-write storage buffers`.")]
-pub trait AtomicsInStorageOnly {}
-impl<T> AtomicsInStorageOnly for (mem::Storage, T) {}
-impl<T: NoAtomics> AtomicsInStorageOnly for (mem::Uniform, T) {}
-
-#[diagnostic::on_unimplemented(
-    message = "atomics can only be used in read-write storage buffers. Use `ReadWrite` instead of `Read`."
-)]
-pub trait AtomicsRequireWriteable {}
-impl<T> AtomicsRequireWriteable for (ReadWrite, T) {}
-impl<T: NoAtomics> AtomicsRequireWriteable for (Read, T) {}
 
 #[cfg(test)]
 mod tests {

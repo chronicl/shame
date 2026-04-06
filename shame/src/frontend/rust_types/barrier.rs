@@ -2,7 +2,7 @@ use crate::frontend::{any::Any, rust_types::reference::Ref};
 use super::{
     mem,
     reference::{AccessModeReadable},
-    type_traits::{GpuSized, GpuStore, NoAtomics},
+    type_traits::{GpuSized, GpuStore},
     AsAny, GpuType,
 };
 
@@ -34,7 +34,7 @@ pub fn storage() { Any::storage_barrier() }
 pub fn workgroup_uniform_load<T, AM>(src: Ref<T, mem::WorkGroup, AM>) -> T
 where
     AM: AccessModeReadable,
-    T: GpuType + GpuStore + GpuSized + NoAtomics,
+    T: GpuType + GpuStore + GpuSized,
 {
     src.as_any().address().workgroup_uniform_load().into()
 }

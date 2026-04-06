@@ -8,7 +8,7 @@ use super::{
     reference::AccessMode,
     scalar_type::{ScalarTypeFp},
     ir::type_layout::TypeLayout,
-    type_traits::{EmptyRefFields, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles},
+    type_traits::{EmptyRefFields, GpuSized, GpuStore},
     vec::{scalar, vec, ToInteger},
     AsAny, GpuType, To, ToGpuType,
 };
@@ -81,10 +81,6 @@ impl<T: ScalarTypeFp, C: Len2, R: Len2> GpuType for mat<T, C, R> {
         }
     }
 }
-
-impl<T: ScalarTypeFp, C: Len2, R: Len2> NoHandles for mat<T, C, R> {}
-impl<T: ScalarTypeFp, C: Len2, R: Len2> NoAtomics for mat<T, C, R> {}
-impl<T: ScalarTypeFp, C: Len2, R: Len2> NoBools for mat<T, C, R> {}
 
 impl<T: ScalarTypeFp, C: Len2, R: Len2> AsAny for mat<T, C, R> {
     fn as_any(&self) -> Any { self.any }

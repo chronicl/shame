@@ -17,7 +17,7 @@ use super::{
     len::x1,
     mem::AddressSpace,
     reference::{AccessMode, AccessModeReadable},
-    type_traits::{EmptyRefFields, GpuSized, GpuStore, GpuStoreImplCategory, NoAtomics, NoBools, NoHandles},
+    type_traits::{EmptyRefFields, GpuSized, GpuStore},
     vec::ToInteger,
 };
 
@@ -112,10 +112,6 @@ impl<T: GpuSized, const N: usize> GpuSized for Array<T, Size<N>> {
             .to_sized_type();
 }
 
-#[rustfmt::skip] impl<T: GpuType + GpuSized + NoHandles, N: ArrayLen> NoHandles for Array<T, N> {}
-#[rustfmt::skip] impl<T: GpuType + GpuSized + NoAtomics, N: ArrayLen> NoAtomics for Array<T, N> {}
-#[rustfmt::skip] impl<T: GpuType + GpuSized + NoBools  , N: ArrayLen> NoBools   for Array<T, N> {}
-
 impl<T: GpuType + GpuStore + GpuSized, N: ArrayLen> ToGpuType for Array<T, N> {
     type Gpu = Self;
 
@@ -203,7 +199,7 @@ impl<T: GpuType + GpuSized, N: ArrayLen> From<Any> for Array<T, N> {
     }
 }
 
-impl<T: GpuSized + GpuType + NoAtomics, N: ArrayLen> Array<T, N> {
+impl<T: GpuSized + GpuType, N: ArrayLen> Array<T, N> {
     /// (no documentation yet)
     #[track_caller]
     pub fn at(&self, index: impl ToInteger) -> T { self.any.array_index(index.to_any()).into() }
@@ -218,7 +214,7 @@ impl<T: GpuSized + GpuType + NoAtomics, N: ArrayLen> Array<T, N> {
     }
 }
 
-impl<Idx: ToInteger, T: GpuType + GpuSized + NoAtomics, N: ArrayLen> GpuIndex<Idx> for Array<T, N> {
+impl<Idx: ToInteger, T: GpuType + GpuSized, N: ArrayLen> GpuIndex<Idx> for Array<T, N> {
     type Output = T;
 
     fn index(&self, index: Idx) -> T { self.any.array_index(index.to_any()).into() }
@@ -252,7 +248,7 @@ where
     fn as_gpu_type_ref(&self) -> Option<&Self::Gpu> { None }
 }
 
-impl<T: GpuType + GpuStore + GpuSized + NoAtomics, const N: usize> Array<T, Size<N>> {
+impl<T: GpuType + GpuStore + GpuSized, const N: usize> Array<T, Size<N>> {
     /// (no documentation yet)
     #[track_caller]
     pub fn new(fields: [impl To<T>; N]) -> Self { fields.to_gpu() }
@@ -268,7 +264,7 @@ impl<T: GpuType + GpuStore + GpuSized + NoAtomics, const N: usize> Array<T, Size
     pub fn map<R>(self, f: impl FnOnce(T) -> R + FlowFn) -> Array<R, Size<N>>
     where
         T: 'static,
-        R: GpuType + GpuStore + GpuSized + NoAtomics + ToGpuType<Gpu = R> + 'static,
+        R: GpuType + GpuStore + GpuSized + ToGpuType<Gpu = R> + 'static,
     {
         let result = Array::<R, _>::zero().cell();
         for_range_impl(0..N as u32, move |i| {
@@ -285,11 +281,8 @@ pub struct ArrayRef<T: GpuStore + GpuType + GpuSized, AS: AddressSpace, AM: Acce
     inner: Ref<Array<T>, AS, AM>,
 }
 
-impl<
-    T: GpuStore + GpuType + GpuSized + NoAtomics + 'static,
-    AS: AddressSpace + 'static,
-    AM: AccessModeReadable + 'static,
-> ArrayRef<T, AS, AM>
+impl<T: GpuStore + GpuType + GpuSized + 'static, AS: AddressSpace + 'static, AM: AccessModeReadable + 'static>
+    ArrayRef<T, AS, AM>
 {
     pub fn new(inner: Ref<Array<T>, AS, AM>) -> Self { Self { inner } }
     pub fn at(&self, index: impl ToInteger) -> T { self.inner.at(index).get() }
@@ -299,7 +292,7 @@ impl<
 
 impl<
     Idx: ToInteger,
-    T: GpuType + GpuSized + GpuStore + NoAtomics + 'static,
+    T: GpuType + GpuSized + GpuStore + 'static,
     AS: AddressSpace + 'static,
     AM: AccessModeReadable + 'static,
 > GpuIndex<Idx> for ArrayRef<T, AS, AM>
@@ -311,7 +304,7 @@ impl<
 
 impl<T, AS, AM> Deref for ArrayRef<T, AS, AM>
 where
-    T: GpuStore + GpuType + GpuSized + NoAtomics,
+    T: GpuStore + GpuType + GpuSized,
     AS: AddressSpace,
     AM: AccessModeReadable,
 {
