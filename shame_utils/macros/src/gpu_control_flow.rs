@@ -217,7 +217,7 @@ fn transform_expr(expr: &mut syn::Expr, semi: &mut Option<Semi>, mode: Transform
                 syn::BinOp::Gt(_) => Some("greater_than"),
                 syn::BinOp::Ge(_) => Some("greater_eq"),
                 syn::BinOp::Eq(_) => Some("equals"),
-                syn::BinOp::Ne(_) => Some("not_equals"),
+                syn::BinOp::Ne(_) => Some("not_equal"),
                 syn::BinOp::AddAssign(_) => Some("set_add"),
                 syn::BinOp::SubAssign(_) => Some("set_sub"),
                 syn::BinOp::MulAssign(_) => Some("set_mul"),
