@@ -314,11 +314,11 @@ pub fn impl_for_struct(
     let (first_field_ident, _) = field_ident.split_first().expect("checked above");
     let _ = first_field_ident; // silence unused warning when only used conditionally
 
-    let enable_if_last_field_has_size_attribute = gpu_fields_with_attrs
-        .last()
-        .and_then(|l| l.size.clone())
-        .map(|_| quote!(()))
-        .into_iter();
+    // let enable_if_last_field_has_size_attribute = gpu_fields_with_attrs
+    //     .last()
+    //     .and_then(|l| l.size.clone())
+    //     .map(|_| quote!(()))
+    //     .into_iter();
 
     // trick for achieving https://doc.rust-lang.org/beta/unstable-book/language-features/trivial-bounds.html
     let triv = quote!(for<'trivial_bound>);
@@ -721,7 +721,7 @@ pub fn impl_vertex_layout(input: DeriveInput) -> Result<TokenStream2, syn::Error
     if fields.named.is_empty() {
         return Err(syn::Error::new_spanned(
             fields,
-            format!("`derive(VertexLayout)` does not support empty structs"),
+            "`derive(VertexLayout)` does not support empty structs",
         ));
     }
     let num_fields = fields.named.len();

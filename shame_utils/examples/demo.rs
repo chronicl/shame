@@ -70,13 +70,13 @@ fn gpu_code_macro_example() {
     let b = ::shame::Cell::new([0u32; 10]);
     ::shame::for_range(0..10u32, |i| {
         ::shame::if_else(
-            (i % 2).equals((0u32)),
+            (i % 2).equals(0u32),
             || {
-                (a).set_add((a * 2 + 1));
-                ((b).at((i))).set((a));
+                (a).set_add(a * 2 + 1);
+                ((b).at(i)).set(a);
             },
             || {
-                (a).set_add((1u32));
+                (a).set_add(1u32);
             },
         );
     });

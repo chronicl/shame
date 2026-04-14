@@ -1,7 +1,6 @@
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{
-    Attribute,
     parse::{Parse, ParseStream},
     parse_macro_input,
     spanned::Spanned as _,

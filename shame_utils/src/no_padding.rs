@@ -1,6 +1,6 @@
 use any::Repr;
 use shame::{
-    ArrayLen, GpuLayout, GpuSized, GpuType, Len, Len2, ScalarType, ScalarTypeFp, ScalarTypeInteger,
+    ArrayLen, GpuLayout, GpuSized, Len, Len2, ScalarType, ScalarTypeFp, ScalarTypeInteger,
     any::{self},
 };
 

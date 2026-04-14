@@ -216,7 +216,7 @@ impl TypeCheck for Decomposition {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum FieldAccess {
+pub enum FieldAccess {
     ByName(CanonName),
     ByIndex(u32),
 }

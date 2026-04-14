@@ -1,4 +1,4 @@
-use shame::{aliases::*, Array, GpuSized, GpuType};
+use shame::{aliases::*, Array, GpuSized};
 
 use crate::NoPadding;
 
