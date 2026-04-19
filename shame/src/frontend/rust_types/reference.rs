@@ -95,17 +95,6 @@ where
     fn as_any(&self) -> Any { self.any }
 }
 
-// TODO: this is a misuse of ToGpuType
-impl<T, AS, AM> ToGpuType for Ref<T, AS, AM>
-where
-    T: GpuSized,
-    AS: AddressSpace,
-    AM: AccessModeReadable,
-{
-    type Gpu = T;
-    fn to_gpu(&self) -> Self::Gpu { self.get() }
-}
-
 impl<T, AS, AM> Ref<T, AS, AM>
 where
     T: GpuLayout,
@@ -396,6 +385,18 @@ impl_ref_binop!(BitOr, bitor);
 impl_ref_binop!(BitXor, bitxor);
 impl_ref_binop!(Shl, shl);
 impl_ref_binop!(Shr, shr);
+
+// TODO: this is a misuse of ToGpuType, but makes Ref more ergonomic to use for
+// things like array access.
+impl<T, AS, AM> ToGpuType for Ref<T, AS, AM>
+where
+    T: GpuSized,
+    AS: AddressSpace,
+    AM: AccessModeReadable,
+{
+    type Gpu = T;
+    fn to_gpu(&self) -> Self::Gpu { self.get() }
+}
 
 #[test]
 fn test_ref_ops() {
